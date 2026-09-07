@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>PrivateSocialClub</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>psc</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>PrivateSocialClub app needs access to your music library to provide music-related features and enhance your driving experience.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>PrivateSocialClub app uses Bluetooth to connect with vehicle devices and provide enhanced features.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>PrivateSocialClub app uses Bluetooth to communicate with nearby devices and vehicles.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>PrivateSocialClub app needs access to calendar to schedule and manage your trips.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PrivateSocialClub app needs access to your camera to capture photos &amp; videos.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>PrivateSocialClub app needs access to contacts to share trip information with your friends and family.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>PrivateSocialClub app needs access to your face to provide face recognition services.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>PrivateSocialClub app uses your location to provide location-based features like nearby places and distance calculations, even when the app is in use.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>PrivateSocialClub app uses your location to provide accurate services and notifications related to your trips and vehicles.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PrivateSocialClub app needs access to your location to provide location-based services, calculate distances, and help you find nearby places.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>PrivateSocialClub app needs access to microphone for voice commands and audio features.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>PrivateSocialClub app uses motion data to detect driving patterns and provide trip analytics.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>PrivateSocialClub app saves photos to your library when needed.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PrivateSocialClub app needs access to your photo library to choose existing images.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>PrivateSocialClub app needs access to reminders to set trip reminders and notifications.</string>
+	<key>RCTNewArchEnabled</key>
+	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>AntDesign.ttf</string>
+		<string>Entypo.ttf</string>
+		<string>EvilIcons.ttf</string>
+		<string>Feather.ttf</string>
+		<string>FontAwesome.ttf</string>
+		<string>FontAwesome5_Brands.ttf</string>
+		<string>FontAwesome5_Regular.ttf</string>
+		<string>FontAwesome5_Solid.ttf</string>
+		<string>FontAwesome6_Brands.ttf</string>
+		<string>FontAwesome6_Regular.ttf</string>
+		<string>FontAwesome6_Solid.ttf</string>
+		<string>Foundation.ttf</string>
+		<string>Ionicons.ttf</string>
+		<string>MaterialIcons.ttf</string>
+		<string>MaterialCommunityIcons.ttf</string>
+		<string>SimpleLineIcons.ttf</string>
+		<string>Octicons.ttf</string>
+		<string>Zocial.ttf</string>
+		<string>Fontisto.ttf</string>
+		<string>Poppins-Black.ttf</string>
+		<string>Poppins-Bold.ttf</string>
+		<string>Poppins-ExtraBold.ttf</string>
+		<string>Poppins-ExtraLight.ttf</string>
+		<string>Poppins-Light.ttf</string>
+		<string>Poppins-Medium.ttf</string>
+		<string>Poppins-Regular.ttf</string>
+		<string>Poppins-SemiBold.ttf</string>
+		<string>ClashDisplay.ttf</string>
+		<string>Poppins-Thin.ttf</string>
+		<string>Poppins-BlackItalic.ttf</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>UILaunchStoryboardName</key>
+	<string>BootSplash</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+</dict>
+</plist>

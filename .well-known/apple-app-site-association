@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "S9YSQ484R9.com.solagroup.psc",
+        "paths": [
+          "/post/*",
+          "/short/*",
+          "/live/*",
+          "/user/*",
+          "/request"
+        ]
+      }
+    ]
+  }
+}

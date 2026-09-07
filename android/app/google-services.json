@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "237040638993",
+    "project_id": "private-social-club",
+    "storage_bucket": "private-social-club.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:237040638993:android:e2b4e6783b348c401465b0",
+        "android_client_info": {
+          "package_name": "com.solagroup.psc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDE4vJboJZZqz25B7eK0zdCwurJOFj1YWU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

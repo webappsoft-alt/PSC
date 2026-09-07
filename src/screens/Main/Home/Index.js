@@ -1,0 +1,903 @@
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+} from "@react-navigation/native";
+import moment from "moment/moment";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  DeviceEventEmitter,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from "react-native";
+import { useDispatch, useSelector } from "react-redux";
+import fonts from "../../../assets/fonts";
+import CustomText from "../../../components/CustomText";
+import Divider from "../../../components/Divider";
+import ScreenWrapper from "../../../components/ScreenWrapper";
+import { useSocket } from "../../../components/SocketProvider";
+import UpdateUserLocation from "../../../components/UpdateUserLocation";
+import { useTabBarVisibility } from "../../../navigation/TabStack";
+import { del, get, post } from "../../../services/ApiRequest";
+import { selectStoryUploadStatus } from "../../../store/reducer/appSlice";
+import { setLocation } from "../../../store/reducer/usersSlice";
+import { COLORS } from "../../../utils/COLORS";
+import { useTheme } from "../../../contexts/ThemeContext";
+import { getProfile } from "../../../utils/constants";
+import { ToastMessage } from "../../../utils/ToastMessage";
+import useLocation from "../../../utils/useLocation";
+import FollowingRow from "./molecules/FollowingRow";
+import MomentCard from "./molecules/MomentCard";
+import PostCard from "./molecules/PostCard";
+import PostCardSkeleton from "./molecules/PostCardSkeleton";
+import RadioCard from "./molecules/RadioCard";
+import ReelCard from "./molecules/ReelCard";
+import TendingTopic from "./molecules/TendingTopic";
+import TrendingIndividual from "./molecules/TrendingIndividual";
+import QuestionModal from "../../../components/QuestionModal";
+import GiftModal from "../../../components/GiftModal";
+
+const TAB_NAMES = [
+  "Technology",
+  "Politics",
+  "Sports",
+  "Music",
+  "Fashion",
+  "Entertainment",
+  "Gaming",
+  "Food",
+  "Health",
+];
+
+const areTopicListsEqual = (current = [], next = []) => {
+  if (current.length !== next.length) return false;
+  return current.every(
+    (item, index) =>
+      item?._id === next[index]?._id &&
+      item?.tag === next[index]?.tag &&
+      item?.topic === next[index]?.topic,
+  );
+};
+
+const FeedPostItem = memo(
+  ({
+    post,
+    shouldPlay,
+    formatCount,
+    onOpenComments,
+    onDeletePress,
+    onEditPress,
+    onHidePost,
+    onHideUserPosts,
+  }) => {
+    const author = post?.author || {};
+    const displayName =
+      `${author.firstName || ""} ${author.lastName || ""}`.trim() ||
+      "Display Name";
+    const username = author.username || "username";
+    const profileColor = author?.profile?.profileColor || "red";
+    const description = post?.description || "";
+    const images = post?.images || [];
+    const hashtags = post?.hashtags || [];
+    const topic = post?.topic || "Crypto";
+    const likesCount = post?.stats?.upvotes || 0;
+    const commentsCount = post?.stats?.comments || 0;
+    const repostsCount = post?.stats?.reposts || 0;
+    const savedCount = post?.stats?.saved || 0;
+    const stats = post?.stats || {};
+    const createdAt = post?.createdAt || "";
+    const timeAgo = useMemo(() => moment(createdAt).fromNow(), [createdAt]);
+
+    const commentPayload = useMemo(
+      () => ({
+        displayName,
+        username,
+        description,
+        likesCount,
+        commentsCount,
+        repostsCount,
+        timeAgo,
+        images,
+      }),
+      [
+        commentsCount,
+        description,
+        displayName,
+        images,
+        likesCount,
+        repostsCount,
+        timeAgo,
+        username,
+      ],
+    );
+
+    const handleOpenComments = useCallback(() => {
+      onOpenComments(post, commentPayload);
+    }, [commentPayload, onOpenComments, post]);
+
+    const handleDelete = useCallback(() => {
+      onDeletePress(post?._id);
+    }, [onDeletePress, post?._id]);
+
+    const handleEdit = useCallback(() => {
+      onEditPress(post);
+    }, [onEditPress, post]);
+
+    const handleHidePost = useCallback(() => {
+      onHidePost(post?._id);
+    }, [onHidePost, post?._id]);
+
+    const handleHideUserPosts = useCallback(() => {
+      onHideUserPosts(author?._id);
+    }, [author?._id, onHideUserPosts]);
+
+    return (
+      <>
+        <PostCard
+          displayName={displayName}
+          username={username}
+          description={description}
+          images={images}
+          hashtags={hashtags}
+          topic={topic}
+          likesCount={likesCount}
+          commentsCount={commentsCount}
+          repostsCount={repostsCount}
+          stats={stats}
+          timeAgo={timeAgo}
+          formatCount={formatCount}
+          upvotes={post?.upvotes || []}
+          downvotes={post?.downvotes || []}
+          savedCount={savedCount}
+          profileColor={profileColor}
+          onCommentPress={handleOpenComments}
+          onDeletePress={handleDelete}
+          onEditPress={handleEdit}
+          onHidePost={handleHidePost}
+          onHideUserPosts={handleHideUserPosts}
+          item={post}
+          onSwipeRight={handleOpenComments}
+          shouldPlay={shouldPlay}
+        />
+        <Divider marginBottom={12} marginTop={8} thickness={4} />
+      </>
+    );
+  },
+);
+
+const Home = ({
+  route,
+  pagerProgress,
+  onSetPage,
+  isFocusedPage,
+  sharedTab,
+}) => {
+  const navigation = useNavigation();
+  const dispatch = useDispatch();
+  const { socket } = useSocket();
+  const { colors } = useTheme();
+  const isFocus = useIsFocused();
+  const activeFocus = isFocusedPage !== undefined ? isFocusedPage : isFocus;
+  const [viewablePostId, setViewablePostId] = useState(null);
+  const tab = sharedTab;
+  const [posts, setPosts] = useState([]);
+  const [unfollowedPosts, setUnfollowedPosts] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [skeletonLoading, setSkeletonLoading] = useState(true);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [storiesData, setStoriesData] = useState([]);
+  const [myStoriesData, setMyStoriesData] = useState([]);
+  const [radioData, setRadioData] = useState([]);
+  const [hashtags, setHashtags] = useState([]);
+  const [selectedHashtag, setSelectedHashtag] = useState(null);
+  const [trendingTopics, setTrendingTopics] = useState([]);
+  const [selectedTrendingTopic, setSelectedTrendingTopic] = useState(null);
+  const { getCurrentLocation } = useLocation();
+  const getLocation = useCallback(async () => {
+    const location = await getCurrentLocation();
+    if (location) {
+      dispatch(setLocation(location));
+    }
+  }, [dispatch, getCurrentLocation]);
+
+  const [error, setError] = useState(null);
+  const storyUploadStatus = useSelector(selectStoryUploadStatus);
+
+  const [feedType, setFeedType] = useState(route?.params?.feedType || "social");
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const { setIsTabBarVisible } = useTabBarVisibility();
+  const lastContentOffset = useRef(0);
+  const scrollRef = useRef(null);
+  const hasFeedContentRef = useRef(false);
+  const isFirstLoadRef = useRef(true);
+  const viewedPostIdsRef = useRef(new Set());
+
+  const tabBarVisibleRef = useRef(true);
+
+  useEffect(() => {
+    getLocation();
+    const listener = scrollY.addListener(({ value }) => {
+      if (value < 0) return;
+
+      const currentOffset = value;
+      const diff = currentOffset - lastContentOffset.current;
+
+      if (Math.abs(diff) < 20) return;
+
+      const shouldShow = diff < 0;
+
+      // ✅ Only update if visibility ACTUALLY changed
+      if (tabBarVisibleRef.current !== shouldShow) {
+        tabBarVisibleRef.current = shouldShow;
+        setIsTabBarVisible(shouldShow);
+      }
+
+      lastContentOffset.current = currentOffset;
+    });
+
+    return () => {
+      scrollY.removeListener(listener);
+    };
+  }, [getLocation, scrollY, setIsTabBarVisible]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // When screen comes into focus, always show bottom tab
+      tabBarVisibleRef.current = true;
+      setIsTabBarVisible(true);
+
+      // Reset last offset so scroll logic doesn’t instantly hide it
+      lastContentOffset.current = 0;
+    }, [setIsTabBarVisible]),
+  );
+
+  useEffect(() => {
+    const type = route?.params?.feedType || "social";
+    if (type !== feedType) {
+      setSkeletonLoading(true); // Show skeleton instantly
+      setPosts([]); // Clear old posts instantly
+      setUnfollowedPosts([]);
+      setFeedType(type);
+    }
+  }, [route?.params?.feedType]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress", (e) => {
+      if (!isFocus) return;
+
+      const currentOffset = lastContentOffset.current || 0;
+
+      // Check if we are scrolled down significantly
+      if (currentOffset > 50) {
+        e.preventDefault();
+
+        const scrollComp = scrollRef.current;
+        if (scrollComp) {
+          // Try multiple ways to scroll to top, covering Animated wrappers and different ScrollView/FlatList types
+          if (typeof scrollComp.scrollToOffset === "function") {
+            scrollComp.scrollToOffset({ offset: 0, animated: true });
+          } else if (typeof scrollComp.scrollTo === "function") {
+            scrollComp.scrollTo({ y: 0, animated: true });
+          } else if (typeof scrollComp.scrollToPosition === "function") {
+            scrollComp.scrollToPosition(0, 0, true);
+          } else if (typeof scrollComp.getNode === "function") {
+            const node = scrollComp.getNode();
+            if (node) {
+              if (typeof node.scrollToOffset === "function") {
+                node.scrollToOffset({ offset: 0, animated: true });
+              } else if (typeof node.scrollTo === "function") {
+                node.scrollTo({ y: 0, animated: true });
+              } else if (typeof node.scrollToPosition === "function") {
+                node.scrollToPosition(0, 0, true);
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, isFocus]);
+
+  const getStories = useCallback(async () => {
+    try {
+      const response = await get("stories");
+      setStoriesData(response.data?.data || []);
+    } catch (error) {
+      console.log("getStories error", error);
+    }
+  }, []);
+
+  const getMyStories = useCallback(async () => {
+    try {
+      const response = await get(`stories/me`);
+      setMyStoriesData(response.data?.data || []);
+    } catch (error) {
+      console.log("getStoriesMy error", error);
+    }
+  }, []);
+
+  const fetchHashtags = useCallback(async () => {
+    try {
+      const response = await get("hashtag/top?&type=post");
+      if (response?.data?.success && response?.data?.data?.hashtags) {
+        const nextHashtags = response.data.data.hashtags.slice(0, 8);
+        setHashtags((currentHashtags) =>
+          areTopicListsEqual(currentHashtags, nextHashtags)
+            ? currentHashtags
+            : nextHashtags,
+        );
+      }
+    } catch (error) {
+      console.log("fetchHashtags error", error);
+    }
+  }, []);
+
+  const fetchTrendingTopics = useCallback(async () => {
+    try {
+      const response = await get("posts/trending-topics?type=post");
+      if (response?.data?.success && response?.data?.data) {
+        const nextTrendingTopics = response.data.data.slice(0, 6);
+        setTrendingTopics((currentTrendingTopics) =>
+          areTopicListsEqual(currentTrendingTopics, nextTrendingTopics)
+            ? currentTrendingTopics
+            : nextTrendingTopics,
+        );
+      }
+    } catch (error) {
+      console.log("fetchTrendingTopics error", error);
+    }
+  }, []);
+
+  const fetchRadios = useCallback(async () => {
+    try {
+      const response = await get("radio");
+      if (response?.data?.success && response?.data?.data) {
+        setRadioData(response.data.data);
+      } else {
+        setRadioData([]);
+      }
+    } catch (error) {
+      console.log("fetchRadios error", error);
+      setRadioData([]);
+    }
+  }, []);
+
+  const fetchMetaData = useCallback(async () => {
+    try {
+      await Promise.all([
+        getStories(),
+        getMyStories(),
+        fetchHashtags(),
+        fetchRadios(),
+        dispatch(getProfile()),
+      ]);
+    } catch (error) {
+      console.log("fetchMetaData error", error);
+    }
+  }, [dispatch, fetchHashtags, getMyStories, getStories, fetchRadios]);
+
+  const fetchPosts = useCallback(
+    async (isManualRefresh = false) => {
+      try {
+        if (isManualRefresh) {
+          setRefreshing(true);
+        } else if (isFirstLoadRef.current || !hasFeedContentRef.current) {
+          setSkeletonLoading(true);
+        }
+        setError(null);
+
+        let endpoint = "posts?&type=post";
+
+        if (feedType === "friends") {
+          endpoint = "posts/my-following?type=post";
+        } else if (feedType === "favourite") {
+          endpoint = "saved?page=1&limit=10";
+        } else {
+          const selectedTopic = TAB_NAMES[tab] || selectedTrendingTopic;
+          if (selectedTopic) {
+            endpoint += `&topic=${selectedTopic}`;
+          }
+
+          if (selectedHashtag) {
+            const tagObj = hashtags.find((h) => h._id === selectedHashtag);
+            if (tagObj) {
+              endpoint += `&hashtags=${tagObj.tag}`;
+            }
+          }
+        }
+
+        if (feedType !== "friends" && feedType !== "favourite") {
+          const followingEndpoint = endpoint + "&following=true";
+          const unfollowEndpoint = endpoint + "&unfollow=true";
+
+          const [followingResponse, unfollowResponse] = await Promise.all([
+            get(followingEndpoint),
+            get(unfollowEndpoint),
+          ]);
+
+          if (
+            followingResponse?.data?.success &&
+            followingResponse?.data?.data
+          ) {
+            setPosts(followingResponse.data.data);
+          } else {
+            setPosts([]);
+          }
+
+          if (unfollowResponse?.data?.success && unfollowResponse?.data?.data) {
+            setUnfollowedPosts(unfollowResponse.data.data);
+          } else {
+            setUnfollowedPosts([]);
+          }
+
+          if (
+            !followingResponse?.data?.success &&
+            !unfollowResponse?.data?.success
+          ) {
+            setError("Failed to fetch posts");
+          }
+        } else {
+          const response = await get(endpoint);
+          if (response?.data?.success && response?.data?.data) {
+            setPosts(response.data.data);
+            setUnfollowedPosts([]);
+          } else {
+            setPosts([]);
+            setUnfollowedPosts([]);
+            setError("Failed to fetch posts");
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching posts:", err);
+        setError(err?.message || "Something went wrong");
+      } finally {
+        setRefreshing(false);
+        setSkeletonLoading(false);
+        setIsFirstLoad(false);
+        isFirstLoadRef.current = false;
+      }
+    },
+    [feedType, hashtags, selectedHashtag, selectedTrendingTopic, tab],
+  );
+
+  const onRefresh = useCallback(() => {
+    fetchPosts(true);
+    fetchMetaData();
+  }, [fetchMetaData, fetchPosts]);
+
+  useEffect(() => {
+    fetchPosts(!isFocus);
+  }, [fetchPosts, isFocus]);
+
+  useEffect(() => {
+    fetchMetaData();
+  }, [fetchMetaData, isFocus]);
+
+  useEffect(() => {
+    getMyStories();
+  }, [getMyStories, storyUploadStatus]);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      "uploadCompleted",
+      () => {
+        onRefresh();
+      },
+    );
+    return () => {
+      subscription.remove();
+    };
+  }, [onRefresh]);
+
+  useEffect(() => {
+    fetchTrendingTopics();
+  }, [fetchTrendingTopics]);
+
+  const formatCount = useCallback((count) => {
+    if (!count || count === 0) return "0";
+    if (count < 1000) return count.toString();
+    if (count < 1000000) return `${(count / 1000).toFixed(1)}k`;
+    return `${(count / 1000000).toFixed(1)}M`;
+  }, []);
+
+  // Handle delete post
+  const handleDeletePost = useCallback(
+    async (postId) => {
+      try {
+        const api = `posts/${postId}`;
+        const response = await del(api);
+
+        if (response?.data?.success) {
+          ToastMessage("Post Deleted Successfully", "success");
+          setPosts((prevPosts) =>
+            prevPosts.filter((post) => post._id !== postId),
+          );
+          setUnfollowedPosts((prevPosts) =>
+            prevPosts.filter((post) => post._id !== postId),
+          );
+          fetchPosts(false);
+        }
+      } catch (error) {
+        console.error("Error deleting post:", error);
+      }
+    },
+    [fetchPosts],
+  );
+
+  // Handle edit post
+  const handleEditPost = useCallback(
+    (post) => {
+      navigation.navigate("CreatePost", {
+        editMode: true,
+        postData: post,
+      });
+    },
+    [navigation],
+  );
+
+  // Handle hide post
+  const handleHidePost = useCallback(async (postId) => {
+    try {
+      const response = await post("hide/post", { postId });
+
+      console.log("response?.data--", response?.data);
+
+      if (response?.data?.success) {
+        ToastMessage("Post hidden successfully", "success");
+        setPosts((prev) => prev.filter((p) => p._id !== postId));
+        setUnfollowedPosts((prev) => prev.filter((p) => p._id !== postId));
+      }
+    } catch (error) {
+      console.log("handleHidePost error", error);
+    }
+  }, []);
+
+  // Handle hide user posts
+  const handleHideUserPosts = useCallback(async (authorId) => {
+    try {
+      const response = await post("hide/post", { authorId });
+      if (response?.data?.success) {
+        ToastMessage("User posts hidden successfully", "success");
+        setPosts((prev) => prev.filter((p) => p.author?._id !== authorId));
+        setUnfollowedPosts((prev) =>
+          prev.filter((p) => p.author?._id !== authorId),
+        );
+      }
+    } catch (error) {
+      console.log("handleHideUserPosts error", error);
+    }
+  }, []);
+
+  // Insert ReelCard and unfollowed text at specific positions
+  const processedPosts = useMemo(() => {
+    if (posts.length === 0 && unfollowedPosts.length === 0) return [];
+
+    const result = [];
+    let postsAdded = 0;
+
+    const addPost = (post) => {
+      result.push({
+        type: "post",
+        data: post,
+        isChange: Math.random() > 0.7,
+        isVideo: Math.random() > 0.8,
+      });
+      postsAdded++;
+
+      if (postsAdded === 2) {
+        result.push({ type: "reelCard" });
+      }
+      if (postsAdded === 5) {
+        result.push({ type: "trendingIndividual" });
+      }
+    };
+
+    posts.forEach((post) => addPost(post));
+
+    if (unfollowedPosts.length > 0) {
+      result.push({ type: "unfollowedText" });
+      unfollowedPosts.forEach((post) => addPost(post));
+    }
+
+    return result;
+  }, [posts, unfollowedPosts]);
+
+  useEffect(() => {
+    hasFeedContentRef.current = posts.length > 0 || unfollowedPosts.length > 0;
+    viewedPostIdsRef.current.clear();
+  }, [posts, unfollowedPosts]);
+
+  const handleOpenComments = useCallback(
+    (post, postData) => {
+      navigation.navigate("CommentScreen", {
+        item: post,
+        postData,
+      });
+    },
+    [navigation],
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }) => {
+      if (item.type === "reelCard") {
+        return (
+          <>
+            {/* <Divider marginBottom={12} marginTop={8} thickness={4} /> */}
+            <ReelCard onSetPage={onSetPage} isScreenActive={activeFocus} />
+          </>
+        );
+      }
+      if (item.type === "trendingIndividual") {
+        return (
+          <>
+            {/* <Divider marginBottom={12} marginTop={8} thickness={4} /> */}
+            <TrendingIndividual />
+          </>
+        );
+      }
+
+      if (item.type === "unfollowedText") {
+        return (
+          <>
+            <CustomText
+              label={
+                "From now on you will only see posts from unfollowed users"
+              }
+              alignSelf={"center"}
+              fontSize={18}
+              color={colors.textSecondary}
+              fontFamily={fonts.medium}
+              textAlign={"center"}
+              marginTop={8}
+            />
+            <Divider marginBottom={12} marginTop={16} thickness={4} />
+          </>
+        );
+      }
+
+      // Render post
+      const post = item.data;
+
+      return (
+        <FeedPostItem
+          post={post}
+          shouldPlay={post?._id === viewablePostId && activeFocus}
+          formatCount={formatCount}
+          onOpenComments={handleOpenComments}
+          onDeletePress={handleDeletePost}
+          onEditPress={handleEditPost}
+          onHidePost={handleHidePost}
+          onHideUserPosts={handleHideUserPosts}
+        />
+      );
+    },
+    [
+      activeFocus,
+      formatCount,
+      handleDeletePost,
+      handleEditPost,
+      handleHidePost,
+      handleHideUserPosts,
+      handleOpenComments,
+      onSetPage,
+      viewablePostId,
+    ],
+  );
+
+  const renderListEmpty = useCallback(() => {
+    if (skeletonLoading || refreshing) {
+      return (
+        <View>
+          <PostCardSkeleton />
+          <Divider marginBottom={12} marginTop={8} thickness={4} />
+          <PostCardSkeleton />
+          <Divider marginBottom={12} marginTop={8} thickness={4} />
+          <PostCardSkeleton />
+          <Divider marginBottom={12} marginTop={8} thickness={4} />
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerContainer}>
+          <CustomText
+            label={error}
+            color={COLORS.subtitle}
+            fontSize={16}
+            textAlign={"center"}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.centerContainer}>
+        <CustomText
+          label={"No posts found"}
+          color={COLORS.subtitle}
+          fontSize={16}
+          textAlign={"center"}
+        />
+      </View>
+    );
+  }, [refreshing, error, skeletonLoading]);
+
+  const keyExtractor = useCallback((item, index) => {
+    if (item.type === "post") return item.data._id;
+    return item.type;
+  }, []);
+
+  const onScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: false,
+      }),
+    [scrollY],
+  );
+
+  const socketRef = useRef(socket);
+
+  useEffect(() => {
+    socketRef.current = socket;
+  }, [socket]);
+
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems && viewableItems.length > 0) {
+      const firstViewable = viewableItems.find(
+        (viewableItem) => viewableItem?.item?.type === "post",
+      );
+      if (firstViewable?.item?.type === "post") {
+        const nextPostId = firstViewable.item.data?._id || null;
+        setViewablePostId((currentPostId) =>
+          currentPostId === nextPostId ? currentPostId : nextPostId,
+        );
+      }
+    }
+
+    viewableItems?.forEach((viewableItem) => {
+      if (viewableItem.isViewable && viewableItem?.item?.type === "post") {
+        const postId = viewableItem?.item?.data?._id;
+        if (
+          postId &&
+          socketRef.current &&
+          !viewedPostIdsRef.current.has(postId)
+        ) {
+          viewedPostIdsRef.current.add(postId);
+          socketRef.current?.emit("post:view", { postId }, (response) => {
+            // console.log(`Post View Callback for ${postId}:`, response);
+          });
+        }
+      }
+    });
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 20, // Emit when 50% of the post is visible
+  }).current;
+
+  const handleHashtagSelection = useCallback((tag) => {
+    setSkeletonLoading(true); // Show skeleton when filtration is applied
+    setPosts([]); // Clear posts for clean transition
+    setUnfollowedPosts([]);
+    setSelectedHashtag((prev) => (prev === tag ? null : tag));
+  }, []);
+
+  const handleTrendingTopicSelection = useCallback((topic) => {
+    setSkeletonLoading(true); // Show skeleton when filtration is applied
+    setPosts([]); // Clear posts for clean transition
+    setUnfollowedPosts([]);
+    setSelectedTrendingTopic((prev) => (prev === topic ? null : topic));
+  }, []);
+
+  // Fixed header is now in TabStack.js
+
+  const renderListHeader = useCallback(
+    () => (
+      <View style={{ marginBottom: 0 }}>
+        <FollowingRow />
+        <Divider marginVertical={0} thickness={1} color={colors.white16} />
+        <MomentCard storiesData={storiesData} myStoriesData={myStoriesData} />
+        <Divider marginBottom={4} thickness={1} color={colors.white16} />
+        {radioData?.length > 0 && (
+          <>
+            <RadioCard data={radioData} />
+            <Divider marginVertical={0} thickness={1} color={colors.white16} />
+          </>
+        )}
+        <TendingTopic
+          hashtags={hashtags}
+          selectedHashtag={selectedHashtag}
+          onSelectHashtag={handleHashtagSelection}
+          trendingTopics={trendingTopics}
+          selectedTrendingTopic={selectedTrendingTopic}
+          onSelectTrendingTopic={handleTrendingTopicSelection}
+        />
+        <Divider
+          marginVertical={0}
+          marginBottom={8}
+          thickness={1}
+          color={colors.white16}
+        />
+      </View>
+    ),
+    [
+      storiesData,
+      myStoriesData,
+      hashtags,
+      selectedHashtag,
+      handleHashtagSelection,
+      trendingTopics,
+      selectedTrendingTopic,
+      handleTrendingTopicSelection,
+    ],
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      <UpdateUserLocation />
+      <View style={{ flex: 1 }}>
+        <ScreenWrapper
+          translucent
+          paddingHorizontal={0.1}
+          statusBarColor={colors.statusBarColor}
+          headerFloating
+        >
+          <FlatList
+            showsVerticalScrollIndicator={false}
+            ref={scrollRef}
+            data={processedPosts}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            ListHeaderComponent={renderListHeader}
+            ListEmptyComponent={renderListEmpty}
+            scrollEnabled={true}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                // tintColor={COLORS.buttonColor}
+                // colors={[COLORS.buttonColor]}
+                progressViewOffset={100}
+              />
+            }
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={5}
+            updateCellsBatchingPeriod={50}
+            initialNumToRender={5}
+            windowSize={10}
+            contentContainerStyle={{ paddingBottom: 100 }}
+          />
+        </ScreenWrapper>
+      </View>
+    </View>
+  );
+};
+
+export default Home;
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 12,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+    minHeight: 200,
+  },
+});
