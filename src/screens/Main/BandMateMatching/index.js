@@ -1,7 +1,7 @@
 import { Dimensions, StyleSheet, View } from "react-native";
 
 import { useNavigation } from "@react-navigation/native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import fonts from "../../../assets/fonts";
 import { Matching } from "../../../assets/svgs";
@@ -34,11 +34,20 @@ const BandMateMatching = () => {
 
   const { cardData } = useSelector((state) => state.matching);
 
+  // Keeps the pagination effect from fetching the same page twice before
+  // `page` has been updated, which would append duplicate profiles
+  const isFetchingRef = useRef(false);
+  const requestIdRef = useRef(0);
+
   const getMatchCardData = async (
     pageNumber = 1,
     isInitial = false,
     loading,
   ) => {
+    if (isFetchingRef.current && !isInitial) return;
+    isFetchingRef.current = true;
+    const requestId = ++requestIdRef.current;
+
     try {
       setLoading(loading);
       const endpoint =
@@ -47,6 +56,9 @@ const BandMateMatching = () => {
           : `matching/recommendations?limit=40&page=${pageNumber}`;
       const response = await get(endpoint);
       // console.log("response---data coming", response?.data);
+      // A newer request (tab change / refresh) has been fired meanwhile,
+      // applying this response would bring already swiped profiles back
+      if (requestId !== requestIdRef.current) return;
       const recommendations = response.data?.recommendations || [];
       const hasMoreData = response.data?.hasMore ?? false;
 
@@ -60,6 +72,9 @@ const BandMateMatching = () => {
     } catch (error) {
       console.error("Error fetching match cards:", error);
     } finally {
+      if (requestId === requestIdRef.current) {
+        isFetchingRef.current = false;
+      }
       setLoading(false);
     }
   };

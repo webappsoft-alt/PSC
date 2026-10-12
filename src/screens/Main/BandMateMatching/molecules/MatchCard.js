@@ -1,5 +1,12 @@
 import { useNavigation } from "@react-navigation/native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Animated,
@@ -42,8 +49,15 @@ const MatchCard = ({ isCross, data }) => {
   const navigation = useNavigation();
   const { userData } = useSelector((state) => state.users);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [cards, setCards] = useState(data && data.length > 0 ? data : []);
+  // Redux is the single source of truth for the stack, a local copy of it can
+  // fall out of sync and bring an already swiped profile back on screen
+  const cards = useMemo(() => (Array.isArray(data) ? data : []), [data]);
   const [history, setHistory] = useState([]);
+  // Set while the final card leaves, so the wrapper is hidden with a plain
+  // (non-animated) style before the whole component unmounts
+  const [isLastCardLeaving, setIsLastCardLeaving] = useState(false);
+  const isAnimatingRef = useRef(false);
+  const stackSizeRef = useRef(0);
 
   const { setPagerScrollEnabled } = useTabBarVisibility();
   const pagerScrollRef = useRef();
@@ -52,18 +66,20 @@ const MatchCard = ({ isCross, data }) => {
   const nextCardLift = useRef(new Animated.Value(10)).current;
   const sliderAnimation = useRef(new Animated.Value(0)).current;
 
-  // Keep cards state in sync with prop updates
-  useEffect(() => {
-    if (data && data.length > 0) {
-      setCards(data);
-    }
-  }, [data]);
-
   const currentCardRef = useRef(null);
 
   useEffect(() => {
     currentCardRef.current = cards[0];
+    stackSizeRef.current = cards.length;
   }, [cards]);
+  // All card animations are JS-driven (useNativeDriver: false) on purpose.
+  // With the native driver the JS-side value is never updated, so any
+  // re-render while a card is swiped off screen (gradient state, slider
+  // tick, stack change) commits the stale JS transform (0 = centre) and on
+  // the new architecture that paints before the native node re-attaches,
+  // flashing the swiped card back on screen. JS-driven values are always
+  // current, so every commit carries the real position. The gesture already
+  // drives `pan` from JS on every move, so this is the natural driver here.
   // Current card animations
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -152,6 +168,7 @@ const MatchCard = ({ isCross, data }) => {
   };
 
   const handleSwipe = (direction) => {
+    // Called once the gesture animation finished, it already set the guard
     let index;
     switch (direction) {
       case "left":
@@ -166,7 +183,7 @@ const MatchCard = ({ isCross, data }) => {
       default:
         return;
     }
-    handleButtonPress(index);
+    handleButtonPress(index, true);
   };
 
   const checkCountAndAlert = (type) => {
@@ -251,14 +268,22 @@ const MatchCard = ({ isCross, data }) => {
     }
   };
 
-  const handleButtonPress = async (index) => {
+  const handleButtonPress = async (index, fromGesture = false) => {
     if (index === 0) {
       handleRewind();
       return;
     }
 
+    // A second swipe while the previous one is still animating would reset the
+    // card that is currently flying out and snap it back into view
+    if (!fromGesture && isAnimatingRef.current) return;
+
     const currentProfile = currentCardRef.current;
-    if (!currentProfile) return;
+    if (!currentProfile) {
+      // The gesture already moved the card away, bring it back
+      if (fromGesture) resetCardPosition();
+      return;
+    }
 
     const profileId = currentProfile._id || currentProfile.id;
     const action = buttonActions[index];
@@ -282,7 +307,13 @@ const MatchCard = ({ isCross, data }) => {
         return;
     }
 
-    if (!checkCountAndAlert(interactionType)) return;
+    if (!checkCountAndAlert(interactionType)) {
+      // The gesture already moved the card away, bring it back
+      if (fromGesture) resetCardPosition();
+      return;
+    }
+
+    isAnimatingRef.current = true;
 
     // Call API
     handleInteraction(interactionType, profileId);
@@ -298,18 +329,18 @@ const MatchCard = ({ isCross, data }) => {
       Animated.timing(nextCardScale, {
         toValue: 1,
         duration: 400,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(nextCardTranslateY, {
         toValue: 0,
         duration: 400,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.spring(nextCardLift, {
         toValue: -25, // 👈 upward lift changed to -25 to match marginTop: 25
         friction: 5,
         tension: 60,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start();
 
@@ -319,18 +350,18 @@ const MatchCard = ({ isCross, data }) => {
         Animated.timing(gradientOpacity, {
           toValue: 1,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(gradientTranslateY, {
           toValue: 0,
           duration: 500,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ]),
       Animated.timing(gradientOpacity, {
         toValue: 0.7,
         duration: 1500,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start();
 
@@ -343,14 +374,14 @@ const MatchCard = ({ isCross, data }) => {
           Animated.timing(translateX, {
             toValue: -screenWidth * 1.5,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
         );
         animations.push(
           Animated.timing(rotateCard, {
             toValue: action.rotation,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
         );
       } else if (action.direction === "right") {
@@ -358,14 +389,14 @@ const MatchCard = ({ isCross, data }) => {
           Animated.timing(translateX, {
             toValue: screenWidth * 1.5,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
         );
         animations.push(
           Animated.timing(rotateCard, {
             toValue: action.rotation,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
         );
       } else if (action.direction === "up") {
@@ -373,7 +404,7 @@ const MatchCard = ({ isCross, data }) => {
           Animated.timing(translateY, {
             toValue: -screenHeight * 1.5,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
         );
       }
@@ -387,20 +418,28 @@ const MatchCard = ({ isCross, data }) => {
   };
 
   const goToNextCard = () => {
-    setCards((prevCards) => {
-      const newCards = [...prevCards];
-      const removedCard = newCards.shift();
-      if (removedCard) {
-        setHistory((prevHistory) => [...prevHistory, removedCard]);
-      }
-      return newCards;
-    });
-    dispatch(removeCard());
+    const removedCard = currentCardRef.current;
+    if (removedCard) {
+      setHistory((prevHistory) => [...prevHistory, removedCard]);
+    }
     setCurrentImageIndex(0); // Reset to first image when changing cards
-    resetCardPosition();
+    if (stackSizeRef.current <= 1) {
+      // Last card: the parent unmounts this component once the stack is empty,
+      // and unmounting a native-animated view restores its transform to the
+      // centre for a frame. Hide it with a plain style first, then remove.
+      setIsLastCardLeaving(true);
+      requestAnimationFrame(() => dispatch(removeCard()));
+      return;
+    }
+    dispatch(removeCard());
+    // The shared animations are reset by the layout effect below once the new
+    // top card is actually on screen (keyed to the card id) so the card flying
+    // out is never snapped back into view
   };
 
   const handleRewind = () => {
+    if (isAnimatingRef.current) return;
+
     if (history.length === 0) {
       ToastMessage("No Previous Post found");
       return;
@@ -415,9 +454,7 @@ const MatchCard = ({ isCross, data }) => {
 
     dispatch(addCardToTop(lastCard));
     setHistory((prevHistory) => prevHistory.slice(0, -1));
-    setCards((prevCards) => [lastCard, ...prevCards]);
     setCurrentImageIndex(0);
-    resetCardPosition();
   };
 
   const resetCardPosition = () => {
@@ -437,11 +474,23 @@ const MatchCard = ({ isCross, data }) => {
     nextCardTranslateY.setValue(10);
   };
 
+  // The animated values are shared by every card, so they are reset only when
+  // the visible top card actually changes. Keying this to the card id (which
+  // arrives through Redux) guarantees the reset runs after the new card is
+  // mounted, never while the just-swiped card is still on top, which is what
+  // was snapping the outgoing card back into view.
+  const topCardId = cards[0]?._id || cards[0]?.id;
+  useLayoutEffect(() => {
+    resetCardPosition();
+    isAnimatingRef.current = false;
+  }, [topCardId]);
+
   // PanResponder for gesture handling
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => !isAnimatingRef.current,
       onMoveShouldSetPanResponder: (_, gestureState) => {
+        if (isAnimatingRef.current) return false;
         return Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10;
       },
       onPanResponderGrant: () => {
@@ -490,6 +539,9 @@ const MatchCard = ({ isCross, data }) => {
 
         // Check if it's a left swipe
         if (dx < -swipeThreshold || vx < -velocityThreshold) {
+          // Block further gestures until this card has been replaced
+          isAnimatingRef.current = true;
+
           // Set gradient for left swipe
           setCurrentGradientColors(["#FF4B4B", "#FF4B4B00"]);
           gradientTranslateY.setValue(200);
@@ -500,18 +552,18 @@ const MatchCard = ({ isCross, data }) => {
               Animated.timing(gradientOpacity, {
                 toValue: 1,
                 duration: 300,
-                useNativeDriver: true,
+                useNativeDriver: false,
               }),
               Animated.timing(gradientTranslateY, {
                 toValue: 0,
                 duration: 500,
-                useNativeDriver: true,
+                useNativeDriver: false,
               }),
             ]),
             Animated.timing(gradientOpacity, {
               toValue: 0.7,
               duration: 1500,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
           ]).start();
 
@@ -519,12 +571,12 @@ const MatchCard = ({ isCross, data }) => {
             Animated.timing(pan, {
               toValue: { x: -screenWidth * 2, y: dy },
               duration: 300,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
             Animated.timing(rotate, {
               toValue: -15,
               duration: 300,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
           ]).start(() => {
             handleSwipe("left");
@@ -532,6 +584,9 @@ const MatchCard = ({ isCross, data }) => {
         }
         // Check if it's a right swipe
         else if (dx > swipeThreshold || vx > velocityThreshold) {
+          // Block further gestures until this card has been replaced
+          isAnimatingRef.current = true;
+
           // Set gradient for right swipe
           setCurrentGradientColors(["#1ED760", "#1ED76000"]);
           gradientTranslateY.setValue(200);
@@ -542,18 +597,18 @@ const MatchCard = ({ isCross, data }) => {
               Animated.timing(gradientOpacity, {
                 toValue: 1,
                 duration: 300,
-                useNativeDriver: true,
+                useNativeDriver: false,
               }),
               Animated.timing(gradientTranslateY, {
                 toValue: 0,
                 duration: 500,
-                useNativeDriver: true,
+                useNativeDriver: false,
               }),
             ]),
             Animated.timing(gradientOpacity, {
               toValue: 0.7,
               duration: 1500,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
           ]).start();
 
@@ -561,12 +616,12 @@ const MatchCard = ({ isCross, data }) => {
             Animated.timing(pan, {
               toValue: { x: screenWidth * 2, y: dy },
               duration: 300,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
             Animated.timing(rotate, {
               toValue: 15,
               duration: 300,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
           ]).start(() => {
             handleSwipe("right");
@@ -579,13 +634,13 @@ const MatchCard = ({ isCross, data }) => {
             Animated.parallel([
               Animated.spring(pan, {
                 toValue: { x: 0, y: 0 },
-                useNativeDriver: true,
+                useNativeDriver: false,
                 friction: 5,
                 tension: 40,
               }),
               Animated.spring(rotate, {
                 toValue: 0,
-                useNativeDriver: true,
+                useNativeDriver: false,
                 friction: 5,
                 tension: 40,
               }),
@@ -598,10 +653,13 @@ const MatchCard = ({ isCross, data }) => {
             return;
           }
 
+          // Block further gestures until this card has been replaced
+          isAnimatingRef.current = true;
+
           Animated.timing(pan, {
             toValue: { x: dx, y: -screenHeight * 2 },
             duration: 300,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }).start(() => {
             handleSwipe("up");
           });
@@ -616,13 +674,13 @@ const MatchCard = ({ isCross, data }) => {
           Animated.parallel([
             Animated.spring(pan, {
               toValue: { x: 0, y: 0 },
-              useNativeDriver: true,
+              useNativeDriver: false,
               friction: 5,
               tension: 40,
             }),
             Animated.spring(rotate, {
               toValue: 0,
-              useNativeDriver: true,
+              useNativeDriver: false,
               friction: 5,
               tension: 40,
             }),
@@ -654,12 +712,12 @@ const MatchCard = ({ isCross, data }) => {
   //     // Map gyro movement to small subtle translations
   //     Animated.spring(gyroX, {
   //       toValue: x * 25,
-  //       useNativeDriver: true,
+  //       useNativeDriver: false,
   //     }).start();
 
   //     Animated.spring(gyroY, {
   //       toValue: y * 25,
-  //       useNativeDriver: true,
+  //       useNativeDriver: false,
   //     }).start();
   //   });
 
@@ -710,6 +768,7 @@ const MatchCard = ({ isCross, data }) => {
       >
         {hasImages ? (
           <ImageFast
+            key={profile?._id || profile?.id}
             source={source}
             style={[styles.image, { position: "absolute" }]}
             onPress={() =>
@@ -718,6 +777,7 @@ const MatchCard = ({ isCross, data }) => {
           />
         ) : (
           <Pressable
+            key={profile?._id || profile?.id}
             style={styles.image}
             onPress={() =>
               navigation.navigate("MatchingDetail", { item: profile })
@@ -813,8 +873,8 @@ const MatchCard = ({ isCross, data }) => {
 
             <View style={styles.genreRow}>
               {profile?.industry?.length > 0 &&
-                profile?.industry?.slice(0, 3)?.map((item) => (
-                  <View style={styles.genrePill}>
+                profile?.industry?.slice(0, 3)?.map((item, index) => (
+                  <View key={`${item}-${index}`} style={styles.genrePill}>
                     <Blur />
                     <CustomText
                       label={item}
@@ -920,8 +980,10 @@ const MatchCard = ({ isCross, data }) => {
     <View style={styles.container}>
       {/* Next Card (Preview) - This will become the current card after swipe */}
       {nextProfile && (
+        // Stable key: this native-animated wrapper must never unmount, only its
+        // content changes per card (see note on the current card below)
         <Animated.View
-          key={`next-${nextProfile._id || nextProfile.id}`}
+          key="next-card"
           style={[
             styles.cardWrapper,
             styles.nextCard,
@@ -938,12 +1000,21 @@ const MatchCard = ({ isCross, data }) => {
       )}
 
       {/* Current Card */}
+      {/*
+        Stable key on purpose. When a native-driven Animated.View unmounts, RN
+        restores its native props to their defaults (translate 0 = centre)
+        and on Fabric that can paint one frame before the view is removed,
+        so keying this wrapper by profile id made every swiped card flash back
+        on screen. Keeping the wrapper mounted and swapping only its content
+        avoids the unmount entirely.
+      */}
       <Animated.View
-        key={`current-${currentProfile?._id || currentProfile?.id}`}
+        key="current-card"
         {...panResponder.panHandlers}
         style={[
           styles.cardWrapper,
           styles.currentCard,
+          isLastCardLeaving && styles.hidden,
           {
             backgroundColor: "#FFFFFF29",
             transform: [
@@ -1016,6 +1087,9 @@ const styles = StyleSheet.create({
   currentCard: {
     position: "absolute",
     zIndex: 2,
+  },
+  hidden: {
+    opacity: 0,
   },
   nextCard: {
     position: "absolute",

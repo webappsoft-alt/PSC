@@ -49,6 +49,10 @@ const MatchingDetail = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
   const userData = useSelector((state) => state.users.userData);
   const [localUser, setLocalUser] = useState(item);
+  // The floating header is rendered with opacity 0 at the top of the page, but
+  // an invisible view still receives touches, which blocked the card's cross
+  // button underneath it. Only let it catch touches once it is actually shown.
+  const [isFloatingHeaderActive, setIsFloatingHeaderActive] = useState(false);
 
   useEffect(() => {
     const images = localUser?.profile?.matchingImages || [];
@@ -308,6 +312,15 @@ const MatchingDetail = ({ route, navigation }) => {
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
+
+  useEffect(() => {
+    const threshold = (insets.top + 80) / 2;
+    const listenerId = scrollY.addListener(({ value }) => {
+      const active = value >= threshold;
+      setIsFloatingHeaderActive((prev) => (prev === active ? prev : active));
+    });
+    return () => scrollY.removeListener(listenerId);
+  }, [scrollY, insets.top]);
   const floatingHeaderTranslateY = scrollY.interpolate({
     inputRange: [0, insets.top + 80],
     outputRange: [-20, 0],
@@ -316,6 +329,7 @@ const MatchingDetail = ({ route, navigation }) => {
 
   const renderFloatingHeader = () => (
     <Animated.View
+      pointerEvents={isFloatingHeaderActive ? "auto" : "none"}
       style={[
         styles.floatingHeader,
         {

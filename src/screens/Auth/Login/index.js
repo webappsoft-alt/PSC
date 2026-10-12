@@ -179,7 +179,7 @@ const Login = ({}) => {
       setLoading(false);
     } catch (error) {
       setLoading(false);
-      console.error("Login error:", error);
+      console.log("Login error:", error);
 
       // Handle error response
       const errorMessage =

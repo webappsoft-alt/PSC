@@ -97,6 +97,9 @@ const ScreenWrapper = ({
         {/* Floating header */}
         {headerFloating && (
           <View
+            // Only the header's own controls should catch touches, the empty
+            // container must let taps reach the content underneath it
+            pointerEvents="box-none"
             style={{
               position: "absolute",
               top: translucent ? 0 : insets.top,

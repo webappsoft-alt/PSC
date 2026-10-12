@@ -1,0 +1,54 @@
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js b/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js
+--- a/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js
+@@ -82,13 +82,11 @@
+     });
+   }, [state, verticalInset, modal]);
+   useEffect(() => {
+-    Dimensions.addEventListener('change', ({
+-      window
+-    }) => {
++    Dimensions.addEventListener('change', ({ window: _window }) => {
+       state.modify(_state => {
+         'worklet';
+ 
+-        _state.window = window;
++        _state.window = _window;
+         return _state;
+       });
+     });
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js b/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js
+--- a/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js
+@@ -86,13 +86,11 @@
+     });
+   }, [state, verticalInset, modal]);
+   (0, _react.useEffect)(() => {
+-    _reactNative.Dimensions.addEventListener('change', ({
+-      window
+-    }) => {
++    _reactNative.Dimensions.addEventListener('change', ({ window: _window }) => {
+       state.modify(_state => {
+         'worklet';
+ 
+-        _state.window = window;
++        _state.window = _window;
+         return _state;
+       });
+     });
+diff --git a/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts b/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts
+--- a/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts
++++ b/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts
+@@ -106,10 +106,10 @@
+     [state, verticalInset, modal]
+   );
+   useEffect(() => {
+-    Dimensions.addEventListener('change', ({ window }) => {
++    Dimensions.addEventListener('change', ({ window: _window }) => {
+       state.modify(_state => {
+         'worklet';
+-        _state.window = window;
++        _state.window = _window;
+         return _state;
+       });
+     });

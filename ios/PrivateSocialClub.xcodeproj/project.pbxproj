@@ -464,7 +464,7 @@
 				CODE_SIGN_ENTITLEMENTS = PrivateSocialClub/PrivateSocialClub.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 50;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = S9YSQ484R9;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = PrivateSocialClub/Info.plist;
@@ -473,7 +473,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.50;
+				MARKETING_VERSION = 0.51;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -501,7 +501,7 @@
 				CODE_SIGN_ENTITLEMENTS = PrivateSocialClub/PrivateSocialClub.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 50;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = S9YSQ484R9;
 				INFOPLIST_FILE = PrivateSocialClub/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -509,7 +509,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.50;
+				MARKETING_VERSION = 0.51;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",

@@ -11,7 +11,13 @@ export const MatchingSlice = createSlice({
       state.cardData = action.payload;
     },
     appendCardData(state, action) {
-      state.cardData = [...state.cardData, ...action.payload];
+      // Skip profiles that are already in the stack so a page that overlaps
+      // with the previous one cannot show the same card twice
+      const existingIds = new Set(state.cardData.map((item) => item?._id));
+      const newCards = (action.payload || []).filter(
+        (item) => item?._id && !existingIds.has(item._id),
+      );
+      state.cardData = [...state.cardData, ...newCards];
     },
     removeCard(state) {
       state.cardData = state.cardData.slice(1);
