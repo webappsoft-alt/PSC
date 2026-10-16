@@ -15,6 +15,11 @@ import Octicons from "react-native-vector-icons/Octicons";
 import SimpleLineIcons from "react-native-vector-icons/SimpleLineIcons";
 import Zocial from "react-native-vector-icons/Zocial";
 
+import {
+  MaterialSymbolsRounded,
+  MaterialSymbolsRoundedFilled,
+} from "./MaterialSymbols";
+
 
 const Icons = ({ family, name, color, size, ...props }) => {
   let Family;
@@ -54,6 +59,12 @@ const Icons = ({ family, name, color, size, ...props }) => {
       break;
     case "MaterialIcons":
       Family = MaterialIcons;
+      break;
+    case "MaterialSymbolsRounded":
+      Family = MaterialSymbolsRounded;
+      break;
+    case "MaterialSymbolsRoundedFilled":
+      Family = MaterialSymbolsRoundedFilled;
       break;
     case "Octicons":
       Family = Octicons;

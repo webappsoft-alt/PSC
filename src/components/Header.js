@@ -31,6 +31,7 @@ const Header = ({
   onCartPress,
   paddingTop,
   search,
+  textTransform,
 }) => {
   const navigation = useNavigation();
   const { colors, themeMode } = useTheme();
@@ -105,7 +106,7 @@ const Header = ({
           label={title}
           color={textColor ? textColor : colors.text}
           fontFamily={fontFamily || fonts.semiBold}
-          textTransform="capitalize"
+          textTransform={textTransform || "capitalize"}
           textAlign={textAlign}
           fontSize={20}
           lineHeight={20 * 1.4}

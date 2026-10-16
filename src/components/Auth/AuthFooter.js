@@ -36,6 +36,7 @@ const AuthFooter = ({
   isBoarder,
   secondBorderColor,
   btnBackgroundColor,
+  btnColor,
   textColor,
   iconColor = COLORS.primaryColor,
   iconBackgroundColor,
@@ -91,6 +92,7 @@ const AuthFooter = ({
           fontFamily={btnFamily}
           isBoarder={isBoarder}
           backgroundColor={btnBackgroundColor}
+          color={btnColor}
           secondBorderColor={secondBorderColor}
           height={48}
         />

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, StyleSheet, View } from "react-native";
+import { Animated, Dimensions, Platform, StyleSheet, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
 import ScreenWrapper from "../../../components/ScreenWrapper";

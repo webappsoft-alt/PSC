@@ -57,7 +57,6 @@ const JobTitle = forwardRef(
       if (err) {
         setError(err);
         return;
-        J;
       }
       setError("");
       const valueToStore = jobTitle.trim();
@@ -66,7 +65,8 @@ const JobTitle = forwardRef(
 
       // Prepare API body with correct field names
       const registrationBody = {
-        email: state?.email?.trim(),
+        ...(state?.email?.trim() && { email: state.email.trim() }),
+        ...(state?.phone?.trim() && { phone: state.phone.trim() }),
         password: state?.password,
         username: state?.first_name?.trim() || "usama",
         dob: state?.dob,
@@ -76,6 +76,9 @@ const JobTitle = forwardRef(
         firstName: state?.full_name?.trim(),
         lastName: state?.last_name?.trim() || "",
         role: state?.role || "individual",
+        ...(state?.gender && { gender: state.gender }),
+        ...(state?.addressing && { addressing: state.addressing }),
+        enhancedTailoredAds: !!state?.enhancedTailoredAds,
         ...{
           fcmToken: fcmtoken,
         },
@@ -110,7 +113,7 @@ const JobTitle = forwardRef(
           }
 
           // Navigate to next screen
-          setCurrentIndex(13);
+          setCurrentIndex(16);
         }
 
         setLoading(false);
@@ -119,7 +122,7 @@ const JobTitle = forwardRef(
         setLoading(false);
         if (setLoadingState) setLoadingState(false);
         const errorMessage =
-          error?.response?.data?.message ||
+          error?.message ||
           "Registration failed. Please try again.";
         ToastMessage(errorMessage, "error");
         console.error("Registration error:", error);
@@ -127,7 +130,7 @@ const JobTitle = forwardRef(
     };
 
     const back = () => {
-      setCurrentIndex(11);
+      setCurrentIndex(14);
     };
 
     useImperativeHandle(ref, () => ({ submit, back, isLoading: loading }));

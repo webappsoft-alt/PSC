@@ -1,25 +1,27 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { View } from "react-native";
 import ReactNativeBiometrics from "react-native-biometrics";
-import { useNavigation } from "@react-navigation/native";
-import * as Keychain from "react-native-keychain";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
+import * as Keychain from "react-native-keychain";
 
 import ErrorComponent from "../../../components/ErrorComponent";
 import ScreenWrapper from "../../../components/ScreenWrapper";
 import AuthFooter from "../../../components/Auth/AuthFooter";
 import CustomText from "../../../components/CustomText";
-import ImageFast from "../../../components/ImageFast";
 import OTPComponent from "../../../components/OTP";
 import Header from "../../../components/Header";
-
 import BiometricModal from "./BiometricModal";
+import {
+  AuthMethodRow,
+  OrSeparator,
+} from "../../../components/Auth/AuthMethodRow";
 
 import { setUserData } from "../../../store/reducer/usersSlice";
 import { setToken } from "../../../store/reducer/AuthConfig";
 import { post } from "../../../services/ApiRequest";
-import { Images } from "../../../assets/images";
+import { ToastMessage } from "../../../utils/ToastMessage";
 import { COLORS } from "../../../utils/COLORS";
 import fonts from "../../../assets/fonts";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -27,116 +29,110 @@ import { useTheme } from "../../../contexts/ThemeContext";
 const LoginPin = () => {
   const { colors, isDark } = useTheme();
   const navigation = useNavigation();
+  const route = useRoute();
   const dispatch = useDispatch();
+
+  const email = route?.params?.email;
+  const phone = route?.params?.phone;
+  const identifier = email ? { email } : { phone };
+
   const [otp, setOtp] = useState("");
-  const [biometricToken, setBiometricToken] = useState(null);
+  const [pinError, setPinError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [biometricType, setBiometricType] = useState("FaceID");
   const [isModal, setModal] = useState(false);
-  const [pinError, setPinError] = useState(false);
-  const isEmail = useSelector((state) => state.users.isEmail);
-  const loginValue = useSelector((state) => state.users.loginValue);
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricToken, setBiometricToken] = useState(null);
+  const [biometricType, setBiometricType] = useState("FaceID");
 
-  const navigateToWelcomeScreen = async (res) => {
-    dispatch(setUserData(res?.user));
-    dispatch(setToken(res?.tokens?.accessToken));
-    await AsyncStorage.setItem("token", res?.tokens?.accessToken);
-    await AsyncStorage.setItem("refreshToken", res?.tokens?.refreshToken);
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "WelcomeScreen" }],
-    });
-  };
-  const onFaceIdPress = async () => {
-    if (biometricToken) {
-      setLoading(true);
-      try {
-        const rnBiometrics = new ReactNativeBiometrics();
-        const { success } = await rnBiometrics.simplePrompt({
-          promptMessage: "Authenticate to continue",
-        });
-
-        if (success) {
-          try {
-            const res = await post("auth/verify-biometric-token", {
-              token: biometricToken,
-            });
-
-            console.log("=========res", res?.data);
-            if (res?.data?.success) {
-              navigateToWelcomeScreen(res?.data);
-            } else {
-              console.log("Biometric verification failed");
-            }
-          } catch (error) {
-            console.log("API Error:", error);
-            setModal(true);
-            setLoading(false);
-          }
-        }
-        setLoading(false);
-      } catch (biometricError) {
-        console.log("Biometric Error:", biometricError);
-        setLoading(false);
-      }
-    } else {
-      setModal(true);
-    }
-  };
-  const handleLoginFirst = () => {
-    setModal(false);
-  };
   useEffect(() => {
     checkBiometricToken();
   }, []);
 
   const checkBiometricToken = async () => {
     try {
-      try {
-        const rnBiometrics = new ReactNativeBiometrics();
-        const { available, biometryType } =
-          await rnBiometrics.isSensorAvailable();
-        setBiometricAvailable(available);
-        setBiometricType(biometryType);
-        const credentials = await Keychain.getGenericPassword();
-
-        if (credentials) {
-          setBiometricToken(credentials.password);
-        }
-      } catch (keychainError) {
-        console.log("Keychain retrieval error:", keychainError);
-      }
+      const rnBiometrics = new ReactNativeBiometrics();
+      const { biometryType } = await rnBiometrics.isSensorAvailable();
+      if (biometryType) setBiometricType(biometryType);
+      const credentials = await Keychain.getGenericPassword();
+      if (credentials) setBiometricToken(credentials.password);
     } catch (error) {
       console.log("Biometric check error:", error);
     }
   };
-  const onContinuePress = async () => {
+
+  const navigateToWelcomeScreen = async (res) => {
+    dispatch(setUserData(res?.user));
+    dispatch(setToken(res?.tokens?.accessToken));
+    await AsyncStorage.setItem("token", res?.tokens?.accessToken);
+    await AsyncStorage.setItem("refreshToken", res?.tokens?.refreshToken);
+    navigation.reset({ index: 0, routes: [{ name: "WelcomeScreen" }] });
+  };
+
+  const onFaceIdPress = async () => {
+    if (!biometricToken) {
+      setModal(true);
+      return;
+    }
     try {
-      if (!otp) {
-        setPinError(true);
-      } else {
-        setPinError(false);
-        setLoading(true);
-        const res = await post("auth/login", {
-          ...(isEmail ? { email: loginValue } : { phone: loginValue }),
-          pin: otp,
+      setLoading(true);
+      const rnBiometrics = new ReactNativeBiometrics();
+      const { success } = await rnBiometrics.simplePrompt({
+        promptMessage: "Authenticate to continue",
+      });
+      if (success) {
+        const res = await post("auth/verify-biometric-token", {
+          token: biometricToken,
         });
-        navigateToWelcomeScreen(res?.data);
+        if (res?.data?.success) {
+          navigateToWelcomeScreen(res?.data);
+        } else {
+          setModal(true);
+        }
       }
       setLoading(false);
     } catch (error) {
+      console.log("Biometric Error:", error);
       setLoading(false);
     }
   };
+
+  const onContinuePress = async () => {
+    if (otp.length < 4) {
+      setPinError("Please enter your 4-digit PIN code");
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await post("auth/login", { ...identifier, pin: otp });
+      setLoading(false);
+      navigateToWelcomeScreen(res?.data);
+    } catch (error) {
+      setLoading(false);
+      // ApiRequest throws { status, data, message } — message is the server's reason.
+      setPinError(error?.message || "Invalid PIN code");
+    }
+  };
+
+  const biometricLabel = `Use ${
+    biometricType === "TouchID"
+      ? "Touch ID"
+      : biometricType === "FaceID"
+      ? "Face ID"
+      : "Fingerprint"
+  } instead`;
+
   return (
     <ScreenWrapper
       scrollEnabled
-      headerUnScrollable={() => <Header title="PIN Code" />}
+      headerUnScrollable={() => <Header title="PIN Code" textTransform="none" />}
       footerUnScrollable={() => (
-        <View style={{ padding: 12 }}>
-          <AuthFooter onPress={onContinuePress} loading={loading} />
-        </View>
+        <AuthFooter
+          paddingHorizontal={12}
+          onPress={onContinuePress}
+          loading={loading}
+          btnBackgroundColor={isDark ? COLORS.white : colors.text}
+          btnColor={isDark ? COLORS.primaryColor : colors.background}
+          btnDisabled={otp.length < 4}
+        />
       )}
     >
       <CustomText
@@ -144,111 +140,61 @@ const LoginPin = () => {
         fontFamily={fonts.semiBold}
         fontSize={24}
         lineHeight={24 * 1.4}
+        marginTop={10}
+        color={isDark ? COLORS.white : colors.text}
       />
       <CustomText
         label="Please enter your PIN code, so that you can access your account."
-        color={isDark ? COLORS.gray1 : colors.textSecondary}
+        color={isDark ? COLORS.gray64 : colors.textSecondary}
+        fontSize={14}
         lineHeight={14 * 1.4}
         marginBottom={40}
       />
 
       <OTPComponent
         value={otp}
-        setValue={setOtp}
-        error={pinError ? "Please enter your PIN code" : false}
+        setValue={(v) => {
+          setOtp(v);
+          if (pinError) setPinError("");
+        }}
+        error={pinError || false}
       />
-      {!pinError && <ErrorComponent errorTitle="Please enter your PIN code" />}
-
-      {biometricAvailable ? (
-        <>
-          <TouchableOpacity
-            activeOpacity={0.6}
-            onPress={onFaceIdPress}
-            style={[styles.row, { marginTop: 40 }]}
-          >
-            <ImageFast
-              source={
-                biometricType === "FaceID" ? Images.faceId : Images.finger
-              }
-              resizeMode="contain"
-              style={{ height: 20, width: 20, marginRight: 12 }}
-              tintColor={isDark ? undefined : colors.text}
-            />
-
-            <CustomText
-              label={`Use ${
-                biometricType === "TouchID"
-                  ? "Touch ID"
-                  : biometricType === "FaceID"
-                  ? "Face ID"
-                  : "Fingerprint"
-              } instead`}
-              fontFamily={fonts.medium}
-              fontSize={16}
-              lineHeight={16 * 1.4}
-            />
-          </TouchableOpacity>
-
-          <CustomText
-            label="Or"
-            marginTop={20}
-            marginBottom={20}
-            alignSelf="center"
-          />
-        </>
-      ) : null}
-
-      <TouchableOpacity
-        onPress={() => navigation.navigate("LoginPass")}
-        style={[styles.row, { marginTop: !biometricAvailable && 40 }]}
-      >
-        <ImageFast
-          source={Images.pass}
-          style={{ height: 20, width: 20, marginRight: 12 }}
-          tintColor={isDark ? undefined : colors.text}
+      {!pinError && (
+        <ErrorComponent
+          errorTitle="Please enter your PIN code"
+          color={isDark ? COLORS.gray2 : colors.textSecondary}
+          font={fonts.regular}
         />
+      )}
 
-        <CustomText
+      <View style={{ gap: 20, marginTop: 40 }}>
+        <AuthMethodRow
+          type="faceid"
+          label={biometricLabel}
+          onPress={onFaceIdPress}
+        />
+        <OrSeparator />
+        <AuthMethodRow
+          type="password"
           label="Use Password"
-          fontFamily={fonts.medium}
-          fontSize={16}
+          onPress={() => navigation.navigate("LoginPassword", { email, phone })}
         />
-      </TouchableOpacity>
-      <CustomText
-        label="Or"
-        marginTop={20}
-        marginBottom={20}
-        alignSelf="center"
-      />
-      <TouchableOpacity
-        onPress={() => navigation.navigate("OTPScreen")}
-        style={styles.row}
-      >
-        <ImageFast
-          source={Images.otp}
-          style={{ height: 20, width: 20, marginRight: 12 }}
-          tintColor={isDark ? undefined : colors.text}
+        <OrSeparator />
+        <AuthMethodRow
+          type="otp"
+          label="Use OTP"
+          onPress={() => navigation.navigate("LoginOtp", { email, phone })}
         />
+      </View>
 
-        <CustomText label="Use OTP" fontFamily={fonts.medium} fontSize={16} />
-      </TouchableOpacity>
-      {/* Biometric Modal */}
       <BiometricModal
         isVisible={isModal}
         onDisable={() => setModal(false)}
         biometricType={biometricType}
-        onLoginFirst={handleLoginFirst}
+        onLoginFirst={() => setModal(false)}
       />
     </ScreenWrapper>
   );
 };
 
 export default LoginPin;
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "center",
-  },
-});

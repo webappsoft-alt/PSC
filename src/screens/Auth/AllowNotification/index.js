@@ -58,19 +58,22 @@ const AllowNotification = () => {
   return (
     <ScreenWrapper
       paddingHorizontal={24}
-      backgroundImage={isDark ? Images.notiBG : undefined}
-      imageBottom={0}
+      backgroundColor="#FAFAFA"
+      statusBarColor="#FAFAFA"
+      barStyle="dark-content"
       footerUnScrollable={() => (
         <View style={{ padding: 14, marginBottom: 20 }}>
           <CustomButton
             title="Continue"
             marginBottom={8}
+            backgroundColor={COLORS.primaryColor}
+            color={COLORS.white}
             onPress={requestNotificationPermission}
           />
           <CustomButton
             title="Later"
-            backgroundColor={isDark ? "#1212120A" : colors.surfaceAlt}
-            color={isDark ? COLORS.primaryColor : colors.text}
+            backgroundColor="#1212120A"
+            color={COLORS.primaryColor}
             onPress={() => navigation.navigate("OnBoarding2", { push: false })}
           />
         </View>
@@ -88,19 +91,20 @@ const AllowNotification = () => {
           source={Images.bell}
           style={{ height: 80, width: 80 }}
           resizeMode="contain"
-          tintColor={isDark ? undefined : colors.text}
+          tintColor={COLORS.primaryColor}
         />
         <CustomText
           label="Instant notifications"
           fontSize={32}
           marginTop={26}
           fontFamily={fonts.semiBold}
+          color={COLORS.primaryColor}
           textAlign={"center"}
         />
         <CustomText
           lineHeight={14 * 1.4}
           label="Receive notifications directly on your phone whenever a new event occurs."
-          color={isDark ? COLORS.gray1 : colors.textSecondary}
+          color="rgba(18, 18, 18, 0.64)"
           textAlign={"center"}
           marginTop={12}
         />
@@ -108,7 +112,7 @@ const AllowNotification = () => {
           label="Manage your notification in Settings anytime."
           marginTop={24}
           lineHeight={14 * 1.4}
-          color={isDark ? COLORS.gray1 : colors.textSecondary}
+          color="rgba(18, 18, 18, 0.64)"
           textAlign={"center"}
         />
       </View>

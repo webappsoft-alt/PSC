@@ -75,7 +75,7 @@ const TrendingIndividual = () => {
 
   return (
     <>
-      <View style={{ paddingHorizontal: 12, backgroundColor: colors.background }}>
+      <View style={{ paddingHorizontal: 8, backgroundColor: colors.background }}>
         <View style={styles.rowBetween}>
           <CustomText
             label={"Trending Individuals"}

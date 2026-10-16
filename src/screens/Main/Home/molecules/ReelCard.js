@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { createThumbnail } from "react-native-create-thumbnail";
 import Video from "react-native-video";
+import ImageFast from "../../../../components/ImageFast";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
@@ -22,6 +24,27 @@ const ReelCard = ({ onSetPage, isScreenActive = true }) => {
   const [reels, setReels] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [thumbs, setThumbs] = useState({});
+
+  // Reels have no stored thumbnail — generate one per video so a card is
+  // never blank while (or if) its video hasn't rendered a frame yet.
+  useEffect(() => {
+    let cancelled = false;
+    reels.forEach((r) => {
+      const uri = r?.video || r?.uri;
+      const key = r?._id || uri;
+      if (!uri || r?.thumbnail || thumbs[key]) return;
+      createThumbnail({ url: uri, timeStamp: 1000 })
+        .then((res) => {
+          if (!cancelled) setThumbs((p) => ({ ...p, [key]: res.path }));
+        })
+        .catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reels]);
 
   useEffect(() => {
     fetchReels();
@@ -40,7 +63,11 @@ const ReelCard = ({ onSetPage, isScreenActive = true }) => {
     try {
       const response = await get("posts?&type=reel&limit=3");
       if (response?.data?.success && response?.data?.data) {
-        setReels(response.data.data.slice(0, 3));
+        setReels(
+          response.data.data
+            .filter((r) => typeof (r?.video || r?.uri) === "string" && (r.video || r.uri))
+            .slice(0, 3),
+        );
       }
     } catch (error) {
       console.log("fetchReels error", error);
@@ -49,14 +76,19 @@ const ReelCard = ({ onSetPage, isScreenActive = true }) => {
     }
   };
 
+  // Only reels that can actually show a picture — no empty placeholder cards.
+  const visibleReels = reels.filter(
+    (r) => r?.thumbnail || thumbs[r?._id || r?.video || r?.uri],
+  );
+
   // 🚫 DO NOT RENDER ANYTHING IF NO DATA
-  if (loading || !reels || reels.length === 0) {
+  if (loading || visibleReels.length === 0) {
     return null;
   }
 
   return (
     <>
-      <View style={{ paddingHorizontal: 12, backgroundColor: colors.background }}>
+      <View style={{ paddingHorizontal: 8, backgroundColor: colors.background }}>
         {/* Header */}
         <View style={styles.rowBetween}>
           <CustomText
@@ -88,9 +120,10 @@ const ReelCard = ({ onSetPage, isScreenActive = true }) => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 12, gap: 8 }}
         >
-          {reels?.map((item, index) => {
+          {visibleReels.map((item, index) => {
             const videoUri = item.video || item.uri;
-            const isActive = index === activeIndex;
+            const isActive = index === activeIndex % visibleReels.length;
+            const poster = item.thumbnail || thumbs[item._id || videoUri];
 
             return (
               <TouchableOpacity
@@ -101,6 +134,13 @@ const ReelCard = ({ onSetPage, isScreenActive = true }) => {
                   onSetPage?.(2);
                 }}
               >
+                {poster ? (
+                  <ImageFast
+                    source={{ uri: poster }}
+                    style={[StyleSheet.absoluteFill, styles.video]}
+                    resizeMode="cover"
+                  />
+                ) : null}
                 <Video
                   source={{ uri: videoUri }}
                   style={styles.video}
@@ -110,7 +150,7 @@ const ReelCard = ({ onSetPage, isScreenActive = true }) => {
                   muted
                   playInBackground={false}
                   playWhenInactive={false}
-                  poster={item.thumbnail}
+                  poster={poster}
                   posterResizeMode="cover"
                 />
               </TouchableOpacity>
@@ -137,6 +177,7 @@ const styles = StyleSheet.create({
     height: 220,
     width: 140,
     borderRadius: 12,
+    backgroundColor: "transparent",
   },
   row: {
     flexDirection: "row",

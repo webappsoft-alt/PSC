@@ -141,6 +141,9 @@ const AnimatedPlusBorder = ({ size = 72 }) => {
   );
 };
 
+// Figma `Today's Highlights` story ring (stroke 3, center, round caps)
+const STORY_RING_COLOR = "#DF3838";
+
 const getRandomColor = (id) => {
   const fallbackColors = [
     "#FFB3BA",
@@ -243,9 +246,9 @@ const MomentItem = ({
         ? isDark
           ? COLORS.white16
           : "rgba(18, 18, 18, 0.12)"
-        : dynamicColor,
+        : STORY_RING_COLOR,
     );
-  }, [index, myStories, item, currentUserId, dynamicColor, isDark]);
+  }, [index, myStories, item, currentUserId, isDark]);
 
   return (
     <TouchableOpacity
@@ -268,22 +271,22 @@ const MomentItem = ({
     >
       <View style={styles.storyContainer}>
         {index === 0 && storyUploadStatus === "uploading" ? (
-          <AnimatedPlusBorder size={72} />
+          <AnimatedPlusBorder size={80} />
         ) : storiesCount > 0 ? (
           <StoryBorder
             segments={storiesCount}
-            size={72}
-            color={dynamicColor}
+            size={80}
+            color={STORY_RING_COLOR}
             segmentColors={allSegmentColors}
           />
         ) : (
           index === 0 && (
             <View style={styles.card}>
               <Icons
-                name={"plus"}
-                family={"Feather"}
+                name={"add"}
+                family={"MaterialSymbolsRounded"}
                 color={isDark ? COLORS.white : colors.text}
-                size={30}
+                size={22}
               />
             </View>
           )
@@ -315,6 +318,19 @@ const MomentItem = ({
             )}
           </View>
         ) : null}
+
+        {index !== 0 && storiesCount > 0 && (
+          <View style={styles.countBadge}>
+            <CustomText
+              label={String(storiesCount)}
+              fontSize={12}
+              lineHeight={16}
+              letterSpacing={-0.06}
+              color={COLORS.white}
+              fontFamily={fonts.medium}
+            />
+          </View>
+        )}
 
         {index === 0 &&
           (storyUploadStatus === "uploading" ||
@@ -722,24 +738,35 @@ const MomentCard = ({ storiesData, myStoriesData }) => {
       <View style={[styles.row, styles.spaceBetween]}>
         <View style={styles.row}>
           <CustomText
-            label={"MOMENTS"}
-            color={colors.textSecondary}
-            fontFamily={fonts.medium}
+            label={"TODAY\u2019S"}
+            fontSize={16}
+            lineHeight={19}
+            color={COLORS.gray48}
+            fontFamily={fonts.BoldItalic}
+            fontStyle="italic"
+            letterSpacing={-0.96}
           />
           <CustomText
-            label={(storiesData?.length || 0).toString()}
+            label={"HIGHLIGHTS"}
+            fontSize={16}
+            lineHeight={19}
             color={colors.text}
-            fontFamily={fonts.medium}
+            fontFamily={fonts.BoldItalic}
+            fontStyle="italic"
+            letterSpacing={-0.96}
+            marginLeft={2}
           />
         </View>
         <TouchableOpacity style={styles.row} onPress={handlePlayAll}>
           <Icons
-            name={"controller-play"}
-            family={"Entypo"}
-            color={isDark ? "#FFFFFF29" : "#00000029"}
+            name={"play_arrow"}
+            family={"MaterialSymbolsRoundedFilled"}
+            size={16}
+            color={COLORS.gray48}
           />
           <CustomText
             label={"PLAY ALL"}
+            fontSize={13}
             color={colors.text}
             fontFamily={fonts.medium}
             activeOpacity={0.8}
@@ -780,12 +807,13 @@ export default React.memo(MomentCard);
 const createStyles = (colors, isDark) =>
   StyleSheet.create({
     mainContainer: {
-      padding: 12,
-      paddingBottom: 0.1,
+      paddingTop: 8,
+      paddingBottom: 12,
+      paddingHorizontal: 8,
     },
     row: { flexDirection: "row", alignItems: "center", gap: 4 },
     spaceBetween: { justifyContent: "space-between" },
-    listContent: { gap: 10, marginTop: 16 },
+    listContent: { gap: 10, marginTop: 8 },
     cardWrapper: {
       position: "relative",
     },
@@ -795,17 +823,31 @@ const createStyles = (colors, isDark) =>
       borderWidth: 2,
       borderColor: isDark ? "#FFFFFF0A" : "rgba(18, 18, 18, 0.08)",
       backgroundColor: isDark ? "transparent" : "rgba(18, 18, 18, 0.04)",
-      height: 72,
-      width: 72,
+      height: 80,
+      width: 80,
       alignItems: "center",
       justifyContent: "center",
     },
     storyContainer: {
-      height: 72,
-      width: 72,
+      height: 80,
+      width: 80,
       position: "relative",
       justifyContent: "center",
       alignItems: "center",
+    },
+    countBadge: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      height: 20,
+      paddingHorizontal: 6,
+      borderRadius: 100,
+      backgroundColor: COLORS.red1,
+      borderWidth: 2,
+      borderColor: colors.background,
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 20,
     },
     storyBorder: {
       position: "absolute",
@@ -813,11 +855,10 @@ const createStyles = (colors, isDark) =>
       left: 0,
     },
     imageContainer: {
-      height: 64,
-      width: 64,
+      height: 70,
+      width: 70,
       borderRadius: 99,
       overflow: "hidden",
-      borderWidth: 3,
     },
     cardImage: {
       width: "100%",

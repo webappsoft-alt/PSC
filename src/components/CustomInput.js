@@ -294,8 +294,8 @@ const CustomInput = ({
         </View>
         {secureTextEntry && (
           <Icons
-            name={hidePass ? "eye" : "eye-off"}
-            family={"Ionicons"}
+            name={hidePass ? "visibility" : "visibility_off"}
+            family={"MaterialSymbolsRounded"}
             color={colors.iconMuted}
             style={{
               position: "absolute",

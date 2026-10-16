@@ -7,8 +7,11 @@ import AuthFooter from "../../../components/Auth/AuthFooter";
 import AuthHeader from "../../../components/Auth/AuthHeader";
 
 import ResetPassword from "./ResetPassword";
-import FullName from "./FullName";
-import FirstName from "./FirstName";
+import Firstname from "./Firstname";
+import Surname from "./Surname";
+import Username from "./Username";
+import Addressing from "./Addressing";
+import Gender from "./Gender";
 import JobTitle from "./JobTitle";
 import WorkingAt from "./WorkingAt";
 import Password from "./Password";
@@ -31,24 +34,52 @@ const SignUpScreens = () => {
     "DOB",
     "UserType",
     "ProRole",
+    "Firstname",
+    "Surname",
+    "Username",
+    "Addressing",
+    "Gender",
     "Email",
     "OtpCode",
     "Password",
     "ResetPassword",
-    "FullName",
-    "FirstName",
     "Industry",
     "WorkingAt",
     "JobTitle",
     "AddPictures",
   ];
+  const subtitles = {
+    1: "Date of Birth",
+    2: "Choose your user type",
+    3: "Choose your user type",
+    4: "Firstname",
+    5: "Surname",
+    6: "Username",
+    7: "Addressing",
+    8: "Gender",
+    9: "Email",
+    10: "Verifying your account",
+    11: "Creating a strong password",
+    12: "Confirming password",
+    13: "Industry",
+    14: "Working At",
+    15: "Job Title",
+    16: "Upload your photos",
+  };
   const init = {
     email: "",
+    phone: "",
     password: "",
     dob: "",
     pin: "",
     full_name: "",
+    last_name: "",
     first_name: "",
+    addressing: "firstname",
+    gender: "",
+    verifyVia: "sms",
+    allowMarketing: true,
+    enhancedTailoredAds: false,
     job_title: "",
     working_at: "",
     industry: "",
@@ -59,185 +90,77 @@ const SignUpScreens = () => {
   };
   const [state, setState] = useState(init);
 
-  // Callback to update loading state from child components
-
-  const setLoadingState = (loading) => {
-    setIsLoading(loading);
-  };
+  // A Customer (regular) never sees the ProRole step (3), so the header
+  // numbering collapses it: their path shows x/15 instead of x/16.
+  const isRegularPath = state?.userType === "Regular";
+  const displayTotal = isRegularPath ? steps.length - 1 : steps.length;
+  const displayStep =
+    isRegularPath && currentIndex > 3 ? currentIndex - 1 : currentIndex;
 
   // Reset loading state when step changes
   useEffect(() => {
     setIsLoading(false);
   }, [currentIndex]);
 
+  const setLoadingState = (loading) => {
+    setIsLoading(loading);
+  };
+
   // Handle back navigation
   const handleBackPress = () => {
     if (currentIndex === 1) {
-      // On first step, navigate back to previous screen
       if (navigation.canGoBack()) {
         navigation.goBack();
       }
     } else {
-      // On other steps, call the step's back function
       stepRef.current?.back?.();
     }
+  };
+
+  const stepProps = {
+    ref: stepRef,
+    currentIndex,
+    setCurrentIndex,
+    state,
+    setState,
+    setLoadingState,
+    setBtnDisabled,
   };
 
   const renderStepView = () => {
     switch (currentIndex) {
       case 1:
-        return (
-          <DOB
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
+        return <DOB {...stepProps} />;
       case 2:
-        return (
-          <UserType
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
+        return <UserType {...stepProps} />;
       case 3:
-        return (
-          <ProRole
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
+        return <ProRole {...stepProps} />;
       case 4:
-        return (
-          <Email
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setLoadingState={setLoadingState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
+        return <Firstname {...stepProps} />;
       case 5:
-        return (
-          <OtpCode
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setLoadingState={setLoadingState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
-
+        return <Surname {...stepProps} />;
       case 6:
-        return (
-          <Password
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
+        return <Username {...stepProps} />;
       case 7:
-        return (
-          <ResetPassword
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
-
+        return <Addressing {...stepProps} />;
       case 8:
-        return (
-          <FullName
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
-
+        return <Gender {...stepProps} />;
       case 9:
-        return (
-          <FirstName
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setLoadingState={setLoadingState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
+        return <Email {...stepProps} />;
       case 10:
-        return (
-          <Industry
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setLoadingState={setLoadingState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
+        return <OtpCode {...stepProps} />;
       case 11:
-        return (
-          <WorkingAt
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
+        return <Password {...stepProps} />;
       case 12:
-        return (
-          <JobTitle
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setLoadingState={setLoadingState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
+        return <ResetPassword {...stepProps} />;
       case 13:
-        return (
-          <AddPictures
-            ref={stepRef}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            state={state}
-            setState={setState}
-            setLoadingState={setLoadingState}
-            setBtnDisabled={setBtnDisabled}
-          />
-        );
-
+        return <Industry {...stepProps} />;
+      case 14:
+        return <WorkingAt {...stepProps} />;
+      case 15:
+        return <JobTitle {...stepProps} />;
+      case 16:
+        return <AddPictures {...stepProps} />;
       default:
         return <Text>No View</Text>;
     }
@@ -258,35 +181,9 @@ const SignUpScreens = () => {
       )}
     >
       <AuthHeader
-        step={currentIndex}
-        totalSteps={steps?.length}
-        subtitle={
-          currentIndex === 1
-            ? "Date of Birth"
-            : currentIndex === 2
-            ? "Choose your user type"
-            : currentIndex === 3
-            ? "Choose your user type"
-            : currentIndex === 4
-            ? "Provide your email address"
-            : currentIndex === 5
-            ? "OTP code"
-            : currentIndex === 6
-            ? "Creating a strong password"
-            : currentIndex === 7
-            ? "Confirming password"
-            : currentIndex === 8
-            ? "Provide your Full Name"
-            : currentIndex === 9
-            ? "Provide your Username"
-            : currentIndex === 10
-            ? "Industry"
-            : currentIndex === 11
-            ? "Working At"
-            : currentIndex === 12
-            ? "Job Title"
-            : "Upload your photos"
-        }
+        step={displayStep}
+        totalSteps={displayTotal}
+        subtitle={subtitles[currentIndex] || ""}
       />
       {renderStepView()}
     </ScreenWrapper>

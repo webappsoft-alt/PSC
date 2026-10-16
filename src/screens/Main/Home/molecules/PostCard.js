@@ -15,7 +15,7 @@ import Video from "react-native-video";
 import { useDispatch, useSelector } from "react-redux";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
-import { FullScreenSvg, Tags } from "../../../../assets/svgs";
+import { FullScreenSvg } from "../../../../assets/svgs";
 import Blur from "../../../../components/Blur";
 import CustomButton from "../../../../components/CustomButton";
 import CustomText from "../../../../components/CustomText";
@@ -24,7 +24,7 @@ import ImageFast from "../../../../components/ImageFast";
 import ProgressiveBlur from "../../../../components/ProgressiveBlur";
 import { useTabBarVisibility } from "../../../../navigation/TabStack";
 import { useTheme } from "../../../../contexts/ThemeContext";
-import { del, post } from "../../../../services/ApiRequest";
+import { del, get, post } from "../../../../services/ApiRequest";
 import { setUserData } from "../../../../store/reducer/usersSlice";
 import { COLORS } from "../../../../utils/COLORS";
 import { ToastMessage } from "../../../../utils/ToastMessage";
@@ -34,8 +34,22 @@ import RepostModal from "./RepostModal";
 import ShareModal from "./ShareModal";
 import SummaryMore from "./SummaryMore";
 import ViewerModal from "./ViewerModal";
+import TaggedSheet from "./TaggedSheet";
+import {
+  measureImageBands,
+  registerNavMedia,
+  unregisterNavMedia,
+} from "../../../../utils/navTone";
 import VotingComponent from "./VotingComponent";
 import Text from "../../../../components/ScaledText";
+import {
+  activeSubtitleText,
+  buildSubtitleLines,
+  captionWords,
+} from "../../../../utils/subtitles";
+
+// Figma action bar — upvoted state
+const UPVOTE_GREEN = "#37B874";
 
 const PostCard = ({
   isChange,
@@ -106,6 +120,13 @@ const PostCard = ({
   const [showRepostModal, setShowRepostModal] = useState(false);
   const [showCreatorSummary, setShowCreatorSummary] = useState(false);
   const [showSummaryMore, setShowSummaryMore] = useState(false);
+  const [showTagged, setShowTagged] = useState(false);
+  const taggedSponsors = Array.isArray(item?.sponsors) ? item.sponsors : [];
+  // "In collaboration with" on Publish A Post is saved as `mentions`; the feed
+  // API returns them populated as `mentionBy`.
+  const taggedCollaborators = Array.isArray(item?.mentionBy)
+    ? item.mentionBy
+    : [];
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [currentDescIndex, setCurrentDescIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -119,6 +140,58 @@ const PostCard = ({
 
   const [videoReady, setVideoReady] = useState({});
   const [bgVideoReady, setBgVideoReady] = useState({});
+
+  // Live captions — same flow as Viral's ShortCard: while this post's video
+  // is the one playing and it has no captions yet, poll the backend every
+  // 2s (which also bumps the Whisper job to the front of the queue) and
+  // show the captions the moment the job finishes.
+  const [liveCaptions, setLiveCaptions] = useState(null);
+  const postHasVideo =
+    !!item?.video ||
+    (Array.isArray(item?.images) &&
+      item.images.some((u) =>
+        /\.(mp4|mov|avi|mkv|webm|m4v)(\?.*)?$/i.test(String(u || "")),
+      ));
+  const postHasCaptions =
+    (Array.isArray(item?.subtitles) && item.subtitles.length > 0) ||
+    !!String(item?.subtitlesText || "").trim();
+  useEffect(() => {
+    const postId = item?._id;
+    if (!postId || !shouldPlay || !postHasVideo || postHasCaptions) return;
+    if (item?.subtitlesStatus === "empty") return;
+    if (liveCaptions) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    let timer = null;
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const res = await get(`posts/${postId}/subtitles`);
+        const data = res?.data?.data;
+        if (cancelled || !data) return;
+        const ready =
+          (Array.isArray(data.subtitles) && data.subtitles.length > 0) ||
+          !!String(data.subtitlesText || "").trim();
+        if (ready) {
+          setLiveCaptions(data);
+          clearInterval(timer);
+        } else if (data.subtitlesStatus === "empty") {
+          clearInterval(timer);
+        }
+      } catch (e) {
+        /* job may still be running — keep waiting */
+      }
+      if (attempts >= 360) clearInterval(timer);
+    };
+    poll();
+    timer = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?._id, shouldPlay, postHasVideo, postHasCaptions, liveCaptions]);
   const [generatedThumbnails, setGeneratedThumbnails] = useState({});
 
   const processedThumbnails = useRef(new Set());
@@ -381,17 +454,22 @@ const PostCard = ({
 
   // Calculate image height based on aspect ratio
   const getImageHeight = () => {
-    const sizeString = item?.size || "1:1 ratio";
+    // Figma: media 367×489 @ 375 frame → width = screen - 8, default 3:4 portrait
+    const mediaWidth = screenWidth - 8;
+    const sizeString = item?.size || "3:4 ratio";
     const aspectRatio = sizeString.replace(" ratio", "").trim();
 
     switch (aspectRatio) {
       case "16:9":
-        return screenWidth * (9 / 16);
+        return mediaWidth * (9 / 16);
       case "4:3":
-        return screenWidth * (3 / 4);
+        return mediaWidth * (3 / 4);
+      case "3:4":
+        return mediaWidth * (4 / 3);
       case "1:1":
+        return mediaWidth;
       default:
-        return screenWidth;
+        return mediaWidth * (4 / 3);
     }
   };
 
@@ -425,7 +503,10 @@ const PostCard = ({
     return text.split(/(\s+)/).map((part, index) => {
       if (part.startsWith("@")) {
         return (
-          <Text key={index} style={{ color: colors.text }}>
+          <Text
+            key={index}
+            style={{ color: colors.text, fontFamily: fonts.semiBold }}
+          >
             {part?.substring(1)}
           </Text>
         );
@@ -436,7 +517,7 @@ const PostCard = ({
 
   // Get dynamic border radius for each image based on scroll position
   const getBorderRadiusStyle = (index) => {
-    const cardWidth = screenWidth - 24;
+    const cardWidth = screenWidth - 8;
     const scrollProgress = scrollOffset / cardWidth;
     const currentIndex = Math.round(scrollProgress);
     const isScrolling = Math.abs(scrollProgress - currentIndex) > 0.01;
@@ -444,10 +525,10 @@ const PostCard = ({
     if (!isScrolling) {
       // Fully snapped - all corners have radius
       return {
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 16,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
       };
     }
 
@@ -455,27 +536,27 @@ const PostCard = ({
     if (index === Math.floor(scrollProgress)) {
       // Current/left image - remove right corners radius
       return {
-        borderTopLeftRadius: 16,
+        borderTopLeftRadius: 8,
         borderTopRightRadius: 0,
-        borderBottomLeftRadius: 16,
+        borderBottomLeftRadius: 8,
         borderBottomRightRadius: 0,
       };
     } else if (index === Math.ceil(scrollProgress)) {
       // Next/right image - remove left corners radius
       return {
         borderTopLeftRadius: 0,
-        borderTopRightRadius: 16,
+        borderTopRightRadius: 8,
         borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 16,
+        borderBottomRightRadius: 8,
       };
     }
 
     // Default - full radius for images not involved in current swipe
     return {
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
-      borderBottomLeftRadius: 16,
-      borderBottomRightRadius: 16,
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
+      borderBottomLeftRadius: 8,
+      borderBottomRightRadius: 8,
     };
   };
 
@@ -483,13 +564,13 @@ const PostCard = ({
   const handleScroll = (event) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     setScrollOffset(contentOffsetX);
-    const index = Math.round(contentOffsetX / (screenWidth - 24));
+    const index = Math.round(contentOffsetX / (screenWidth - 8));
     setCurrentImageIndex(index);
   };
 
   const handleDescScroll = (event) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
-    const index = Math.round(contentOffsetX / (screenWidth - 24));
+    const index = Math.round(contentOffsetX / (screenWidth - 16));
     setCurrentDescIndex(index);
   };
 
@@ -710,6 +791,61 @@ const PostCard = ({
   const isCurrentMediaVideo =
     images[currentImageIndex] && isVideoUrl(images[currentImageIndex]);
 
+  // Adaptive tab bar: report this post's media + its brightness bands so the
+  // bottom nav icons can flip dark/light while it scrolls behind the bar.
+  const mediaWrapRef = useRef(null);
+  const navMediaKey = useRef(
+    `post-${item?._id || Math.random().toString(36).slice(2)}`,
+  ).current;
+  const toneUri = isCurrentMediaVideo
+    ? item?.thumbnail || generatedThumbnails[currentImageIndex] || null
+    : images[currentImageIndex] || null;
+  useEffect(() => {
+    let alive = true;
+    if (!toneUri || isDetail) return undefined;
+    measureImageBands(toneUri).then((bands) => {
+      if (alive && bands && mediaWrapRef.current) {
+        registerNavMedia(navMediaKey, mediaWrapRef.current, bands);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [toneUri, isDetail, navMediaKey]);
+  useEffect(() => () => unregisterNavMedia(navMediaKey), [navMediaKey]);
+
+  // Auto-generated subtitles pill (Figma). Words + timings come from the
+  // backend Whisper job (same data as Viral: { word, startMs, endMs }); the
+  // pill shows the phrase being spoken at the current playback position.
+  const captionVideoIndex = useMemo(() => {
+    if (item?.video) {
+      const i = images.indexOf(item.video);
+      if (i >= 0) return i;
+    }
+    return images.findIndex((u) => isVideoUrl(u));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [images, item?.video]);
+  const captionDurationMs =
+    (videoProgress[captionVideoIndex]?.duration || 0) * 1000;
+  const subtitleLines = useMemo(
+    () =>
+      buildSubtitleLines(
+        captionWords(liveCaptions || item, captionDurationMs),
+      ),
+    // duration only matters for the plain-text fallback; round it so the
+    // lines aren't rebuilt on every progress tick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [liveCaptions, item?.subtitles, item?.subtitlesText, Math.round(captionDurationMs / 1000)],
+  );
+  const captionedVideoIndex = subtitleLines.length ? captionVideoIndex : -1;
+  const captionForIndex =
+    currentImageIndex === captionedVideoIndex
+      ? activeSubtitleText(
+          subtitleLines,
+          (videoProgress[currentImageIndex]?.currentTime || 0) * 1000,
+        )
+      : null;
+
   return (
     <View>
       {/* Fixed Swipe indicators - placed outside the animated container */}
@@ -742,12 +878,26 @@ const PostCard = ({
         ]}
       >
         <View style={styles.swipeIndicatorContent}>
-          <Image source={Images.thoughts} style={styles.swipeIcon} />
-          <CustomText
-            label="Share Your Thoughts"
-            color={COLORS.white}
-            fontSize={12}
+          <Icons
+            family="MaterialSymbolsRoundedFilled"
+            name="chat_bubble"
+            size={67}
+            color={COLORS.gray64}
           />
+          <View style={[styles.row, { gap: 4, paddingHorizontal: 0 }]}>
+            <CustomText
+              label="Share Your Thought"
+              color={COLORS.gray64}
+              fontSize={16}
+              fontFamily={fonts.medium}
+            />
+            <Icons
+              family="MaterialSymbolsRounded"
+              name="north_east"
+              size={16}
+              color={COLORS.gray64}
+            />
+          </View>
         </View>
       </Animated.View>
 
@@ -780,15 +930,26 @@ const PostCard = ({
         ]}
       >
         <View style={styles.swipeIndicatorContent}>
-          <Image
-            source={Images.globeShare || Images.message}
-            style={styles.swipeIcon}
+          <Icons
+            family="MaterialSymbolsRoundedFilled"
+            name="share"
+            size={67}
+            color={COLORS.gray64}
           />
-          <CustomText
-            label="Share It With Others"
-            color={COLORS.white}
-            fontSize={12}
-          />
+          <View style={[styles.row, { gap: 4, paddingHorizontal: 0 }]}>
+            <CustomText
+              label="Share It With Others"
+              color={COLORS.gray64}
+              fontSize={16}
+              fontFamily={fonts.medium}
+            />
+            <Icons
+              family="MaterialSymbolsRounded"
+              name="north_east"
+              size={16}
+              color={COLORS.gray64}
+            />
+          </View>
         </View>
       </Animated.View>
 
@@ -815,7 +976,7 @@ const PostCard = ({
         >
           <View>
             {showHeader && (
-              <View style={styles.rowBetween}>
+              <View style={[styles.rowBetween, { paddingHorizontal: 8 }]}>
                 {/* Left Section */}
                 <TouchableOpacity
                   style={styles.row}
@@ -824,7 +985,7 @@ const PostCard = ({
                 >
                   <View
                     style={{
-                      padding: 4,
+                      padding: 2,
                       borderColor: profileColor,
                       borderWidth: 2,
                       borderRadius: 99,
@@ -849,7 +1010,13 @@ const PostCard = ({
                   </View>
                   <View style={styles.userInfo}>
                     <View style={styles.nameRow}>
-                      <CustomText label={displayName} />
+                      <CustomText
+                        label={displayName}
+                        fontSize={14}
+                        lineHeight={18}
+                        letterSpacing={-0.07}
+                        fontFamily={fonts.medium}
+                      />
                       {item?.author?.role == "individual" && (
                         <ImageFast
                           source={Images.verified}
@@ -865,7 +1032,9 @@ const PostCard = ({
                     </View>
                     <CustomText
                       label={`${username}`}
-                      color={colors.textSecondary}
+                      fontSize={12}
+                      lineHeight={16}
+                      color={COLORS.gray48}
                     />
                   </View>
                 </TouchableOpacity>
@@ -883,20 +1052,31 @@ const PostCard = ({
                   {showFollowButton && !isOwner && (
                     <CustomButton
                       title={isFollowingUser ? "Following" : "Follow"}
-                      width={isFollowingUser ? "80%" : "64%"}
+                      width={isFollowingUser ? 92 : 64}
                       onPress={handleFollowPress}
-                      height={32}
+                      height={28}
                       borderRadius={8}
                       fontSize={14}
-                      backgroundColor={colors.surfaceAlt}
-                      color={colors.text}
+                      fontFamily={fonts.medium}
+                      backgroundColor={
+                        isFollowingUser ? colors.surfaceAlt : COLORS.white
+                      }
+                      color={isFollowingUser ? colors.text : "#121212"}
                     />
                   )}
                   {/* {!showFollowButton && ( */}
-                  <TouchableOpacity onPress={() => setShowModal(true)}>
-                    <Image
-                      source={Images.moreIcon}
-                      style={[styles.moreIcon, { tintColor: colors.text }]}
+                  <TouchableOpacity
+                    onPress={() => setShowModal(true)}
+                    style={[
+                      styles.moreButton,
+                      { backgroundColor: colors.surfaceAlt },
+                    ]}
+                  >
+                    <Icons
+                      family="MaterialSymbolsRounded"
+                      name="more_vert"
+                      size={20}
+                      color={colors.text}
                     />
                   </TouchableOpacity>
                   {/* )} */}
@@ -906,19 +1086,21 @@ const PostCard = ({
 
             {/* reposted from */}
             {item?.parentPostId && (
-              <View style={[styles.row, { gap: 4, marginTop: 4 }]}>
-                <Image
-                  source={Images.arrowNext}
-                  style={{
-                    height: 20,
-                    width: 20,
-                    tintColor: colors.textSecondary,
-                  }}
+              <View style={[styles.row, { gap: 4, marginTop: 6 }]}>
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="subdirectory_arrow_right"
+                  size={18}
+                  color={colors.text}
                 />
                 <CustomText
-                  label="Reposted from"
-                  color={colors.textSecondary}
-                  fontSize={12}
+                  label={
+                    item?.repostType === "share" || item?.type === "share"
+                      ? "Original post from"
+                      : "Reposted from"
+                  }
+                  color={COLORS.gray48}
+                  fontSize={13}
                 />
                 <TouchableOpacity
                   onPress={() =>
@@ -949,7 +1131,49 @@ const PostCard = ({
                   />
                   <CustomText
                     label={item?.parentPost?.author?.firstName}
-                    fontFamily={fonts.medium}
+                    fontSize={13}
+                    fontFamily={fonts.semiBold}
+                    marginLeft={4}
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
+            {/* Figma: "in Partnership with ✋ Brand" (sponsoredBy) */}
+            {Array.isArray(item?.sponsors) && item.sponsors[0] && (
+              <View style={[styles.row, { gap: 4, marginTop: 6 }]}>
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="handshake"
+                  size={18}
+                  color={COLORS.gray48}
+                />
+                <CustomText
+                  label="in Partnership with"
+                  color={COLORS.gray48}
+                  fontSize={13}
+                />
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate("UserProfile", {
+                      userId: item.sponsors[0]?._id,
+                    })
+                  }
+                  style={[styles.row, { paddingHorizontal: 0 }]}
+                >
+                  {item.sponsors[0]?.profile?.avatar ? (
+                    <ImageFast
+                      source={{ uri: item.sponsors[0].profile.avatar }}
+                      style={{ height: 16, width: 16, borderRadius: 99 }}
+                    />
+                  ) : null}
+                  <CustomText
+                    label={
+                      item.sponsors[0]?.firstName ||
+                      item.sponsors[0]?.username ||
+                      "Partner"
+                    }
+                    fontSize={13}
+                    fontFamily={fonts.semiBold}
                     marginLeft={4}
                   />
                 </TouchableOpacity>
@@ -959,7 +1183,7 @@ const PostCard = ({
               style={[
                 styles.wrapper,
                 {
-                  marginTop: 10,
+                  marginTop: 8,
                 },
               ]}
             >
@@ -968,11 +1192,17 @@ const PostCard = ({
                   style={[styles.tagBg, { backgroundColor: colors.surfaceAlt }]}
                   key={index}
                 >
-                  <Tags width={12} height={12} color={colors.textSecondary} />
+                  <Icons
+                    family="MaterialSymbolsRounded"
+                    name="tag"
+                    size={16}
+                    color={COLORS.gray64}
+                  />
                   <CustomText
                     label={`${item}`}
                     fontSize={12}
-                    color={colors.textSecondary}
+                    lineHeight={16}
+                    color={COLORS.gray64}
                     fontFamily={fonts.medium}
                     marginLeft={2}
                   />
@@ -986,8 +1216,9 @@ const PostCard = ({
               <CustomText
                 label={"LOOKING FOR INVESTMENT"}
                 fontSize={10}
+                lineHeight={14}
                 fontFamily={fonts.semiBold}
-                color={"rgba(255, 255, 255, 0.64)"}
+                color={COLORS.white}
               />
             </View>
 
@@ -1006,23 +1237,26 @@ const PostCard = ({
                 {description ? (
                   <>
                     {Array.isArray(description) && description.length > 1 ? (
-                      <View style={{ paddingHorizontal: 12 }}>
+                      <View style={{ paddingHorizontal: 8 }}>
                         <ScrollView
                           horizontal
                           pagingEnabled
                           showsHorizontalScrollIndicator={false}
                           onScroll={handleDescScroll}
                           scrollEventThrottle={16}
-                          style={{ width: screenWidth - 24 }}
+                          style={{ width: screenWidth - 16 }}
                         >
                           {description?.map((desc, index) => (
                             <View
                               key={index}
-                              style={{ width: screenWidth - 24 }}
+                              style={{ width: screenWidth - 16 }}
                             >
                               <CustomText
                                 marginTop={8}
-                                color={colors.text}
+                                fontSize={14}
+                                lineHeight={18}
+                                letterSpacing={-0.14}
+                                color={COLORS.gray64}
                                 marginBottom={6}
                                 numberOfLines={!isDetail && 2}
                               >
@@ -1050,7 +1284,7 @@ const PostCard = ({
                             styles.row,
                             {
                               justifyContent: "space-between",
-                              marginBottom: 20,
+                              marginBottom: 12,
                               paddingHorizontal: 0,
                             },
                           ]}
@@ -1091,10 +1325,13 @@ const PostCard = ({
                         </View>
                       </View>
                     ) : (
-                      <View style={{ paddingHorizontal: 12 }}>
+                      <View style={{ paddingHorizontal: 8 }}>
                         <CustomText
                           marginTop={8}
-                          color={colors.text}
+                          fontSize={14}
+                          lineHeight={18}
+                          letterSpacing={-0.14}
+                          color={COLORS.gray64}
                           marginBottom={6}
                           numberOfLines={!isDetail && 2}
                         >
@@ -1123,7 +1360,7 @@ const PostCard = ({
                             styles.row,
                             {
                               justifyContent: "space-between",
-                              marginBottom: 20,
+                              marginBottom: 12,
                               paddingHorizontal: 0,
                             },
                           ]}
@@ -1147,7 +1384,53 @@ const PostCard = ({
                     )}
                   </>
                 ) : null}
+                {!isDetail && item?.topic ? (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate("SearchScreen")}
+                    style={[
+                      styles.findPostsRow,
+                      { backgroundColor: colors.surfaceAlt },
+                    ]}
+                  >
+                    <Icons
+                      family="MaterialSymbolsRounded"
+                      name="tag"
+                      size={16}
+                      color={colors.text}
+                    />
+                    <View style={styles.findPostsTextWrap}>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          fontSize: 12,
+                          lineHeight: 16,
+                          fontFamily: fonts.medium,
+                          color: colors.text,
+                        }}
+                      >
+                        {item.topic}
+                        <Text
+                          style={{
+                            fontFamily: fonts.regular,
+                            color: COLORS.gray48,
+                          }}
+                        >
+                          {"  find other posts about it."}
+                        </Text>
+                      </Text>
+                    </View>
+                    <Icons
+                      family="MaterialSymbolsRounded"
+                      name="chevron_right"
+                      size={18}
+                      color={colors.text}
+                    />
+                  </TouchableOpacity>
+                ) : null}
                 <View
+                  ref={mediaWrapRef}
+                  collapsable={false}
                   style={{
                     // paddingVertical: 8,
                     alignItems: "center",
@@ -1165,7 +1448,7 @@ const PostCard = ({
                             styles.glowShadowContainer,
                             {
                               height: getImageHeight(),
-                              width: screenWidth - 24,
+                              width: screenWidth - 8,
                               shadowColor: bgColor || "#FFFFFF",
                             },
                           ]}
@@ -1175,7 +1458,7 @@ const PostCard = ({
                               <View
                                 style={{
                                   height: getImageHeight(),
-                                  width: screenWidth - 24,
+                                  width: screenWidth - 8,
                                 }}
                               >
                                 <Video
@@ -1183,8 +1466,8 @@ const PostCard = ({
                                   source={{ uri: images[currentImageIndex] }}
                                   style={{
                                     height: getImageHeight(),
-                                    width: screenWidth - 24,
-                                    borderRadius: 16,
+                                    width: screenWidth - 8,
+                                    borderRadius: 8,
                                   }}
                                   resizeMode="cover"
                                   muted
@@ -1209,8 +1492,8 @@ const PostCard = ({
                                       StyleSheet.absoluteFill,
                                       {
                                         height: getImageHeight(),
-                                        width: screenWidth - 24,
-                                        borderRadius: 16,
+                                        width: screenWidth - 8,
+                                        borderRadius: 8,
                                       },
                                     ]}
                                     resizeMode="cover"
@@ -1222,8 +1505,8 @@ const PostCard = ({
                                 source={{ uri: images[currentImageIndex] }}
                                 style={{
                                   height: getImageHeight(),
-                                  width: screenWidth - 24,
-                                  borderRadius: 16,
+                                  width: screenWidth - 8,
+                                  borderRadius: 8,
                                 }}
                               />
                             )}
@@ -1235,15 +1518,6 @@ const PostCard = ({
                           </View>
                         </View>
                       )}
-                      <View
-                        style={[
-                          styles.glowBg,
-                          {
-                            top: item?.size === "16:9 ratio" ? "41%" : "32%",
-                            height: item?.size === "16:9 ratio" ? "32%" : "45%",
-                          },
-                        ]}
-                      />
                       <ScrollView
                         scrollEnabled={images.length > 1}
                         ref={scrollViewRef}
@@ -1253,7 +1527,7 @@ const PostCard = ({
                         onScroll={handleScroll}
                         scrollEventThrottle={16}
                         decelerationRate="fast"
-                        snapToInterval={screenWidth - 24}
+                        snapToInterval={screenWidth - 8}
                         snapToAlignment="center"
                         disableIntervalMomentum={true}
                         onTouchStart={
@@ -1261,13 +1535,13 @@ const PostCard = ({
                             ? onMediaCarouselTouchStart
                             : undefined
                         }
-                        style={[styles.scrollView, { width: screenWidth - 24 }]}
+                        style={[styles.scrollView, { width: screenWidth - 8 }]}
                       >
                         {images.map((imageUri, index) => (
                           <View
                             key={index}
                             style={{
-                              width: screenWidth - 24,
+                              width: screenWidth - 8,
                               height: getImageHeight(),
                             }}
                           >
@@ -1289,7 +1563,7 @@ const PostCard = ({
                                   style={[
                                     {
                                       height: getImageHeight(),
-                                      width: screenWidth - 24,
+                                      width: screenWidth - 8,
                                       backgroundColor: "rgba(0, 0, 0, 0.2)",
                                     },
                                     getBorderRadiusStyle(index),
@@ -1338,7 +1612,7 @@ const PostCard = ({
                                       style={[
                                         {
                                           height: getImageHeight(),
-                                          width: screenWidth - 24,
+                                          width: screenWidth - 8,
                                         },
                                         getBorderRadiusStyle(index),
                                       ]}
@@ -1372,7 +1646,7 @@ const PostCard = ({
                                 style={[
                                   {
                                     height: getImageHeight(),
-                                    width: screenWidth - 24,
+                                    width: screenWidth - 8,
                                   },
                                   getBorderRadiusStyle(index),
                                 ]}
@@ -1420,7 +1694,7 @@ const PostCard = ({
                                 intensity={80}
                                 direction="bottom"
                                 tint="light"
-                                height={60}
+                                height={48}
                                 imageUri={imageUri}
                                 style={{
                                   borderBottomLeftRadius:
@@ -1459,7 +1733,10 @@ const PostCard = ({
                             bottom: 0,
                             left: 0,
                             right: 0,
-                            padding: 8,
+                            minHeight: 48,
+                            paddingHorizontal: 8,
+                            paddingVertical: 8,
+                            alignItems: "center",
                           },
                         ]}
                       >
@@ -1469,26 +1746,23 @@ const PostCard = ({
                             <TouchableOpacity
                               onPress={toggleMute}
                               style={{
-                                paddingHorizontal: 10,
                                 height: 32,
                                 width: 36,
                                 justifyContent: "center",
                                 alignItems: "center",
-                                marginHorizontal: 10,
                                 backgroundColor: "rgba(255, 255, 255, 0.04)",
-                                borderRadius: 99,
+                                borderRadius: 100,
                                 overflow: "hidden",
-                                marginBottom: 4,
                               }}
                             >
                               <Blur />
                               <Icons
                                 name={
                                   isCurrentVideoMuted()
-                                    ? "volume-up"
-                                    : "volume-off"
+                                    ? "volume_up"
+                                    : "volume_off"
                                 }
-                                family={"MaterialIcons"}
+                                family={"MaterialSymbolsRoundedFilled"}
                                 size={16}
                                 color={COLORS.white}
                               />
@@ -1533,33 +1807,64 @@ const PostCard = ({
                               onPress={() => setShowViewerModal(true)}
                             />
                           </View>
-                        ) : (
+                        ) : taggedSponsors.length || taggedCollaborators.length ? (
                           <TouchableOpacity
                             style={[
                               styles.repostButton,
                               { overflow: "hidden" },
                             ]}
+                            onPress={() => setShowTagged(true)}
                           >
                             <Blur />
-                            <Image
-                              source={Images.friend}
-                              style={{ height: 16, width: 16 }}
+                            <Icons
+                              family="MaterialSymbolsRoundedFilled"
+                              name="group"
+                              size={16}
+                              color={COLORS.white}
                             />
                           </TouchableOpacity>
+                        ) : (
+                          <View />
                         )}
 
-                        {isCurrentMediaVideo ? (
+                        {isCurrentMediaVideo && captionForIndex ? (
                           <View
-                            style={{ alignItems: "flex-end", paddingRight: 12 }}
+                            style={[
+                              styles.subtitlePill,
+                              images?.length > 1 && {
+                                transform: [{ translateY: -20 }],
+                              },
+                            ]}
                           >
+                            <Blur />
+                            <Icons
+                              family="MaterialSymbolsRoundedFilled"
+                              name="record_voice_over"
+                              size={12}
+                              color={COLORS.white}
+                            />
+                            <CustomText
+                              label={captionForIndex}
+                              fontSize={12}
+                              lineHeight={16}
+                              fontFamily={fonts.medium}
+                              color={COLORS.white}
+                              numberOfLines={1}
+                              marginLeft={4}
+                            />
+                          </View>
+                        ) : null}
+
+                        {isCurrentMediaVideo ? (
+                          <View style={{ alignItems: "flex-end" }}>
                             <View
                               style={{
+                                height: 24,
                                 paddingHorizontal: 10,
                                 backgroundColor: "rgba(255, 255, 255, 0.04)",
-                                borderRadius: 99,
-                                paddingVertical: 6,
+                                borderRadius: 100,
+                                justifyContent: "center",
                                 overflow: "hidden",
-                                marginBottom: 4,
                               }}
                             >
                               <Blur />
@@ -1574,6 +1879,7 @@ const PostCard = ({
                                 }
                                 fontFamily={fonts.medium}
                                 fontSize={12}
+                                lineHeight={16}
                               />
                             </View>
                             <TouchableOpacity onPress={handleFullScreenPress}>
@@ -1593,60 +1899,54 @@ const PostCard = ({
                             onPress={() => setShowRepostModal(true)}
                           >
                             <Blur />
-                            <Image
-                              source={Images.repostWhite}
-                              style={{
-                                height: 12,
-                                width: 12,
-                                tintColor: colors.text,
-                              }}
+                            <Icons
+                              family="MaterialSymbolsRounded"
+                              name="repeat"
+                              size={16}
+                              color={colors.text}
                             />
                           </TouchableOpacity>
                         ) : (
                           <View />
                         )}
                       </View>
+
+                      {images?.length > 1 && (
+                        <View pointerEvents="none" style={styles.dotsOverlay}>
+                          {images?.map((img, index) => (
+                            <View
+                              key={index}
+                              style={[
+                                styles.dot,
+                                index === currentImageIndex && styles.dotActive,
+                              ]}
+                            />
+                          ))}
+                        </View>
+                      )}
                     </>
                   ) : (
                     <View
                       style={{
                         height: getImageHeight(),
-                        width: screenWidth - 24,
+                        width: screenWidth - 8,
                         backgroundColor: profileColor || COLORS.inputBg,
-                        borderRadius: 16,
+                        borderRadius: 8,
                       }}
                     />
                   )}
 
                   {/* Dynamic Pagination Indicators */}
                 </View>
-                {images?.length > 1 && (
-                  <View style={styles.rowSwipper}>
-                    {images?.map((img, index) => (
-                      <View
-                        key={index}
-                        style={[
-                          styles.indicator,
-                          index === currentImageIndex
-                            ? [
-                                styles.activeIndicator,
-                                { backgroundColor: bgColor },
-                              ]
-                            : styles.inactiveIndicator,
-                          index === currentImageIndex && styles.activeWidth,
-                        ]}
-                      />
-                    ))}
-                  </View>
-                )}
+                {null}
               </>
             )}
             <View
               style={[
                 styles.rowButtons,
                 {
-                  marginTop: images?.length > 1 ? 0 : 8,
-                  paddingHorizontal: 12,
+                  marginTop: 4,
+                  paddingHorizontal: 8,
                 },
               ]}
             >
@@ -1664,38 +1964,25 @@ const PostCard = ({
                 disabled={isVoting}
                 style={[
                   styles.rowbtn,
+                  styles.rowbtnSpread,
                   { backgroundColor: colors.surfaceAlt },
                   hasUpvoted() && {
-                    backgroundColor:
-                      themeMode === "dark" ? COLORS.white : COLORS.black,
+                    backgroundColor: "rgba(55, 184, 116, 0.16)",
                   },
                 ]}
               >
-                <Image
-                  source={Images.arrowUp}
-                  style={{
-                    height: 20,
-                    width: 20,
-                    tintColor: hasUpvoted()
-                      ? themeMode === "dark"
-                        ? COLORS.black
-                        : COLORS.white
-                      : colors.text,
-                  }}
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="arrow_upward"
+                  size={16}
+                  color={hasUpvoted() ? UPVOTE_GREEN : colors.text}
                 />
-
                 <CustomText
                   label={formatCount(localUpvotes.length)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  marginRight={4}
-                  color={
-                    hasUpvoted()
-                      ? themeMode === "dark"
-                        ? COLORS.black
-                        : COLORS.white
-                      : colors.text
-                  }
+                  lineHeight={16}
+                  color={hasUpvoted() ? UPVOTE_GREEN : colors.text}
                 />
               </TouchableOpacity>
 
@@ -1713,6 +2000,7 @@ const PostCard = ({
                 disabled={isVoting}
                 style={[
                   styles.rowbtn,
+                  styles.rowbtnSpread,
                   { backgroundColor: colors.surfaceAlt },
                   hasDownvoted() && {
                     backgroundColor:
@@ -1724,6 +2012,7 @@ const PostCard = ({
                   label={formatCount(localDownvotes.length)}
                   fontFamily={fonts.medium}
                   fontSize={12}
+                  lineHeight={16}
                   color={
                     hasDownvoted()
                       ? themeMode === "dark"
@@ -1731,19 +2020,18 @@ const PostCard = ({
                         : COLORS.white
                       : colors.text
                   }
-                  marginLeft={4}
                 />
-                <Image
-                  source={Images.arrowDown}
-                  style={{
-                    height: 20,
-                    width: 20,
-                    tintColor: hasDownvoted()
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="arrow_downward"
+                  size={16}
+                  color={
+                    hasDownvoted()
                       ? themeMode === "dark"
                         ? COLORS.black
                         : COLORS.white
-                      : colors.text,
-                  }}
+                      : colors.text
+                  }
                 />
               </TouchableOpacity>
 
@@ -1758,22 +2046,23 @@ const PostCard = ({
                     : onCommentPress
                 }
                 onStartShouldSetResponder={() => true}
-                style={[styles.rowbtn, { backgroundColor: colors.surfaceAlt }]}
+                style={[
+                  styles.rowbtn,
+                  styles.rowbtnSpread,
+                  { backgroundColor: colors.surfaceAlt },
+                ]}
               >
-                <Image
-                  source={Images.chat}
-                  style={{
-                    height: 16,
-                    width: 16,
-                    marginLeft: 3,
-                    tintColor: colors.text,
-                  }}
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="chat_bubble"
+                  size={16}
+                  color={colors.text}
                 />
                 <CustomText
                   label={formatCount(commentsCount)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  marginRight={4}
+                  lineHeight={16}
                   color={colors.text}
                 />
               </TouchableOpacity>
@@ -1788,23 +2077,33 @@ const PostCard = ({
                     : setShowShareModal(true)
                 }
                 onStartShouldSetResponder={() => true}
-                style={[styles.rowbtn, { backgroundColor: colors.surfaceAlt }]}
+                style={[
+                  styles.rowbtn,
+                  styles.rowbtnSpread,
+                  { backgroundColor: colors.surfaceAlt },
+                ]}
               >
-                <Image
-                  source={Images.arrowUpRight}
-                  style={{ height: 16, width: 16, tintColor: colors.text }}
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="north_east"
+                  size={16}
+                  color={colors.text}
                 />
                 <CustomText
                   label={formatCount(stats?.shares || 0)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  marginRight={4}
+                  lineHeight={16}
                   color={colors.text}
                 />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.rowbtn, { backgroundColor: colors.surfaceAlt }]}
+                style={[
+                  styles.rowbtn,
+                  styles.rowbtnSpread,
+                  { backgroundColor: colors.surfaceAlt },
+                ]}
                 onPress={() =>
                   item?.privacy?.repost == false
                     ? ToastMessage(
@@ -1815,20 +2114,17 @@ const PostCard = ({
                 }
                 onStartShouldSetResponder={() => true}
               >
-                <Image
-                  source={Images.repost}
-                  style={{
-                    height: 16,
-                    width: 16,
-                    marginLeft: 4,
-                    tintColor: colors.text,
-                  }}
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="sync_alt"
+                  size={16}
+                  color={colors.text}
                 />
                 <CustomText
                   label={formatCount(repostsCount)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  marginRight={4}
+                  lineHeight={16}
                   color={colors.text}
                 />
               </TouchableOpacity>
@@ -1846,6 +2142,7 @@ const PostCard = ({
                 disabled={isSaving}
                 style={[
                   styles.rowbtn,
+                  styles.rowbtnSpread,
                   { backgroundColor: colors.surfaceAlt },
                   isSaved && {
                     backgroundColor:
@@ -1853,24 +2150,23 @@ const PostCard = ({
                   },
                 ]}
               >
-                <Image
-                  source={Images.savePlus}
-                  style={{
-                    height: 13,
-                    width: 13,
-                    marginLeft: 4,
-                    tintColor: isSaved
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="bookmark_add"
+                  size={16}
+                  color={
+                    isSaved
                       ? themeMode === "dark"
                         ? COLORS.black
                         : COLORS.white
-                      : colors.text,
-                  }}
+                      : colors.text
+                  }
                 />
                 <CustomText
                   label={formatCount(localSaves)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  marginRight={4}
+                  lineHeight={16}
                   color={
                     isSaved
                       ? themeMode === "dark"
@@ -1883,9 +2179,14 @@ const PostCard = ({
             </View>
             {upvotes?.length > 0 && item?.friendLikes?.length > 0 && (
               <View style={[styles.row, { gap: 4, marginTop: 4 }]}>
-                {userData?.profile?.avatar ? (
+                {item?.friendLikes[0]?.profile?.avatar ||
+                userData?.profile?.avatar ? (
                   <ImageFast
-                    source={{ uri: userData?.profile?.avatar }}
+                    source={{
+                      uri:
+                        item?.friendLikes[0]?.profile?.avatar ||
+                        userData?.profile?.avatar,
+                    }}
                     style={{ height: 16, width: 16, borderRadius: 99 }}
                   />
                 ) : (
@@ -1894,18 +2195,32 @@ const PostCard = ({
                       height: 16,
                       width: 16,
                       borderRadius: 99,
-                      backgroundColor: userData?.profile?.profileColor,
+                      backgroundColor:
+                        item?.friendLikes[0]?.profile?.profileColor ||
+                        userData?.profile?.profileColor,
                     }}
                   />
                 )}
                 <CustomText
-                  label={`${item?.friendLikes[0]?.firstName}`}
+                  label={`${item?.friendLikes[0]?.firstName}${
+                    item?.friendLikes?.length > 1
+                      ? ` & ${item.friendLikes.length - 1} friend${
+                          item.friendLikes.length - 1 > 1 ? "s" : ""
+                        }`
+                      : ""
+                  }`}
+                  fontSize={12}
+                  lineHeight={16}
+                  letterSpacing={-0.06}
                   fontFamily={fonts.medium}
                 />
                 <CustomText
                   label={"reacted to this post"}
+                  fontSize={12}
+                  lineHeight={16}
+                  letterSpacing={-0.06}
                   fontFamily={fonts.regular}
-                  color={colors.textSecondary}
+                  color={COLORS.gray48}
                 />
               </View>
             )}
@@ -1914,12 +2229,15 @@ const PostCard = ({
               <View
                 style={[
                   styles.row,
-                  { justifyContent: "space-between", marginTop: 6 },
+                  { justifyContent: "space-between", marginTop: 4 },
                 ]}
               >
                 <View style={[styles.row, { gap: 4, paddingHorizontal: 0 }]}>
                   <CustomText
                     label={item?.topComment?.author?.firstName}
+                    fontSize={12}
+                    lineHeight={16}
+                    letterSpacing={-0.12}
                     fontFamily={fonts.medium}
                   />
                   <View
@@ -1927,42 +2245,65 @@ const PostCard = ({
                       height: 4,
                       width: 4,
                       borderRadius: 99,
-                      backgroundColor: colors.surfaceAlt,
+                      backgroundColor: "rgba(255, 255, 255, 0.16)",
                     }}
                   />
                   <CustomText
                     label={"With the most liked comment"}
+                    fontSize={12}
+                    lineHeight={16}
+                    letterSpacing={-0.12}
                     fontFamily={fonts.regular}
-                    color={colors.textSecondary}
+                    color={colors.text}
                   />
                 </View>
-                <ImageFast
-                  source={Images.heart}
-                  tintColor={colors.textSecondary}
-                  style={{
-                    height: 16,
-                    width: 16,
-                    tintColor: colors.textSecondary,
-                  }}
-                />
+                <View style={[styles.row, { gap: 4, paddingHorizontal: 0 }]}>
+                  <Icons
+                    family="MaterialSymbolsRoundedFilled"
+                    name="group"
+                    size={16}
+                    color={COLORS.gray48}
+                  />
+                  <CustomText
+                    label={formatCount(
+                      item?.topComment?.stats?.likes ||
+                        item?.topComment?.likes?.length ||
+                        0,
+                    )}
+                    fontSize={12}
+                    lineHeight={16}
+                    fontFamily={fonts.medium}
+                  />
+                  <Icons
+                    family="MaterialSymbolsRounded"
+                    name="arrow_upward"
+                    size={14}
+                    color={colors.text}
+                  />
+                </View>
               </View>
             )}
             {commentsCount > 0 && (
               <CustomText
                 label={`View all ${formatCount(commentsCount)} comments`}
-                color={colors.textSecondary}
+                fontSize={12}
+                lineHeight={16}
+                letterSpacing={-0.06}
+                color={COLORS.gray48}
                 fontFamily={fonts.regular}
                 marginBottom={4}
-                marginTop={6}
-                marginLeft={12}
+                marginTop={4}
+                marginLeft={8}
               />
             )}
             <CustomText
               label={timeAgo}
-              color={colors.textSecondary}
-              fontSize={12}
-              marginLeft={12}
-              marginTop={commentsCount > 0 ? 0 : 6}
+              color={COLORS.gray48}
+              fontSize={10}
+              lineHeight={14}
+              letterSpacing={-0.05}
+              marginLeft={8}
+              marginTop={commentsCount > 0 ? 0 : 4}
               fontFamily={fonts.regular}
             />
           </View>
@@ -2078,6 +2419,13 @@ const PostCard = ({
           item={item}
         />
 
+        <TaggedSheet
+          visible={showTagged}
+          onDismiss={() => setShowTagged(false)}
+          sponsors={taggedSponsors}
+          collaborators={taggedCollaborators}
+        />
+
         {/* Viewer Modal */}
         <ViewerModal
           isVisible={showViewerModal}
@@ -2095,28 +2443,36 @@ export default PostCard;
 const createStyles = (colors, themeMode) =>
   StyleSheet.create({
     mainContainer: {
-      paddingVertical: 4,
-
-      // paddingHorizontal: 12,
+      paddingTop: 12,
+      paddingBottom: 12,
       backgroundColor: colors.background,
     },
     row: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 12,
+      paddingHorizontal: 8,
     },
+    // Figma action pill: 56.5 fill × 28, r4, pad 6/2/4/2, gap 2, left-aligned
     rowbtn: {
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "flex-start",
+      gap: 2,
       backgroundColor:
         themeMode === "dark" ? "#FFFFFF0A" : "rgba(18, 18, 18, 0.04)",
-      paddingRight: 6,
-      paddingLeft: 4,
-      paddingVertical: 4,
+      paddingLeft: 6,
+      paddingRight: 4,
+      paddingVertical: 2,
       borderRadius: 4,
-      width: "15.5%",
       height: 28,
+      flex: 1,
+      minWidth: 0,
+    },
+    // Action pills: icon and count spread apart, inset from the pill edges
+    rowbtnSpread: {
       justifyContent: "space-between",
+      paddingLeft: 10,
+      paddingRight: 10,
     },
     rowBetween: {
       flexDirection: "row",
@@ -2125,8 +2481,8 @@ const createStyles = (colors, themeMode) =>
       justifyContent: "space-between",
     },
     avatar: {
-      height: 32,
-      width: 32,
+      height: 40,
+      width: 40,
       borderRadius: 99,
     },
     userInfo: {
@@ -2137,20 +2493,23 @@ const createStyles = (colors, themeMode) =>
       alignItems: "center",
     },
     verifiedIcon: {
-      height: 14,
-      width: 14,
+      height: 16,
+      width: 16,
       marginLeft: 4,
     },
-    moreIcon: {
+    moreButton: {
       height: 32,
       width: 32,
+      borderRadius: 99,
+      alignItems: "center",
+      justifyContent: "center",
       marginLeft: 8,
     },
     wrapper: {
       gap: 4,
       flexWrap: "wrap",
       flexDirection: "row",
-      paddingHorizontal: 12,
+      paddingHorizontal: 8,
       alignItems: "center",
     },
     cardBg: {
@@ -2179,23 +2538,28 @@ const createStyles = (colors, themeMode) =>
     rowButtons: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
-      paddingVertical: 4,
+      gap: 4,
+      paddingVertical: 0,
     },
-    indicator: {
-      height: 6,
+    dotsOverlay: {
+      position: "absolute",
+      bottom: 20,
+      alignSelf: "center",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      zIndex: 2,
+    },
+    dot: {
+      height: 5,
+      width: 5,
       borderRadius: 99,
+      backgroundColor: "rgba(255, 255, 255, 0.48)",
     },
-    activeWidth: {
-      width: 30,
-    },
-    activeIndicator: {
-      width: 30,
-    },
-    inactiveIndicator: {
-      width: 6,
-      backgroundColor:
-        themeMode === "dark" ? "#A1937529" : "rgba(18, 18, 18, 0.16)",
+    dotActive: {
+      width: 24,
+      height: 5,
+      backgroundColor: COLORS.white,
     },
     glowBg: {
       position: "absolute",
@@ -2209,21 +2573,20 @@ const createStyles = (colors, themeMode) =>
       elevation: 50,
     },
     scrollView: {
-      borderRadius: 16,
+      borderRadius: 8,
     },
+    // Blurred media backdrop only — no coloured shadow (Figma has none)
     glowShadowContainer: {
       position: "absolute",
-      borderRadius: 16,
-      shadowOpacity: 0.5,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 20,
+      borderRadius: 8,
+      shadowOpacity: 0,
+      elevation: 0,
     },
 
     ambientWrapper: {
       width: "100%",
       height: "100%",
-      borderRadius: 16,
+      borderRadius: 8,
       overflow: "hidden",
     },
     videoOverlay: {
@@ -2235,7 +2598,7 @@ const createStyles = (colors, themeMode) =>
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: "rgba(0,0,0,0.1)",
-      borderRadius: 16,
+      borderRadius: 8,
     },
     playIcon: {
       width: 50,
@@ -2301,7 +2664,7 @@ const createStyles = (colors, themeMode) =>
       backgroundColor: "rgba(55, 184, 116, 0.48)",
       marginTop: 8,
       height: 20,
-      marginHorizontal: 12,
+      marginHorizontal: 8,
     },
     backButton: {
       borderRadius: 99,
@@ -2319,8 +2682,6 @@ const createStyles = (colors, themeMode) =>
       borderRadius: 99,
       alignItems: "center",
       justifyContent: "center",
-      // marginBottom: 10,
-      marginHorizontal: 12,
     },
     tagWrapper: {
       gap: 4,
@@ -2335,14 +2696,43 @@ const createStyles = (colors, themeMode) =>
       flexDirection: "row",
       alignItems: "center",
       borderRadius: 99,
-      paddingLeft: 8,
-      paddingRight: 10,
-      height: 24,
+      paddingLeft: 6,
+      paddingRight: 8,
+      height: 28,
     },
     person: {
       height: 16,
       width: 16,
       borderRadius: 99,
+    },
+    findPostsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      height: 32,
+      borderRadius: 100,
+      paddingLeft: 8,
+      paddingRight: 10,
+      marginHorizontal: 8,
+      marginBottom: 12,
+      gap: 4,
+    },
+    findPostsTextWrap: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    subtitlePill: {
+      flex: 1,
+      maxWidth: 250,
+      height: 24,
+      borderRadius: 100,
+      backgroundColor: "rgba(18, 18, 18, 0.8)",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 10,
+      marginHorizontal: 8,
+      overflow: "hidden",
     },
     topBlurContainer: {
       position: "absolute",

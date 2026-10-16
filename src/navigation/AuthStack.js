@@ -7,10 +7,17 @@ import ConfirmPinCode from "../screens/Auth/ConfirmPinCode";
 import ForgotPass from "../screens/Auth/ForgotPass";
 import ForgotPasswordOtp from "../screens/Auth/ForgotPasswordOtp";
 import Login from "../screens/Auth/Login";
+import LoginPassword from "../screens/Auth/Login/LoginPassword";
+import LoginPin from "../screens/Auth/Login/LoginPin";
+import LoginOtp from "../screens/Auth/Login/LoginOtp";
+import LoginQRCode from "../screens/Auth/Login/LoginQRCode";
 import PreviousAccounts from "../screens/Auth/PreviousAccounts";
 import TwoFactorVerify from "../screens/Auth/TwoFactorVerify";
 import NewPass from "../screens/Auth/NewPass";
 import OnBoardingScreens from "../screens/Auth/OnBoarding/index";
+import OnBoarding1 from "../screens/Auth/OnBoarding1";
+import OnBoarding2 from "../screens/Auth/OnBoarding2";
+import OnBoarding3 from "../screens/Auth/OnBoarding3";
 import Password from "../screens/Auth/Password";
 import PersonalAds from "../screens/Auth/PersonalAds";
 import PinCode from "../screens/Auth/PinCode";
@@ -71,6 +78,10 @@ const AuthStack = () => {
       <Stack.Screen name="NewPass" component={NewPass} />
       <Stack.Screen name="Profile" component={Profile} />
       <Stack.Screen name="Login" component={Login} />
+      <Stack.Screen name="LoginPassword" component={LoginPassword} />
+      <Stack.Screen name="LoginPin" component={LoginPin} />
+      <Stack.Screen name="LoginOtp" component={LoginOtp} />
+      <Stack.Screen name="LoginQRCode" component={LoginQRCode} />
       <Stack.Screen name="PreviousAccounts" component={PreviousAccounts} />
       <Stack.Screen name="TwoFactorVerify" component={TwoFactorVerify} />
       <Stack.Screen
@@ -79,6 +90,9 @@ const AuthStack = () => {
       />
       <Stack.Screen name="CustomCameraScreen" component={CustomCameraScreen} />
       <Stack.Screen name="WelcomeScreen" component={WelcomeScreen} />
+      <Stack.Screen name="OnBoarding1" component={OnBoarding1} />
+      <Stack.Screen name="OnBoarding2" component={OnBoarding2} />
+      <Stack.Screen name="OnBoarding3" component={OnBoarding3} />
       <Stack.Screen name="ProfilePrivacy" component={ProfilePrivacy} />
 
       {/* Pro Screens */}

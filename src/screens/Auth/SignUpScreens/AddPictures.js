@@ -184,7 +184,7 @@ const AddPictures = forwardRef(
     };
 
     const back = () => {
-      setCurrentIndex(12);
+      setCurrentIndex(15);
     };
 
     useImperativeHandle(ref, () => ({ submit, back, isLoading: loading }));

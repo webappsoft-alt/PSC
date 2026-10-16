@@ -117,7 +117,7 @@ const CustomInputTextOnly = ({
                 family={"Ionicons"}
                 name={"location"}
                 size={14}
-                color={isDark ? COLORS.white16 : COLORS.black}
+                color={colors.text}
               />
               {/* <ImageFast
                 source={Images.LocationPin}

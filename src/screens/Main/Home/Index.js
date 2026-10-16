@@ -6,13 +6,18 @@ import {
 import moment from "moment/moment";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   DeviceEventEmitter,
   FlatList,
+  Platform,
   RefreshControl,
   StyleSheet,
   View,
 } from "react-native";
+import ReactNativeHapticFeedback from "react-native-haptic-feedback";
+import LinearGradient from "react-native-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 import fonts from "../../../assets/fonts";
 import CustomText from "../../../components/CustomText";
@@ -29,7 +34,9 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { getProfile } from "../../../utils/constants";
 import { ToastMessage } from "../../../utils/ToastMessage";
 import useLocation from "../../../utils/useLocation";
-import FollowingRow from "./molecules/FollowingRow";
+import FeedComposerRow from "./molecules/FeedComposerRow";
+import { evaluateNavTone } from "../../../utils/navTone";
+import { feedHeaderHeight } from "./molecules/FeedHeader";
 import MomentCard from "./molecules/MomentCard";
 import PostCard from "./molecules/PostCard";
 import PostCardSkeleton from "./molecules/PostCardSkeleton";
@@ -162,7 +169,7 @@ const FeedPostItem = memo(
           onSwipeRight={handleOpenComments}
           shouldPlay={shouldPlay}
         />
-        <Divider marginBottom={12} marginTop={8} thickness={4} />
+        <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
       </>
     );
   },
@@ -174,9 +181,12 @@ const Home = ({
   onSetPage,
   isFocusedPage,
   sharedTab,
+  sharedTabNames,
+  feedFilters,
 }) => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
+  const insets = useSafeAreaInsets();
   const { socket } = useSocket();
   const { colors } = useTheme();
   const isFocus = useIsFocused();
@@ -205,10 +215,11 @@ const Home = ({
 
   const [error, setError] = useState(null);
   const storyUploadStatus = useSelector(selectStoryUploadStatus);
+  const feedLocation = useSelector((state) => state.users.location);
 
   const [feedType, setFeedType] = useState(route?.params?.feedType || "social");
   const scrollY = useRef(new Animated.Value(0)).current;
-  const { setIsTabBarVisible } = useTabBarVisibility();
+  const { setIsTabBarVisible, setFeedRowVisible } = useTabBarVisibility();
   const lastContentOffset = useRef(0);
   const scrollRef = useRef(null);
   const hasFeedContentRef = useRef(false);
@@ -220,6 +231,8 @@ const Home = ({
   useEffect(() => {
     getLocation();
     const listener = scrollY.addListener(({ value }) => {
+      // adaptive tab bar: re-check the media under the bar (once per frame)
+      evaluateNavTone();
       if (value < 0) return;
 
       const currentOffset = value;
@@ -227,7 +240,7 @@ const Home = ({
 
       if (Math.abs(diff) < 20) return;
 
-      const shouldShow = diff < 0;
+      const shouldShow = diff < 0 || currentOffset <= 0;
 
       // ✅ Only update if visibility ACTUALLY changed
       if (tabBarVisibleRef.current !== shouldShow) {
@@ -235,23 +248,27 @@ const Home = ({
         setIsTabBarVisible(shouldShow);
       }
 
+      // Pinterest-style: Feed/Shorts row collapses on scroll down
+      setFeedRowVisible?.(shouldShow);
+
       lastContentOffset.current = currentOffset;
     });
 
     return () => {
       scrollY.removeListener(listener);
     };
-  }, [getLocation, scrollY, setIsTabBarVisible]);
+  }, [getLocation, scrollY, setIsTabBarVisible, setFeedRowVisible]);
 
   useFocusEffect(
     useCallback(() => {
       // When screen comes into focus, always show bottom tab
       tabBarVisibleRef.current = true;
       setIsTabBarVisible(true);
+      setFeedRowVisible?.(true);
 
       // Reset last offset so scroll logic doesn’t instantly hide it
       lastContentOffset.current = 0;
-    }, [setIsTabBarVisible]),
+    }, [setIsTabBarVisible, setFeedRowVisible]),
   );
 
   useEffect(() => {
@@ -381,11 +398,17 @@ const Home = ({
   }, [dispatch, fetchHashtags, getMyStories, getStories, fetchRadios]);
 
   const fetchPosts = useCallback(
-    async (isManualRefresh = false) => {
+    async (isManualRefresh = false, fromPull = false) => {
       try {
-        if (isManualRefresh) {
+        // Only a user pull shows the RefreshControl. Starting it
+        // programmatically leaves UIRefreshControl's ~60pt content inset stuck
+        // on iOS (the gap under the header).
+        if (fromPull) {
           setRefreshing(true);
-        } else if (isFirstLoadRef.current || !hasFeedContentRef.current) {
+        } else if (
+          !isManualRefresh &&
+          (isFirstLoadRef.current || !hasFeedContentRef.current)
+        ) {
           setSkeletonLoading(true);
         }
         setError(null);
@@ -397,7 +420,9 @@ const Home = ({
         } else if (feedType === "favourite") {
           endpoint = "saved?page=1&limit=10";
         } else {
-          const selectedTopic = TAB_NAMES[tab] || selectedTrendingTopic;
+          const topicNames = sharedTabNames || TAB_NAMES;
+          const selectedTopic =
+            (tab !== null && topicNames[tab]) || selectedTrendingTopic;
           if (selectedTopic) {
             endpoint += `&topic=${selectedTopic}`;
           }
@@ -406,6 +431,23 @@ const Home = ({
             const tagObj = hashtags.find((h) => h._id === selectedHashtag);
             if (tagObj) {
               endpoint += `&hashtags=${tagObj.tag}`;
+            }
+          }
+
+          // Filters sheet: sorting + time period
+          if (feedFilters?.sortBy && feedFilters.sortBy !== "createdAt") {
+            endpoint += `&sortBy=${feedFilters.sortBy}`;
+          }
+          if (feedFilters?.period) {
+            endpoint += `&period=${feedFilters.period}`;
+          }
+
+          // Area picked from the header location → posts published around it
+          if (feedLocation?.feedArea) {
+            if (feedLocation.city) {
+              endpoint += `&city=${encodeURIComponent(feedLocation.city)}`;
+            } else if (feedLocation.latitude && feedLocation.longitude) {
+              endpoint += `&lat=${feedLocation.latitude}&lng=${feedLocation.longitude}&radius=50`;
             }
           }
         }
@@ -461,11 +503,24 @@ const Home = ({
         isFirstLoadRef.current = false;
       }
     },
-    [feedType, hashtags, selectedHashtag, selectedTrendingTopic, tab],
+    [
+      feedType,
+      hashtags,
+      selectedHashtag,
+      selectedTrendingTopic,
+      tab,
+      sharedTabNames,
+      feedFilters,
+      feedLocation,
+    ],
   );
 
   const onRefresh = useCallback(() => {
-    fetchPosts(true);
+    ReactNativeHapticFeedback.trigger("impactLight", {
+      enableVibrateFallback: true,
+      ignoreAndroidSystemSettings: false,
+    });
+    fetchPosts(true, true);
     fetchMetaData();
   }, [fetchMetaData, fetchPosts]);
 
@@ -485,17 +540,25 @@ const Home = ({
     const subscription = DeviceEventEmitter.addListener(
       "uploadCompleted",
       () => {
-        onRefresh();
+        fetchPosts(true);
+        fetchMetaData();
       },
     );
     return () => {
       subscription.remove();
     };
-  }, [onRefresh]);
+  }, [fetchPosts, fetchMetaData]);
 
   useEffect(() => {
     fetchTrendingTopics();
   }, [fetchTrendingTopics]);
+
+  // Figma: list content starts 1px below the 170pt header.
+  // On iOS the pager (react-native-pager-view 8 / SwiftUI TabView) already
+  // shifts every page down by the status-bar safe-area inset, so that part of
+  // the header is cleared natively and must not be padded a second time.
+  const pagerTopShift = Platform.OS === "ios" ? insets.top : 0;
+  const listTopPadding = feedHeaderHeight(insets.top) + 1 - pagerTopShift;
 
   const formatCount = useCallback((count) => {
     if (!count || count === 0) return "0";
@@ -628,6 +691,7 @@ const Home = ({
           <>
             {/* <Divider marginBottom={12} marginTop={8} thickness={4} /> */}
             <ReelCard onSetPage={onSetPage} isScreenActive={activeFocus} />
+            <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
           </>
         );
       }
@@ -636,6 +700,7 @@ const Home = ({
           <>
             {/* <Divider marginBottom={12} marginTop={8} thickness={4} /> */}
             <TrendingIndividual />
+            <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
           </>
         );
       }
@@ -643,18 +708,30 @@ const Home = ({
       if (item.type === "unfollowedText") {
         return (
           <>
-            <CustomText
-              label={
-                "From now on you will only see posts from unfollowed users"
-              }
-              alignSelf={"center"}
-              fontSize={18}
-              color={colors.textSecondary}
-              fontFamily={fonts.medium}
-              textAlign={"center"}
-              marginTop={8}
-            />
-            <Divider marginBottom={12} marginTop={16} thickness={4} />
+            {/* Figma: 375 fill × 60 hug, pad 16, linear #121212 → gold (sampled
+                bottom ≈ rgb(143,128,98)); text 351 fill, Medium 14 / 125% /
+                −2%, white, centered */}
+            <View style={styles.unfollowedBanner}>
+              <LinearGradient
+                colors={["rgba(161, 147, 117, 0)", "rgba(161, 147, 117, 0.86)"]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <CustomText
+                label={
+                  "From now on you will only see posts from unfollowed users"
+                }
+                fontSize={14}
+                lineHeight={17.5}
+                letterSpacing={-0.28}
+                color={COLORS.white}
+                fontFamily={fonts.medium}
+                textAlign={"center"}
+                containerStyle={{ width: "100%" }}
+              />
+            </View>
+            <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
           </>
         );
       }
@@ -693,11 +770,11 @@ const Home = ({
       return (
         <View>
           <PostCardSkeleton />
-          <Divider marginBottom={12} marginTop={8} thickness={4} />
+          <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
           <PostCardSkeleton />
-          <Divider marginBottom={12} marginTop={8} thickness={4} />
+          <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
           <PostCardSkeleton />
-          <Divider marginBottom={12} marginTop={8} thickness={4} />
+          <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
         </View>
       );
     }
@@ -799,14 +876,14 @@ const Home = ({
   const renderListHeader = useCallback(
     () => (
       <View style={{ marginBottom: 0 }}>
-        <FollowingRow />
-        <Divider marginVertical={0} thickness={1} color={colors.white16} />
+        <FeedComposerRow />
+        <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
         <MomentCard storiesData={storiesData} myStoriesData={myStoriesData} />
-        <Divider marginBottom={4} thickness={1} color={colors.white16} />
+        <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
         {radioData?.length > 0 && (
           <>
             <RadioCard data={radioData} />
-            <Divider marginVertical={0} thickness={1} color={colors.white16} />
+            <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
           </>
         )}
         <TendingTopic
@@ -817,12 +894,7 @@ const Home = ({
           selectedTrendingTopic={selectedTrendingTopic}
           onSelectTrendingTopic={handleTrendingTopicSelection}
         />
-        <Divider
-          marginVertical={0}
-          marginBottom={8}
-          thickness={1}
-          color={colors.white16}
-        />
+        <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
       </View>
     ),
     [
@@ -850,6 +922,9 @@ const Home = ({
           <FlatList
             showsVerticalScrollIndicator={false}
             ref={scrollRef}
+            // iOS otherwise adds the safe-area inset on top of paddingTop
+            contentInsetAdjustmentBehavior="never"
+            automaticallyAdjustContentInsets={false}
             data={processedPosts}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
@@ -864,9 +939,11 @@ const Home = ({
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                // tintColor={COLORS.buttonColor}
-                // colors={[COLORS.buttonColor]}
-                progressViewOffset={100}
+                // iOS draws its spinner at the very top of the list — under
+                // the floating feed header — so it's hidden there and our own
+                // indicator below the header is shown instead.
+                tintColor={Platform.OS === "ios" ? "transparent" : undefined}
+                progressViewOffset={listTopPadding}
               />
             }
             removeClippedSubviews={true}
@@ -874,8 +951,31 @@ const Home = ({
             updateCellsBatchingPeriod={50}
             initialNumToRender={5}
             windowSize={10}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={{
+              paddingTop: listTopPadding,
+              paddingBottom: 100,
+            }}
           />
+          {Platform.OS === "ios" ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pullIndicator,
+                {
+                  top: listTopPadding + 18,
+                  opacity: refreshing
+                    ? 1
+                    : scrollY.interpolate({
+                        inputRange: [-70, -20],
+                        outputRange: [1, 0],
+                        extrapolate: "clamp",
+                      }),
+                },
+              ]}
+            >
+              <ActivityIndicator size="small" color={colors.text} />
+            </Animated.View>
+          ) : null}
         </ScreenWrapper>
       </View>
     </View>
@@ -885,6 +985,19 @@ const Home = ({
 export default Home;
 
 const styles = StyleSheet.create({
+  unfollowedBanner: {
+    width: "100%",
+    padding: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  pullIndicator: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",

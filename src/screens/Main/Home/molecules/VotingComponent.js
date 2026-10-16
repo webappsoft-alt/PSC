@@ -34,7 +34,7 @@ const VotingComponent = () => {
   };
 
   return (
-    <View style={{ gap: 10 }}>
+    <View style={{ gap: 8, paddingHorizontal: 8 }}>
       {options.map((item, index) => {
         const width = (containerWidth * item.percentage) / 100;
 
@@ -60,8 +60,8 @@ const VotingComponent = () => {
                       index == 0
                         ? COLORS.white
                         : index == 1
-                        ? "#FFFFFF29"
-                        : "#FFFFFF0A",
+                        ? "rgba(255, 255, 255, 0.16)"
+                        : "rgba(255, 255, 255, 0.04)",
                   },
                 ]}
               />
@@ -73,8 +73,10 @@ const VotingComponent = () => {
                 >
                   <CustomText
                     label={item.name}
+                    fontSize={14}
+                    lineHeight={18}
                     fontFamily={fonts.medium}
-                    color={index == 0 ? COLORS.black : COLORS.white}
+                    color={index == 0 ? "#121212" : COLORS.white}
                   />
                   <View style={styles.imageStackContainer}>
                     {Array.from({
@@ -93,16 +95,17 @@ const VotingComponent = () => {
                   <CustomText
                     label={item.name1}
                     fontFamily={fonts.medium}
-                    fontSize={12}
-                    color={
-                      index == 0 ? COLORS.black : "rgba(255, 255, 255, 0.64)"
-                    }
+                    fontSize={14}
+                    lineHeight={18}
+                    letterSpacing={-0.07}
+                    color={index == 0 ? "#121212" : "rgba(255, 255, 255, 0.64)"}
                   />
                 </View>
                 <CustomText
                   label={`${item.percentage}%`}
+                  fontSize={14}
+                  lineHeight={18}
                   fontFamily={fonts.medium}
-                  //   color={width > 100 ? COLORS.black : COLORS.white}
                   color={COLORS.white}
                 />
               </View>
@@ -118,7 +121,7 @@ export default VotingComponent;
 
 const styles = StyleSheet.create({
   outerBar: {
-    height: 56,
+    height: 40,
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#FFFFFF0A",
@@ -132,16 +135,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingLeft: 12,
+    paddingRight: 16,
   },
   imageStackContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
   stackImage: {
-    height: 18,
-    width: 18,
-    borderRadius: 9,
+    height: 24,
+    width: 24,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#0000001A", // subtle border for clarity
   },

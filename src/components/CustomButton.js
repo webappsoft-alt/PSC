@@ -150,7 +150,7 @@ const CustomButton = ({
         {loading && (
           <ActivityIndicator
             size={loadingSize || 25}
-            color={indicatorColor || COLORS.white}
+            color={indicatorColor || color || COLORS.primaryColor}
           />
         )}
 

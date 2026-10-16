@@ -4,12 +4,12 @@ import fonts from "../../../assets/fonts";
 import { Images } from "../../../assets/images";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
-import ImageFast from "../../../components/ImageFast";
+import Icons from "../../../components/Icons";
 import ScreenWrapper from "../../../components/ScreenWrapper";
 import { COLORS } from "../../../utils/COLORS";
 
 const PinOnBoarding = ({ route }) => {
-  const { state } = route.params;
+  const state = route?.params?.state;
   const navigation = useNavigation();
   return (
     <ScreenWrapper
@@ -27,6 +27,7 @@ const PinOnBoarding = ({ route }) => {
             title="Later"
             backgroundColor={COLORS.lightGray}
             color={COLORS.primaryColor}
+            onPress={() => navigation.navigate("AllowNotification")}
           />
         </View>
       )}
@@ -39,10 +40,11 @@ const PinOnBoarding = ({ route }) => {
           paddingHorizontal: 30,
         }}
       >
-        <ImageFast
-          source={Images.pinCode}
-          style={{ height: 80, width: 80 }}
-          resizeMode="contain"
+        <Icons
+          family="MaterialSymbolsRoundedFilled"
+          name="pin"
+          size={80}
+          color="#8C8C8C"
         />
         <CustomText
           label="PIN Code"

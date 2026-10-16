@@ -1,190 +1,196 @@
 import { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert, StatusBar, StyleSheet, View } from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import AuthFooter from "../../../components/Auth/AuthFooter";
 import CustomInput from "../../../components/CustomInput";
-import Header from "../../../components/Header";
-import { ToastMessage } from "../../../utils/ToastMessage";
-import { post } from "../../../services/ApiRequest";
-import ErrorComponent from "../../../components/ErrorComponent";
+import CustomPhoneInput from "../../../components/CustomPhoneInput";
 import CustomText from "../../../components/CustomText";
+import ErrorComponent from "../../../components/ErrorComponent";
+import Header from "../../../components/Header";
+import Icons from "../../../components/Icons";
+import { SlidingSegmentPager } from "../../../components/Auth/SlidingSegmentControl";
+
 import fonts from "../../../assets/fonts";
 import { COLORS } from "../../../utils/COLORS";
-import AuthFooter from "../../../components/Auth/AuthFooter";
+import { isValidEmail, isValidPhone } from "../../../utils/constants";
+import { post } from "../../../services/ApiRequest";
+import { ToastMessage } from "../../../utils/ToastMessage";
 import { useTheme } from "../../../contexts/ThemeContext";
 
-const ForgotPass = ({ navigation }) => {
+const ForgotPass = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+
+  const paramEmail = route?.params?.email;
+  const paramPhone = route?.params?.phone;
+
+  const [email, setEmail] = useState(paramEmail || "");
+  const [phoneNumber, setPhoneNumber] = useState(paramPhone || "");
+  const [contactMethod, setContactMethod] = useState(
+    paramEmail ? "email" : "phone",
+  );
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [email, setEmail] = useState("");
-  const [showSuccessColor, setShowSuccessColor] = useState(false);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  const validateEmail = (val) => {
-    let newErrors = "";
-    if (!val.trim()) {
-      newErrors = "Please enter your email";
-    } else if (!emailRegex.test(val.trim())) {
-      newErrors = "Please enter a valid email address";
-    } else {
-      newErrors = "";
-      setShowSuccessColor(true);
-      setTimeout(() => {
-        setShowSuccessColor(false);
-      }, 2000);
-    }
-    return newErrors;
-  };
-
-  const handleEmailChange = (text) => {
-    setEmail(text);
-    if (error) {
-      // Clear API errors immediately when user starts typing
-      if (error.includes("Invalid") || error.includes("failed")) {
-        setError("");
-      } else {
-        // For validation errors, check if input is valid
-        const newError = validateEmail(text);
-        if (!newError) {
-          setError("");
-        }
-      }
-    }
+  const canContinue = () => {
+    if (contactMethod === "email") return isValidEmail(email);
+    return isValidPhone(phoneNumber);
   };
 
   const sendOtp = async () => {
-    const emailError = validateEmail(email);
-    if (emailError) {
-      setError(emailError);
-      return;
-    }
-
-    setError("");
-
+    const identifier =
+      contactMethod === "email"
+        ? { email: email.trim() }
+        : { phone: phoneNumber };
     try {
       setLoading(true);
-      const body = { email: email.trim() };
-      const response = await post("auth/forgot-password-otp", body);
-
-      console.log("Forgot password response:", response?.data);
+      const response = await post("auth/forgot-password-otp", identifier);
 
       if (response?.data?.success) {
-        // Show code in alert
         Alert.alert("OTP Sent", `Verification code: ${response.data?.code}`, [
           {
             text: "OK",
-            onPress: () => {
-              // Navigate to OTP verification screen
-              navigation.navigate("ForgotPasswordOtp", {
-                email: email.trim(),
-              });
-            },
+            onPress: () =>
+              navigation.navigate("ForgotPasswordOtp", { ...identifier }),
           },
         ]);
-        ToastMessage(
-          response.data?.message || "OTP sent successfully",
-          "success",
-        );
       } else {
-        const errorMessage = response?.data?.message || "Failed to send OTP";
-        setError(errorMessage);
-        ToastMessage(errorMessage, "error");
+        ToastMessage(response?.data?.message || "Failed to send OTP", "error");
       }
-
       setLoading(false);
     } catch (error) {
       setLoading(false);
-      console.error("Forgot password error:", error);
-      const errorMessage =
-        error?.message || "Failed to send OTP. Please try again.";
-      setError(errorMessage);
-      ToastMessage(errorMessage, "error");
+      ToastMessage(
+        error?.message ||
+          "Failed to send OTP. Please try again.",
+        "error",
+      );
     }
   };
 
   return (
-    <ScreenWrapper
-      scrollEnabled
-      headerUnScrollable={() => (
-        <View style={{ paddingHorizontal: 12, marginBottom: 12 }}>
-          <CustomText
-            label={"Forgot my password"}
-            fontFamily={fonts.semiBold}
-            fontSize={20}
-          />
-          <CustomText
-            label={"Regain access with your email"}
-            fontFamily={fonts.regular}
-            color={isDark ? COLORS.subtitle : colors.textSecondary}
-          />
-        </View>
-      )}
-      footerUnScrollable={() => (
-        <View style={{ paddingHorizontal: 12 }}>
-          <AuthFooter
-            onPress={sendOtp}
-            loading={loading}
-            btnTitle="Send OTP"
-            btnDisabled={!email.trim()}
-          />
-        </View>
-      )}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, paddingTop: insets.top },
+      ]}
     >
-      <View style={{ justifyContent: "space-between", flex: 1 }}>
-        <View>
-          <CustomText
-            label={"What is your email?"}
-            fontFamily={fonts.semiBold}
-            fontSize={24}
-            marginTop={8}
-            marginBottom={6}
-            color={isDark ? COLORS.white : colors.text}
-          />
+      <StatusBar
+        barStyle={colors.statusBarStyle}
+        backgroundColor="transparent"
+        translucent
+      />
 
-          <CustomInput
-            value={email}
-            onChangeText={handleEmailChange}
-            error={error}
-            marginBottom={4}
-            placeholder="E.g. abc@email.com"
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
+      <Header title="Forgot my password" textTransform="none" />
 
-          <ErrorComponent
-            errorTitle={
-              showSuccessColor
-                ? "Valid email address."
-                : "We will send a verification code to this email"
-            }
-            error={error}
-            isValid={showSuccessColor}
-            color={
-              showSuccessColor
-                ? "#64CD75"
-                : error
-                ? "#EE1045CC"
-                : isDark
-                ? COLORS.gray2
-                : colors.textSecondary
-            }
-          />
-        </View>
+      <View style={styles.content}>
+        <SlidingSegmentPager
+          items={[
+            { key: "phone", label: "Phone Number" },
+            { key: "email", label: "Email" },
+          ]}
+          selectedKey={contactMethod}
+          onChange={setContactMethod}
+          trackColor={colors.surfaceAlt}
+          pillColor={colors.text}
+          activeLabelColor={colors.background}
+          inactiveLabelColor={isDark ? COLORS.gray64 : colors.textSecondary}
+          style={styles.toggle}
+          renderPage={(key) => (
+            <View>
+              <CustomText
+                label={
+                  key === "email"
+                    ? "What is your email?"
+                    : "What is your phone number?"
+                }
+                fontFamily={fonts.semiBold}
+                fontSize={24}
+                lineHeight={24 * 1.4}
+                letterSpacing={-0.24}
+                marginBottom={8}
+                color={isDark ? COLORS.white : colors.text}
+              />
+
+              {key === "email" ? (
+                <CustomInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="E.g. abc@email.com"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  marginBottom={8}
+                />
+              ) : (
+                <View>
+                  <CustomPhoneInput
+                    value={phoneNumber}
+                    setValue={setPhoneNumber}
+                    withLabel="PHONE NUMBER"
+                    marginBottom={8}
+                  />
+                  <View pointerEvents="none" style={styles.phoneRightIcon}>
+                    <Icons
+                      family="MaterialSymbolsRoundedFilled"
+                      name="call"
+                      size={18}
+                      color={COLORS.buttonColor}
+                    />
+                  </View>
+                </View>
+              )}
+
+              <ErrorComponent
+                errorTitle={`We will send a verification code to this ${
+                  key === "email" ? "email" : "phone number"
+                }.`}
+                color={isDark ? COLORS.gray2 : colors.textSecondary}
+                font={fonts.regular}
+              />
+            </View>
+          )}
+        />
       </View>
-    </ScreenWrapper>
+
+      <AuthFooter
+        paddingHorizontal={12}
+        onPress={sendOtp}
+        loading={loading}
+        btnTitle="Send OTP"
+        btnBackgroundColor={isDark ? COLORS.white : colors.text}
+        btnColor={isDark ? COLORS.primaryColor : colors.background}
+        btnDisabled={!canContinue()}
+      />
+    </View>
   );
 };
 
 export default ForgotPass;
 
 const styles = StyleSheet.create({
-  logo: {
-    width: "70%",
-    height: 250,
-    alignSelf: "center",
-    marginTop: 40,
-    marginBottom: 60,
+  container: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 12,
+  },
+  toggle: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  phoneRightIcon: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    height: 32,
+    width: 32,
+    borderRadius: 100,
+    backgroundColor: "rgba(161, 147, 117, 0.16)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -28,7 +28,7 @@ const ResetPassword = forwardRef(
       setBtnDisabled?.(!password.trim());
     }, [password]);
 
-    const [error, setError] = useState("Password do not match");
+    const [error, setError] = useState("");
     const [isError, setIsError] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -56,14 +56,12 @@ const ResetPassword = forwardRef(
           finalState = data;
         }
 
-        if (currentIndex < 12) {
-          setCurrentIndex(8);
-        }
+        setCurrentIndex(13);
       }
     };
 
     const back = () => {
-      setCurrentIndex(6);
+      setCurrentIndex(11);
     };
 
     useImperativeHandle(ref, () => ({ submit, back, isLoading: loading }));
@@ -111,7 +109,7 @@ const ResetPassword = forwardRef(
           <ErrorComponent
             error={isError}
             isValid={showSuccessColor}
-            errorTitle={error}
+            errorTitle={error || "Please re-enter your password"}
             color={
               showSuccessColor
                 ? "#64CD75"

@@ -48,16 +48,14 @@ const ConfirmPinCode = ({ route }) => {
             navigation.navigate("OnBoarding1");
           }
         } else {
-          setError(res?.data?.message);
+          setError(res?.data?.message || "Failed to save PIN code");
         }
         setLoading(false);
-        if (biometricAvailable) {
-          setShowBiometricModal(true);
-        } else {
-          navigation.navigate("OnBoarding1");
-        }
       } catch (error) {
         setLoading(false);
+        setError(
+          error?.message || "Failed to save PIN code",
+        );
       }
     }
   };
@@ -194,7 +192,7 @@ const ConfirmPinCode = ({ route }) => {
         lineHeight={24 * 1.4}
       />
       <CustomText
-        label={"Please enter your PIN code again to confirm it"}
+        label={"Please enter your PIN code again to confirm it."}
         color={isDark ? COLORS.gray1 : colors.textSecondary}
         marginBottom={40}
         marginTop={6}

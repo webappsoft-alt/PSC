@@ -74,7 +74,7 @@ const PersonalAds = ({ route }) => {
           tintColor={isDark ? undefined : colors.text}
         />
         <CustomText
-          label={`Enhanced &\n tailored ads`}
+          label={"Allowed\npersonalized ads"}
           fontSize={32}
           lineHeight={28 * 1.4}
           marginTop={12}

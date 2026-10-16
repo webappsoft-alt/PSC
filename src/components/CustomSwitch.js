@@ -1,7 +1,8 @@
-import { StyleSheet, View } from "react-native";
-import ToggleSwitch from "toggle-switch-react-native";
+import { Platform, StyleSheet, Switch, View } from "react-native";
+import { useTheme } from "../contexts/ThemeContext";
 import { COLORS } from "../utils/COLORS";
 
+/** Same as Viral's CustomSwitch: the platform switch, accent-coloured when on. */
 const CustomSwitch = ({
   setValue,
   value,
@@ -10,6 +11,10 @@ const CustomSwitch = ({
   marginBottom,
   bgColor,
 }) => {
+  const { isDark } = useTheme();
+  const onTint = bgColor || COLORS.buttonColor;
+  const androidTrackOff = isDark ? "#39393D" : "#E5E5EA";
+
   return (
     <View
       style={[
@@ -17,38 +22,18 @@ const CustomSwitch = ({
         { marginLeft, marginRight, marginBottom },
       ]}
     >
-      <ToggleSwitch
-        isOn={value}
-        onToggle={setValue}
-        size="medium"
-        onColor="#000"
-        offColor="#000"
-        thumbOnStyle={{
-          backgroundColor: "#fff",
-          height: 27,
-          width: 27,
-          borderRadius: 100,
-          marginLeft: 2,
-        }}
-        thumbOffStyle={{
-          backgroundColor: "#fff",
-          height: 27,
-          width: 27,
-          borderRadius: 100,
-          marginLeft: 2,
-        }}
-        trackOnStyle={{
-          backgroundColor: bgColor || "#A19375",
-          height: 31,
-          width: 51,
-          borderRadius: 100,
-        }}
-        trackOffStyle={{
-          backgroundColor: COLORS.inputBg,
-          height: 31,
-          width: 51,
-          borderRadius: 100,
-        }}
+      <Switch
+        value={!!value}
+        onValueChange={setValue}
+        // iOS: only the "on" tint (as Viral). Setting the off colour or
+        // ios_backgroundColor paints a second layer behind the native
+        // switch — the two-tone off state.
+        trackColor={
+          Platform.OS === "android"
+            ? { false: androidTrackOff, true: onTint }
+            : { true: onTint }
+        }
+        thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
       />
     </View>
   );
@@ -58,8 +43,6 @@ export default CustomSwitch;
 
 const styles = StyleSheet.create({
   switchContainer: {
-    // width: 48,
-    // flexDirection: "row",
-    // alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import CustomButton from "../../../components/CustomButton";
 import CustomInput from "../../../components/CustomInput";
 import CustomText from "../../../components/CustomText";
 import ErrorComponent from "../../../components/ErrorComponent";
 import Icons from "../../../components/Icons";
 import ScreenWrapper from "../../../components/ScreenWrapper";
+import Header from "../../../components/Header";
 import AuthFooter from "../../../components/Auth/AuthFooter";
 
 import fonts from "../../../assets/fonts";
-import { Images } from "../../../assets/images";
-import ImageFast from "../../../components/ImageFast";
 import { post } from "../../../services/ApiRequest";
 import { COLORS } from "../../../utils/COLORS";
 import { ToastMessage } from "../../../utils/ToastMessage";
@@ -19,7 +23,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 
 const ForgotPasswordOtp = ({ navigation, route }) => {
   const { colors, isDark } = useTheme();
-  const { email } = route.params || {};
+  const { email, phone } = route.params || {};
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [showSuccessColor, setShowSuccessColor] = useState(false);
@@ -116,7 +120,7 @@ const ForgotPasswordOtp = ({ navigation, route }) => {
 
   const onSendAgain = async () => {
     const body = {
-      email: email,
+      ...(email ? { email } : { phone }),
     };
 
     try {
@@ -124,7 +128,7 @@ const ForgotPasswordOtp = ({ navigation, route }) => {
       const res = await post(`auth/forgot-password-otp`, body);
 
       if (res?.data?.success) {
-        ToastMessage(res?.data?.message || "OTP sent successfully", "success");
+        Alert.alert("OTP Sent", `Verification code: ${res?.data?.code}`);
         startTimer();
       }
       setResendLoad(false);
@@ -138,20 +142,7 @@ const ForgotPasswordOtp = ({ navigation, route }) => {
     <ScreenWrapper
       scrollEnabled
       headerUnScrollable={() => (
-        <View style={{ paddingHorizontal: 12, marginBottom: 12 }}>
-          <CustomText
-            label={"Verify OTP"}
-            fontFamily={fonts.semiBold}
-            fontSize={20}
-            lineHeight={20 * 1.4}
-          />
-          <CustomText
-            label={"Enter the code sent to your email"}
-            fontFamily={fonts.regular}
-            color={isDark ? COLORS.subtitle : colors.textSecondary}
-            lineHeight={14 * 1.4}
-          />
-        </View>
+        <Header title="Verify OTP" textTransform="none" />
       )}
       footerUnScrollable={() => (
         <View style={{ paddingHorizontal: 12 }}>
@@ -159,6 +150,8 @@ const ForgotPasswordOtp = ({ navigation, route }) => {
             onPress={submit}
             loading={loading}
             btnTitle="Verify OTP"
+            btnBackgroundColor={isDark ? COLORS.white : colors.text}
+            btnColor={isDark ? COLORS.primaryColor : colors.background}
             btnDisabled={!otp.trim()}
           />
         </View>
@@ -208,14 +201,15 @@ const ForgotPasswordOtp = ({ navigation, route }) => {
               }
             }}
           >
-            <ImageFast
-              source={Images.EmailIcon}
-              resizeMode={"contain"}
-              style={{ width: 11, height: 9.33, marginRight: 8 }}
-              tintColor={isDark ? undefined : colors.text}
+            <Icons
+              family="MaterialSymbolsRoundedFilled"
+              name={email ? "mail" : "call"}
+              size={16}
+              color={isDark ? COLORS.white : colors.text}
+              marginRight={8}
             />
             <CustomText
-              label={email}
+              label={email || phone}
               fontFamily={fonts.medium}
               color={isDark ? COLORS.white : colors.text}
               lineHeight={14 * 1.4}
@@ -229,23 +223,63 @@ const ForgotPasswordOtp = ({ navigation, route }) => {
             />
           </TouchableOpacity>
 
-          <CustomButton
-            title={"Send again"}
-            marginTop={40}
-            loading={resendLoad}
-            width={137}
-            fontSize={12}
-            height={32}
-            rightIconWidth={14}
-            rightIconHeight={14}
-            backgroundColor={isDark ? COLORS.inputBg : colors.surfaceAlt}
-            color={isDark ? COLORS.white : colors.text}
-            rightIcon={Images.refresh}
-            rightIconTintColor={isDark ? COLORS.white : colors.text}
-            onPress={isTimerActive ? () => {} : onSendAgain}
-            indicatorColor={isDark ? COLORS.white : COLORS.black}
-            disabled={timer > 0}
-          />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            disabled={isTimerActive || resendLoad}
+            onPress={isTimerActive ? undefined : onSendAgain}
+            style={[
+              styles.resendBtn,
+              {
+                backgroundColor: isTimerActive
+                  ? isDark
+                    ? COLORS.white04
+                    : colors.surfaceAlt
+                  : isDark
+                  ? COLORS.white
+                  : colors.text,
+                opacity: isTimerActive ? 0.9 : 1,
+              },
+            ]}
+          >
+            {resendLoad ? (
+              <ActivityIndicator
+                size="small"
+                color={isTimerActive ? colors.text : colors.background}
+              />
+            ) : (
+              <View style={styles.resendInner}>
+                <CustomText
+                  label="Send again"
+                  fontFamily={fonts.semiBold}
+                  fontSize={12}
+                  lineHeight={12 * 1.4}
+                  color={
+                    isTimerActive
+                      ? isDark
+                        ? COLORS.white
+                        : colors.text
+                      : isDark
+                      ? COLORS.primaryColor
+                      : colors.background
+                  }
+                />
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="replay"
+                  size={14}
+                  color={
+                    isTimerActive
+                      ? isDark
+                        ? COLORS.white
+                        : colors.text
+                      : isDark
+                      ? COLORS.primaryColor
+                      : colors.background
+                  }
+                />
+              </View>
+            )}
+          </TouchableOpacity>
 
           <ErrorComponent
             errorTitle={
@@ -265,6 +299,21 @@ const ForgotPasswordOtp = ({ navigation, route }) => {
 export default ForgotPasswordOtp;
 
 const styles = StyleSheet.create({
+  resendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    height: 32,
+    borderRadius: 100,
+    alignSelf: "center",
+    marginTop: 40,
+  },
+  resendInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",

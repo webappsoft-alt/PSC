@@ -3,7 +3,6 @@ import { StyleSheet, TouchableOpacity, View } from "react-native";
 
 import fonts from "../../../assets/fonts";
 import CustomText from "../../../components/CustomText";
-import { ProSvg, RegularSvg } from "../../../assets/svgs";
 
 import { COLORS } from "../../../utils/COLORS";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -11,9 +10,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 const UserType = forwardRef(
   ({ currentIndex, setCurrentIndex, state, setState, setBtnDisabled }, ref) => {
     const { colors, isDark } = useTheme();
-    const [selectedType, setSelectedType] = useState(
-      state?.userType || "",
-    );
+    const [selectedType, setSelectedType] = useState(state?.userType || "");
 
     useEffect(() => {
       setBtnDisabled?.(!selectedType);
@@ -22,10 +19,10 @@ const UserType = forwardRef(
     const submit = () => {
       if (selectedType === "Regular") {
         setState({ ...state, userType: "Regular", role: "regular" });
-        setCurrentIndex(4); // Go to Email
+        setCurrentIndex(4); // Customer skips ProRole -> Firstname
       } else {
         setState({ ...state, userType: "Pro" });
-        setCurrentIndex(3); // Go to ProRole
+        setCurrentIndex(3); // Professional -> ProRole
       }
     };
 
@@ -38,17 +35,13 @@ const UserType = forwardRef(
     const data = [
       {
         id: "Regular",
-        title: "Regular",
-        subtitle:
-          "I want to use PSC to get the latest news and build my network in no time.",
-        Icon: RegularSvg,
+        title: "A Customer",
+        color: COLORS.darkGreen,
       },
       {
         id: "Pro",
-        title: "Pro",
-        subtitle:
-          "I want to use PSC to get the latest trends and build an online presence for my company/ brand.",
-        Icon: ProSvg,
+        title: "A Professional",
+        color: COLORS.darkPurple,
       },
     ];
 
@@ -56,58 +49,42 @@ const UserType = forwardRef(
       <View style={styles.container}>
         <View>
           <CustomText
-            label="I want to use PSC as a"
+            label="I am"
             fontFamily={fonts.semiBold}
             fontSize={24}
-            marginTop={16}
+            lineHeight={24 * 1.4}
+            letterSpacing={-0.24}
+            marginTop={12}
             marginBottom={16}
-            color={isDark ? COLORS.white : colors.text}
+            color={isDark ? COLORS.gray64 : colors.textSecondary}
           />
           {data?.map((item) => {
             const isSelected = selectedType === item.id;
             return (
               <TouchableOpacity
                 key={item.id}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
                 onPress={() => setSelectedType(item.id)}
                 style={[
                   styles.card,
                   {
+                    backgroundColor: item.color,
                     borderColor: isSelected
                       ? isDark
                         ? COLORS.white
                         : colors.text
-                      : isDark
-                      ? COLORS.white04
-                      : colors.border,
-                    borderWidth: isSelected ? 2 : 1,
-                    backgroundColor: isSelected
-                      ? isDark
-                        ? COLORS.white04
-                        : colors.surfaceAlt
                       : "transparent",
                   },
                 ]}
               >
-                <View style={styles.row}>
-                  <item.Icon color={isDark ? COLORS.white : colors.text} />
-                  <CustomText
-                    label={item.title}
-                    fontFamily={fonts.medium}
-                    fontSize={22}
-                    color={isDark ? COLORS.white : colors.text}
-                    marginLeft={8}
-                  />
-                </View>
-                <View style={styles.textContainer}>
-                  <CustomText
-                    label={item.subtitle}
-                    fontFamily={fonts.regular}
-                    fontSize={14}
-                    color={isDark ? COLORS.gray64 : colors.textSecondary}
-                    marginTop={8}
-                  />
-                </View>
+                <CustomText
+                  label={item.title}
+                  fontFamily={fonts.semiBold}
+                  fontSize={24}
+                  lineHeight={24 * 1.4}
+                  letterSpacing={-0.24}
+                  color={COLORS.white}
+                />
               </TouchableOpacity>
             );
           })}
@@ -124,19 +101,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   card: {
+    height: 190,
     borderRadius: 12,
+    borderWidth: 2,
     padding: 16,
-    marginBottom: 8,
-    height: 160,
-    // flexDirection: "row",
-    // alignItems: "flex-start",
-  },
-  textContainer: {
-    // flex: 1,
-    marginTop: 4,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
+    marginBottom: 12,
   },
 });

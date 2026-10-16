@@ -731,3 +731,15 @@ export const pro_fearures = [
   "Fine tune your Matches",
   "Ad-free experience",
 ];
+
+// --- Auth validation helpers (shared across the login/registration flow) ---
+export const isValidEmail = (emailValue = "") => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(String(emailValue).trim());
+};
+
+// Full phone string includes the dial code (e.g. "+3112345678").
+export const isValidPhone = (phoneValue = "") => {
+  const digits = String(phoneValue).replace(/[^\d]/g, "");
+  return digits.length >= 10 && digits.length <= 15;
+};

@@ -1,16 +1,14 @@
-import { StyleSheet, TouchableOpacity, Image, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 
 import ErrorComponent from "../../../components/ErrorComponent";
 import CustomInput from "../../../components/CustomInput";
 import CustomText from "../../../components/CustomText";
-import ImageFast from "../../../components/ImageFast";
+import Icons from "../../../components/Icons";
 
-import { Images } from "../../../assets/images";
 import { COLORS } from "../../../utils/COLORS";
 import fonts from "../../../assets/fonts";
 import Divider from "../../../components/Divider";
-import { PNGIcons } from "../../../assets/images/icons";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 const Password = forwardRef(
@@ -106,13 +104,11 @@ const Password = forwardRef(
         return;
       }
       setState({ ...state, password: pass });
-      if (currentIndex < 12) {
-        setCurrentIndex(7);
-      }
+      setCurrentIndex(12);
     };
 
     const back = () => {
-      setCurrentIndex(5);
+      setCurrentIndex(10);
     };
 
     const generatePassword = () => {
@@ -172,10 +168,12 @@ const Password = forwardRef(
               fontFamily={fonts.regular}
               fontSize={12}
             />
-            <ImageFast
-              style={{ height: 10, width: 10, marginLeft: 4 }}
-              source={Images.uparrow}
-              resizeMode="contain"
+            <Icons
+              family="MaterialSymbolsRounded"
+              name="arrow_outward"
+              size={12}
+              color={COLORS.buttonColor}
+              marginLeft={4}
             />
           </TouchableOpacity>
 
@@ -222,14 +220,12 @@ const Password = forwardRef(
             }
           />
           <View style={styles.row}>
-            <Image
-              source={PNGIcons.insurance}
-              style={{
-                height: 12,
-                width: 12,
-                tintColor: isDark ? COLORS.subtitle : colors.textSecondary,
-                marginRight: 4,
-              }}
+            <Icons
+              family="MaterialSymbolsRoundedFilled"
+              name="verified_user"
+              size={12}
+              color={isDark ? COLORS.subtitle : colors.textSecondary}
+              marginRight={4}
             />
             <CustomText
               label={"Your password on PSC is encrypted & secured."}

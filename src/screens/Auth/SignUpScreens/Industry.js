@@ -67,13 +67,13 @@ const Industry = forwardRef(
       const valueToStore = industry.map((item) => normalize(item));
       setState({ ...state, industry: valueToStore });
 
-      if (currentIndex < 12) {
-        setCurrentIndex(11);
+      {
+        setCurrentIndex(14);
       }
     };
 
     const back = () => {
-      setCurrentIndex(9);
+      setCurrentIndex(12);
     };
 
     useImperativeHandle(ref, () => ({ submit, back, isLoading: false }));

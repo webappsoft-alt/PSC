@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef } from "react";
+import { useNavigation } from "@react-navigation/native";
 import { StyleSheet, View } from "react-native";
 import ScreenWrapper from "../../../components/ScreenWrapper";
 import CustomText from "../../../components/CustomText";
@@ -8,9 +9,47 @@ import { Images } from "../../../assets/images";
 import { COLORS } from "../../../utils/COLORS";
 import fonts from "../../../assets/fonts";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useSelector } from "react-redux";
+
+// Greets the user the way they chose at registration (Addressing step):
+// "lastname" -> corporate ("Hello Mr. Johnson"), otherwise friendly ("Hi James").
+const getGreeting = (user) => {
+  const firstName = user?.firstName?.trim();
+  const lastName = user?.lastName?.trim();
+  const addressing = user?.profile?.addressing;
+
+  if (addressing === "lastname" && lastName) {
+    const title =
+      user?.gender === "male" ? "Mr. " : user?.gender === "female" ? "Ms. " : "";
+    return `Hello ${title}${lastName}`;
+  }
+  if (firstName) return `Hi ${firstName}`;
+  if (user?.username) return `Hi ${user.username}`;
+  return "Hello";
+};
 
 const WelcomeScreen = () => {
   const { colors, isDark } = useTheme();
+  const userData = useSelector((state) => state?.users?.userData);
+  const user = userData?.user || userData;
+  const avatar = user?.profile?.avatar;
+  const navigation = useNavigation();
+  const hasLeft = useRef(false);
+
+  // Hand off to the main app. WelcomeScreen lives inside AuthStack, so reset
+  // the root navigator (its parent), which owns the "MainStack" route.
+  const goToHome = useCallback(() => {
+    if (hasLeft.current) return;
+    hasLeft.current = true;
+    const root = navigation.getParent() || navigation;
+    root.reset({ index: 0, routes: [{ name: "MainStack" }] });
+  }, [navigation]);
+
+  useEffect(() => {
+    const timer = setTimeout(goToHome, 2500);
+    return () => clearTimeout(timer);
+  }, [goToHome]);
+
   return (
     <ScreenWrapper
       paddingHorizontal={24}
@@ -47,13 +86,13 @@ const WelcomeScreen = () => {
           {/* <View style={styles.avatarOuter}> */}
           <View style={[styles.avatarInner, { borderColor: isDark ? COLORS.white : colors.border }]}>
             <ImageFast
-              source={Images.profile}
+              source={avatar ? { uri: avatar } : Images.profile}
               style={{ width: 110, height: 110, borderRadius: 99 }}
             />
           </View>
 
           <CustomText
-            label={"Hello Mr. Myles"}
+            label={getGreeting(user)}
             color={isDark ? COLORS.white : colors.text}
             fontFamily={fonts.semiBold}
             fontSize={24}
@@ -69,6 +108,7 @@ const WelcomeScreen = () => {
             height={43}
             borderRadius={28}
             marginTop={12}
+            onPress={goToHome}
           />
         </View>
       </View>

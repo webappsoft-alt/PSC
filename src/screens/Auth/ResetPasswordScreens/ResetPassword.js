@@ -94,7 +94,7 @@ const ResetPassword = forwardRef(
         console.error("Password reset error:", error);
 
         const errorMessage =
-          error?.response?.data?.message ||
+          error?.message ||
           "Failed to reset password. Please try again.";
         setError(errorMessage);
         setIsError(true);

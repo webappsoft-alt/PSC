@@ -42,13 +42,13 @@ const WorkingAt = forwardRef(
       }
       setError("");
       setState({ ...state, working_at: workingAt.trim() });
-      if (currentIndex < 12) {
-        setCurrentIndex(12);
+      {
+        setCurrentIndex(15);
       }
     };
 
     const back = () => {
-      setCurrentIndex(10);
+      setCurrentIndex(13);
     };
 
     useImperativeHandle(ref, () => ({ submit, back }));

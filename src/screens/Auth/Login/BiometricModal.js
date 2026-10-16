@@ -1,11 +1,11 @@
-import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { BlurView } from "@react-native-community/blur";
 
 import CustomButton from "../../../components/CustomButton";
 import CustomModal from "../../../components/CustomModal";
 import CustomText from "../../../components/CustomText";
+import Icons from "../../../components/Icons";
 
-import { PNGIcons } from "../../../assets/images/icons";
 import { COLORS } from "../../../utils/COLORS";
 import fonts from "../../../assets/fonts";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -64,10 +64,15 @@ const BiometricModal = ({
                 borderRadius: 99,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: COLORS.lightGray,
+                backgroundColor: colors.surfaceAlt,
               }}
             >
-              <Image source={PNGIcons.cross} style={styles.icon} />
+              <Icons
+                family="MaterialSymbolsRounded"
+                name="close"
+                size={18}
+                color={colors.text}
+              />
             </TouchableOpacity>
           </View>
           <CustomText
@@ -81,9 +86,8 @@ const BiometricModal = ({
             <CustomButton
               title="Continue"
               marginTop={24}
-              onPress={onSubmit}
+              onPress={onLoginFirst}
               marginBottom={10}
-              loading={loading}
             />
             <CustomButton
               title="Later"
@@ -116,10 +120,6 @@ const styles = StyleSheet.create({
     width: "100%",
     padding: 12,
     borderRadius: 20,
-  },
-  icon: {
-    height: 16,
-    width: 16,
   },
   row: {
     flexDirection: "row",

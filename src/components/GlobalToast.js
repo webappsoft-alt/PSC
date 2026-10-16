@@ -19,7 +19,8 @@ import fonts from "../assets/fonts";
 import { Images } from "../assets/images";
 import { COLORS } from "../utils/COLORS";
 import CustomText from "./CustomText";
-import ImageFast from "./ImageFast";
+import Blur from "./Blur";
+import Icons from "./Icons";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -122,18 +123,22 @@ const ToastItem = ({ toast, index, onHide }) => {
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.toastContainer, animatedStyle]}>
         <View style={styles.cardInner}>
+          <Blur borderRadius={96} style={{ position: "absolute" }} />
           <View style={styles.textContainer}>
-            <ImageFast
-              removeLoading
-              source={toast.type == "error" ? Images.error : Images.success}
-              style={{
-                height: 14,
-                width: 14,
-              }}
-            />
+            <View style={styles.icon}>
+              <View style={styles.iconDot} />
+              <Icons
+                family="MaterialSymbolsRoundedFilled"
+                name={toast.type == "error" ? "cancel" : "check_circle"}
+                size={16}
+                color={toast.type == "error" ? COLORS.red1 : "#23B672"}
+              />
+            </View>
             <CustomText
               label={toast.message}
               fontSize={13}
+              lineHeight={18}
+              letterSpacing={-0.2}
               fontFamily={fonts.medium}
               color={COLORS.white}
               numberOfLines={2}
@@ -164,10 +169,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
+    paddingLeft: 8,
+    paddingRight: 12,
     paddingVertical: 8,
-    borderRadius: 100,
-    gap: 12,
+    borderRadius: 96,
+    gap: 4,
+    overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -185,5 +192,18 @@ const styles = StyleSheet.create({
     gap: 4,
     justifyContent: "center",
     alignItems: "center",
+  },
+  icon: {
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconDot: {
+    position: "absolute",
+    width: 9,
+    height: 9,
+    borderRadius: 100,
+    backgroundColor: "#fff",
   },
 });

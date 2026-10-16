@@ -86,7 +86,7 @@ import Shorts from "../screens/Main/Shorts";
 import CreateShort from "../screens/Main/Shorts/CreateShort.js";
 import PublishShort from "../screens/Main/Shorts/PublishShort.js";
 import ShortWithId from "../screens/Main/Shorts/ShortWithId.js";
-import { setNotificationDot } from "../store/reducer/NotiSlice.js";
+import { setNewFollower, setNotificationDot } from "../store/reducer/NotiSlice.js";
 import HomeStack from "./HomeStack.js";
 import TabStack from "./TabStack";
 // Live Streaming Screens
@@ -112,6 +112,14 @@ const MainStack = () => {
   const checkNotificationSocket = () => {
     socket?.on("notification", (data) => {
       dispatch(setNotificationDot(true));
+      // Surface a follow as the feed's "NEW FOLLOWER" toast
+      const n = data?.notification || data;
+      if (n?.type === "follow") {
+        const user = n?.senderId || n?.sender || n?.user || null;
+        if (user && typeof user === "object") {
+          dispatch(setNewFollower({ id: n?._id, user }));
+        }
+      }
     });
   };
 

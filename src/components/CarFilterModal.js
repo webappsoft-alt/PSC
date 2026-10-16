@@ -7,6 +7,8 @@ import {
 } from "react-native";
 
 import { useEffect, useRef, useState } from "react";
+import LottieView from "lottie-react-native";
+import { findTopic } from "../utils/feedTopics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../assets/fonts";
 import { Images } from "../assets/images";
@@ -15,6 +17,7 @@ import CustomButton from "./CustomButton";
 import CustomModal from "./CustomModal";
 import CustomText from "./CustomText";
 import Divider from "./Divider";
+import CustomSwitch from "./CustomSwitch";
 import Icons from "./Icons";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -43,6 +46,9 @@ const FilterModal = ({
   multiSelect = false, // New prop for multi-select mode
   selectedItems = [], // Array of selected items for multi-select
   singleSelect = false, // New prop for single-select mode with confirm button
+  toggleMode = false, // Figma home "+" sheet: a switch per row (on = chip shown)
+  enabledItems = [], // names currently on (toggleMode)
+  onToggleItem, // (name, enabled) => void (toggleMode)
 }) => {
   const insests = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -70,6 +76,10 @@ const FilterModal = ({
       : DEFAULT_FILTERS;
 
   const handleItemToggle = (item) => {
+    if (toggleMode) {
+      onToggleItem?.(item.name, !enabledItems.includes(item.name));
+      return;
+    }
     if (multiSelect) {
       const isSelected = localSelectedItems.includes(item.name);
       if (isSelected) {
@@ -154,7 +164,14 @@ const FilterModal = ({
                   onPress={() => handleItemToggle(f)}
                 >
                   <View style={styles.row}>
-                    {f?.image ? (
+                    {findTopic(f?.name)?.animation ? (
+                      <LottieView
+                        source={findTopic(f.name).animation}
+                        autoPlay
+                        loop
+                        style={styles.filterAnimation}
+                      />
+                    ) : f?.image ? (
                       <Image source={f.image} style={styles.filterImage} />
                     ) : null}
                     <View>
@@ -163,7 +180,7 @@ const FilterModal = ({
                         color={colors.text}
                         fontFamily={fonts.medium}
                         fontSize={16}
-                        marginLeft={f?.image ? 12 : 0}
+                        marginLeft={f?.image || findTopic(f?.name) ? 12 : 0}
                       />
                       {f.subtitle && (
                         <CustomText
@@ -176,20 +193,27 @@ const FilterModal = ({
                       )}
                     </View>
                   </View>
-                  <View
-                    style={
-                      isSelected
-                        ? styles.circleIndicatorUnselected
-                        : styles.circleIndicator
-                    }
-                  >
-                    <View
-                      style={[
-                        styles.innerCircle,
-                        isSelected && styles.innerCircleSelected,
-                      ]}
+                  {toggleMode ? (
+                    <CustomSwitch
+                      value={enabledItems.includes(f.name)}
+                      setValue={(enabled) => onToggleItem?.(f.name, enabled)}
                     />
-                  </View>
+                  ) : (
+                    <View
+                      style={
+                        isSelected
+                          ? styles.circleIndicatorUnselected
+                          : styles.circleIndicator
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.innerCircle,
+                          isSelected && styles.innerCircleSelected,
+                        ]}
+                      />
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -255,6 +279,10 @@ const createStyles = (colors, isDark) => StyleSheet.create({
     height: 16,
     borderRadius: 6,
     resizeMode: "cover",
+  },
+  filterAnimation: {
+    width: 24,
+    height: 24,
   },
   circleIndicator: {
     width: 20,

@@ -63,7 +63,7 @@ const PinCode = () => {
         marginTop={12}
       />
       <CustomText
-        label="Please enter a PIN code that you will be able to remember and do not share it with someone else."
+        label="Please enter a PIN code that you will be able to remember and do not share it with anyone else."
         color={isDark ? COLORS.gray1 : colors.textSecondary}
         marginBottom={40}
         marginTop={6}

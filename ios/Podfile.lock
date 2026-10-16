@@ -3150,6 +3150,35 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - RNReactNativeHapticFeedback (3.0.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - RNReanimated (3.18.0):
     - boost
     - DoubleConversion
@@ -3592,6 +3621,7 @@ DEPENDENCIES:
   - RNImageCropPicker (from `../node_modules/react-native-image-crop-picker`)
   - RNKeychain (from `../node_modules/react-native-keychain`)
   - RNPermissions (from `../node_modules/react-native-permissions`)
+  - RNReactNativeHapticFeedback (from `../node_modules/react-native-haptic-feedback`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSensors (from `../node_modules/react-native-sensors`)
@@ -3857,6 +3887,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-keychain"
   RNPermissions:
     :path: "../node_modules/react-native-permissions"
+  RNReactNativeHapticFeedback:
+    :path: "../node_modules/react-native-haptic-feedback"
   RNReanimated:
     :path: "../node_modules/react-native-reanimated"
   RNScreens:
@@ -4001,6 +4033,7 @@ SPEC CHECKSUMS:
   RNImageCropPicker: 7e2934e261490f1b384cbafebad405fcf8d213f1
   RNKeychain: 75a69663382c48a55fbe875a6f1bd83fe7169b6a
   RNPermissions: deda3ac88b1ef5c5a92b3dfb80ee2c0c79156dae
+  RNReactNativeHapticFeedback: f6ecf57bf34eb8621a59ed8125312dfbc7d21c8b
   RNReanimated: f0b3fbd5eb856a0c9df7f9cbcf7c7d12ba3d10f2
   RNScreens: 8cde32f9b40bb18db59ebc288ac8853bf2efd493
   RNSensors: 117ba71c7eeeea0407ea0c0bb79e3495d602049b

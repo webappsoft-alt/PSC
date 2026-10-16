@@ -8,7 +8,11 @@ const light = "Poppins-Light";
 const extraLight = "Poppins-ExtraLight";
 const thin = "Poppins-Thin";
 const ClashDisplay = "ClashDisplay";
-const BoldItalic = "Poppins-BlackItalic";
+const BoldItalic = "Poppins-BoldItalic";
+const blackItalic = "Poppins-BlackItalic";
+const semiBoldItalic = "Poppins-SemiBoldItalic";
+const mediumItalic = "Poppins-MediumItalic";
+const italic = "Poppins-Italic";
 export default {
   black,
   boldExtra,
@@ -21,4 +25,8 @@ export default {
   thin,
   ClashDisplay,
   BoldItalic,
+  blackItalic,
+  semiBoldItalic,
+  mediumItalic,
+  italic,
 };

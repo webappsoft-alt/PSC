@@ -1,427 +1,241 @@
-import { useEffect, useState } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { useDispatch, useSelector } from "react-redux";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useState } from "react";
+import {
+  StatusBar,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { useSelector } from "react-redux";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AuthFooter from "../../../components/Auth/AuthFooter";
-import CustomButton from "../../../components/CustomButton";
 import CustomInput from "../../../components/CustomInput";
+import CustomPhoneInput from "../../../components/CustomPhoneInput";
 import CustomText from "../../../components/CustomText";
 import ErrorComponent from "../../../components/ErrorComponent";
 import Header from "../../../components/Header";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import Icons from "../../../components/Icons";
+import { SlidingSegmentPager } from "../../../components/Auth/SlidingSegmentControl";
 
 import fonts from "../../../assets/fonts";
-import {
-  setIsEmail,
-  setLocation,
-  setLoginValue,
-  setUserData,
-} from "../../../store/reducer/usersSlice";
-import { setToken } from "../../../store/reducer/AuthConfig";
 import { COLORS } from "../../../utils/COLORS";
-import useLocation from "../../../utils/useLocation";
-import ImageFast from "../../../components/ImageFast";
-import { Images } from "../../../assets/images";
-import { useNavigation } from "@react-navigation/native";
-import { post } from "../../../services/ApiRequest";
-import { ToastMessage } from "../../../utils/ToastMessage";
+import { isValidEmail, isValidPhone } from "../../../utils/constants";
 import { useTheme } from "../../../contexts/ThemeContext";
 
-const Login = ({}) => {
-  const { colors, isDark } = useTheme();
+const Login = () => {
   const navigation = useNavigation();
-  const dispatch = useDispatch();
-  const { getCurrentLocation } = useLocation();
-  const getLocation = async () => {
-    const location = await getCurrentLocation();
-    if (location) {
-      dispatch(setLocation(location));
-    }
-  };
+  const route = useRoute();
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [showEmailSuccessColor, setShowEmailSuccessColor] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const reduxSavedAccounts = useSelector(
-    (state) => state?.users?.savedAccounts || [],
-  );
+  const savedAccounts = useSelector((state) => state?.users?.savedAccounts);
   const hasSavedAccounts =
-    Array.isArray(reduxSavedAccounts) && reduxSavedAccounts.length > 0;
+    Array.isArray(savedAccounts) && savedAccounts.length > 0;
 
-  console.log(
-    "hasSavedAccounts---",
-    hasSavedAccounts,
-    "reduxSavedAccounts---",
-    reduxSavedAccounts,
+  const paramEmail = route?.params?.email;
+  const paramPhone = route?.params?.phone;
+
+  const [email, setEmail] = useState(paramEmail || "");
+  const [phoneNumber, setPhoneNumber] = useState(paramPhone || "");
+  const [contactMethod, setContactMethod] = useState(
+    paramEmail ? "email" : paramPhone ? "phone" : route?.params?.tab || "phone",
   );
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const canContinue = () => {
+    if (contactMethod === "email") return isValidEmail(email);
+    return isValidPhone(phoneNumber);
+  };
 
-  const emailErrorCheck = (val) => {
-    let newErrors = "";
-    if (!val.trim()) {
-      newErrors = "Please enter your email";
-    } else if (!emailRegex.test(val.trim())) {
-      newErrors = "Please enter a valid email address";
+  const handleContinue = () => {
+    if (contactMethod === "email") {
+      navigation.navigate("LoginPassword", { email: email.trim() });
     } else {
-      newErrors = "";
-      setShowEmailSuccessColor(true);
-      setTimeout(() => {
-        setShowEmailSuccessColor(false);
-      }, 2000);
-    }
-    return newErrors;
-  };
-
-  const passwordErrorCheck = (val) => {
-    let newErrors = "";
-    if (!val.trim()) {
-      newErrors = "Please enter your password";
-    } else if (val.length < 6) {
-      newErrors = "Password must be at least 6 characters";
-    } else {
-      newErrors = "";
-    }
-    return newErrors;
-  };
-
-  const handleContinue = async () => {
-    const emailErr = emailErrorCheck(email);
-    const passwordErr = passwordErrorCheck(password);
-    const fcmtoken = await AsyncStorage.getItem("fcmToken");
-
-    if (emailErr || passwordErr) {
-      setEmailError(emailErr);
-      setPasswordError(passwordErr);
-      return;
-    }
-
-    setEmailError("");
-    setPasswordError("");
-
-    const body = {
-      email: email.trim(),
-      password: password,
-      ...(fcmtoken && { fcmToken: fcmtoken }),
-    };
-
-    try {
-      setLoading(true);
-      const response = await post("auth/login", body);
-
-      if (response?.data?.requiresMfa) {
-        if (response?.data?.otp?.code) {
-          alert(`2FA Verification Code: ${response.data.otp.code}`);
-        } else {
-          ToastMessage(
-            response?.data?.message || "OTP sent to email",
-            "success",
-          );
-        }
-
-        if (response?.data?.token) {
-          await AsyncStorage.setItem("token", response.data.token);
-        }
-
-        navigation.navigate("TwoFactorVerify", {
-          token: response?.data?.token,
-          email: email.trim(),
-        });
-        setLoading(false);
-        return;
-      }
-
-      if (response?.data?.success) {
-        // Store user data in Redux
-        if (response?.data?.user) {
-          dispatch(setUserData(response.data.user));
-        }
-
-        // Store tokens in AsyncStorage and Redux
-        if (response?.data?.tokens?.accessToken) {
-          dispatch(setToken(response.data.tokens.accessToken));
-          await AsyncStorage.setItem("token", response.data.tokens.accessToken);
-        }
-
-        if (response?.data?.tokens?.refreshToken) {
-          await AsyncStorage.setItem(
-            "refreshToken",
-            response.data.tokens.refreshToken,
-          );
-        }
-
-        // Store login value
-        dispatch(setLoginValue(email));
-        dispatch(setIsEmail(true));
-
-        // Navigate to main app
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "MainStack" }],
-        });
-      } else {
-        // Handle unsuccessful login
-        const errorMessage =
-          response?.data?.message || "Invalid email or password";
-
-        console.log("errorMessage----", errorMessage);
-
-        setEmailError("Invalid credentials");
-        setPasswordError("Invalid credentials");
-        ToastMessage(errorMessage, "error");
-      }
-
-      setLoading(false);
-    } catch (error) {
-      setLoading(false);
-      console.log("Login error:", error);
-
-      // Handle error response
-      const errorMessage =
-        error?.response?.data?.message || "Invalid email or password";
-
-      setEmailError("Invalid credentials");
-      setPasswordError("Invalid credentials");
-      ToastMessage(errorMessage, "error");
+      navigation.navigate("LoginPassword", { phone: phoneNumber });
     }
   };
 
-  useEffect(() => {
-    getLocation();
-  }, []);
+  const headerTitle =
+    contactMethod === "email" ? "Enter Your Email" : "Enter Your Phone Number";
 
   return (
-    <ScreenWrapper
-      scrollEnabled
-      headerUnScrollable={() => (
-        <View
-          style={[
-            styles.logo,
-            {
-              backgroundColor: isDark ? "#FFFFFF14" : "rgba(18, 18, 18, 0.08)",
-            },
-          ]}
-        />
-      )}
-      footerUnScrollable={() => (
-        <View style={{ padding: 12 }}>
-          <AuthFooter
-            onPress={handleContinue}
-            loading={loading}
-            btnDisabled={!email.trim() || !password.trim()}
-          />
-        </View>
-      )}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, paddingTop: insets.top },
+      ]}
     >
-      <CustomText
-        label="Login to PSC"
-        fontFamily={fonts.semiBold}
-        fontSize={24}
-        lineHeight={24 * 1.4}
-        marginTop={16}
-        marginBottom={18}
+      <StatusBar
+        barStyle={colors.statusBarStyle}
+        backgroundColor="transparent"
+        translucent
       />
 
-      {/* Email Field */}
-      <CustomInput
-        value={email}
-        onChangeText={(text) => {
-          setEmail(text);
-          if (emailError) {
-            // Clear API errors immediately when user starts typing
-            if (
-              emailError.includes("Invalid credentials") ||
-              emailError.includes("credentials")
-            ) {
-              setEmailError("");
-            } else {
-              // For validation errors, check if input is valid
-              const newError = emailErrorCheck(text);
-              if (!newError) {
-                setEmailError("");
-              }
-            }
-          }
-        }}
-        marginBottom={4}
-        placeholder="E.g. abc@email.com"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        withLabel="EMAIL ADDRESS"
-      />
-      <ErrorComponent
-        errorTitle={
-          !email
-            ? "Enter Your Email"
-            : showEmailSuccessColor
-            ? "Valid email address."
-            : emailError
-            ? "Invalid Credentials"
-            : "Enter your email to proceed"
-        }
-        error={emailError}
-        isValid={showEmailSuccessColor}
-        color={
-          showEmailSuccessColor
-            ? "#64CD75"
-            : emailError
-            ? "#EE1045"
-            : isDark
-            ? COLORS.gray2
-            : colors.textSecondary
-        }
-        font={fonts.medium}
-        // marginTop={emailError ? -6 : 0}
-      />
+      <Header title={headerTitle} textTransform="none" />
 
-      {/* Password Field */}
-      <CustomInput
-        value={password}
-        onChangeText={(text) => {
-          setPassword(text);
-          if (passwordError) {
-            // Clear API errors immediately when user starts typing
-            if (
-              passwordError.includes("failed") ||
-              passwordError.includes("credentials") ||
-              passwordError.includes("Invalid")
-            ) {
-              setPasswordError("");
-            } else {
-              // For validation errors, check if input is valid
-              const newError = passwordErrorCheck(text);
-              if (!newError) {
-                setPasswordError("");
-              }
-            }
-          }
-        }}
-        marginTop={12}
-        marginBottom={4}
-        placeholder="Enter your password"
-        autoCapitalize="none"
-        secureTextEntry={true}
-        withLabel="PASSWORD"
-      />
-      <ErrorComponent
-        errorTitle={
-          !password
-            ? "Enter Your Password"
-            : passwordError
-            ? "Invalid Credentials"
-            : "Enter your password"
-        }
-        error={passwordError}
-        color={
-          passwordError
-            ? "#EE1045"
-            : isDark
-            ? COLORS.gray2
-            : colors.textSecondary
-        }
-        marginBottom={8}
-        // marginTop={passwordError ? -6 : 0}
-      />
+      <View style={styles.content}>
+        <SlidingSegmentPager
+          items={[
+            { key: "phone", label: "Phone Number" },
+            { key: "email", label: "Email" },
+          ]}
+          selectedKey={contactMethod}
+          onChange={setContactMethod}
+          trackColor={colors.surfaceAlt}
+          pillColor={colors.text}
+          activeLabelColor={colors.background}
+          inactiveLabelColor={isDark ? COLORS.gray64 : colors.textSecondary}
+          style={styles.toggle}
+          renderPage={(key) => (
+            <View>
+              <CustomText
+                label={
+                  key === "email"
+                    ? "What is your email?"
+                    : "What is your phone number?"
+                }
+                fontFamily={fonts.semiBold}
+                fontSize={24}
+                lineHeight={24 * 1.4}
+                letterSpacing={-0.24}
+                marginBottom={8}
+                color={isDark ? COLORS.white : colors.text}
+              />
 
-      <TouchableOpacity
-        onPress={() => navigation.navigate("ForgotPass")}
-        activeOpacity={0.6}
-        style={styles.item}
-      >
-        <CustomText
-          label="Forgot my password"
-          color={COLORS.buttonColor}
-          fontFamily={fonts.regular}
-          fontSize={12}
-          lineHeight={12 * 1.4}
+              {key === "email" ? (
+                <CustomInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="E.g. abc@email.com"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  marginBottom={8}
+                />
+              ) : (
+                <View>
+                  <CustomPhoneInput
+                    value={phoneNumber}
+                    setValue={setPhoneNumber}
+                    withLabel="PHONE NUMBER"
+                    marginBottom={8}
+                  />
+                  <View
+                    pointerEvents="none"
+                    style={styles.phoneRightIcon}
+                  >
+                    <Icons
+                      family="MaterialSymbolsRoundedFilled"
+                      name="call"
+                      size={18}
+                      color={COLORS.buttonColor}
+                    />
+                  </View>
+                </View>
+              )}
+
+              <ErrorComponent
+                errorTitle={`Please enter a valid ${
+                  key === "email" ? "email address" : "phone number"
+                }`}
+                color={isDark ? COLORS.gray2 : colors.textSecondary}
+                marginBottom={4}
+                font={fonts.regular}
+              />
+              <ErrorComponent
+                errorTitle={`We will later use this ${
+                  key === "email" ? "email" : "phone number"
+                } to verify your account.`}
+                color={isDark ? COLORS.gray2 : colors.textSecondary}
+                font={fonts.regular}
+              />
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate("LoginQRCode")}
+                style={styles.qrRow}
+              >
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="qr_code_scanner"
+                  size={22}
+                  color={isDark ? COLORS.white : colors.text}
+                />
+                <CustomText
+                  label="Use QR-Code"
+                  fontFamily={fonts.medium}
+                  fontSize={16}
+                  lineHeight={16 * 1.4}
+                  marginLeft={10}
+                  color={isDark ? COLORS.white : colors.text}
+                />
+              </TouchableOpacity>
+
+              {hasSavedAccounts && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate("PreviousAccounts")}
+                  style={styles.previousAccounts}
+                >
+                  <CustomText
+                    label="Sign in with previous account"
+                    color={COLORS.buttonColor}
+                    fontFamily={fonts.medium}
+                    fontSize={14}
+                    lineHeight={14 * 1.4}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         />
-        <ImageFast
-          style={{ height: 10, width: 10, marginLeft: 4 }}
-          source={Images.uparrow}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
+      </View>
 
-      <CustomText
-        label="Don't have an account? Register"
-        color={COLORS.buttonColor}
-        fontFamily={fonts.regular}
-        alignSelf={"center"}
-        marginTop={30}
-        onPress={() => navigation.navigate("SignUpScreens")}
+      <AuthFooter
+        paddingHorizontal={12}
+        onPress={handleContinue}
+        btnBackgroundColor={isDark ? COLORS.white : colors.text}
+        btnColor={isDark ? COLORS.primaryColor : colors.background}
+        btnDisabled={!canContinue()}
       />
-
-      {hasSavedAccounts && (
-        <TouchableOpacity
-          onPress={() => navigation.navigate("PreviousAccounts")}
-          style={{
-            alignSelf: "center",
-            marginTop: 18,
-            paddingVertical: 10,
-            paddingHorizontal: 16,
-          }}
-          activeOpacity={0.7}
-        >
-          <CustomText
-            label="Sign in with previous account"
-            color={COLORS.buttonColor}
-            fontFamily={fonts.medium}
-            fontSize={14}
-            alignSelf="center"
-          />
-        </TouchableOpacity>
-      )}
-    </ScreenWrapper>
+    </View>
   );
 };
 
 export default Login;
 
 const styles = StyleSheet.create({
-  logo: {
-    width: 44,
-    height: 44,
-    alignSelf: "center",
-    marginVertical: 20,
-    borderRadius: 99,
+  container: {
+    flex: 1,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 35,
+  content: {
+    flex: 1,
+    paddingHorizontal: 12,
   },
-  circle: {
-    backgroundColor: "#4347FF",
-    height: 24,
-    width: 24,
+  toggle: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  phoneRightIcon: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    height: 32,
+    width: 32,
     borderRadius: 100,
-  },
-  locationContainer: {
-    backgroundColor: "#F8F9FA",
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
-  },
-  locationHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    backgroundColor: "rgba(161, 147, 117, 0.16)",
     alignItems: "center",
-    marginBottom: 8,
+    justifyContent: "center",
   },
-  locationInfo: {
-    marginBottom: 4,
+  previousAccounts: {
+    alignSelf: "center",
+    marginTop: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
-  item: {
+  qrRow: {
     flexDirection: "row",
     alignItems: "center",
+    alignSelf: "center",
+    marginTop: 24,
   },
 });

@@ -1,15 +1,11 @@
 import React from "react";
-import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import fonts from "../../../../assets/fonts";
-import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
+import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { COLORS } from "../../../../utils/COLORS";
 
-import { SvgXml } from "react-native-svg";
-
-const getHashtagSvg = (color) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="${color}"><g><path d="M20,9L20,9c0-0.55-0.45-1-1-1h-3V5c0-0.55-0.45-1-1-1h0c-0.55,0-1,0.45-1,1v3h-4V5c0-0.55-0.45-1-1-1h0C8.45,4,8,4.45,8,5 v3H5C4.45,8,4,8.45,4,9v0c0,0.55,0.45,1,1,1h3v4H5c-0.55,0-1,0.45-1,1v0c0,0.55,0.45,1,1,1h3v3c0,0.55,0.45,1,1,1h0 c0.55,0,1-0.45,1-1v-3h4v3c0,0.55,0.45,1,1,1h0c0.55,0,1-0.45,1-1v-3h3c0.55,0,1-0.45,1-1v0c0-0.55-0.45-1-1-1h-3v-4h3 C19.55,10,20,9.55,20,9z M14,14h-4v-4h4V14z"/></g></svg>`;
 
 const TendingTopic = ({
   hashtags = [],
@@ -24,22 +20,30 @@ const TendingTopic = ({
     <View style={[styles.mainContainer, { backgroundColor: colors.background }]}>
       <View style={styles.row}>
         <CustomText
-          label={"TRENDING"}
-          color={colors.textSecondary}
-          fontFamily={fonts.medium}
+          label={"TODAY\u2019S"}
+          fontSize={16}
+          lineHeight={19}
+          color={COLORS.gray48}
+          fontFamily={fonts.BoldItalic}
+          fontStyle="italic"
+          letterSpacing={-0.96}
         />
         <CustomText
-          label={"TOPICS"}
+          label={"MAIN TOPICS"}
+          fontSize={16}
+          lineHeight={19}
           color={colors.text}
           marginLeft={4}
-          fontFamily={fonts.medium}
+          fontFamily={fonts.BoldItalic}
+          fontStyle="italic"
+          letterSpacing={-0.96}
         />
       </View>
       <View style={styles.wrapper}>
         {hashtags?.map((item, index) => {
           const isSelected = selectedHashtag === item._id;
           const bgColor = isSelected ? colors.text : colors.surfaceAlt;
-          const textColor = isSelected ? colors.background : colors.textSecondary;
+          const textColor = isSelected ? "#121212" : COLORS.gray48;
 
           return (
             <TouchableOpacity
@@ -55,10 +59,16 @@ const TendingTopic = ({
                 },
               ]}
             >
-              <SvgXml xml={getHashtagSvg(textColor)} width={16} height={16} />
+              <Icons
+                family="MaterialSymbolsRounded"
+                name="tag"
+                size={16}
+                color={textColor}
+              />
               <CustomText
                 label={item.tag}
                 fontSize={12}
+                lineHeight={16}
                 color={textColor}
                 fontFamily={fonts.medium}
                 marginLeft={2}
@@ -89,10 +99,11 @@ const TendingTopic = ({
                 },
               ]}
             >
-              <Image
-                tintColor={textColor}
-                source={Images.stock}
-                style={{ height: 14, width: 14 }}
+              <Icons
+                family="MaterialSymbolsRounded"
+                name="trending_up"
+                size={16}
+                color={textColor}
               />
               {/* <Stock
                 fill={textColor}
@@ -103,9 +114,10 @@ const TendingTopic = ({
               <CustomText
                 label={item.topic}
                 fontSize={12}
+                lineHeight={16}
                 fontFamily={fonts.medium}
                 color={textColor}
-                marginLeft={4}
+                marginLeft={2}
               />
             </TouchableOpacity>
           );
@@ -118,24 +130,25 @@ const TendingTopic = ({
 export default React.memo(TendingTopic);
 
 const styles = StyleSheet.create({
-  mainContainer: { padding: 12 },
+  mainContainer: { paddingHorizontal: 8, paddingVertical: 12 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   wrapper: {
-    gap: 4,
+    rowGap: 8,
+    columnGap: 4,
     flexWrap: "wrap",
     flexDirection: "row",
     alignItems: "center",
   },
   cardBg: {
     backgroundColor: COLORS.inputBg,
-    paddingLeft: 8,
-    paddingRight: 10,
-    borderRadius: 99,
-    height: 32,
+    paddingLeft: 6,
+    paddingRight: 8,
+    borderRadius: 100,
+    height: 28,
     justifyContent: "center",
   },
 });

@@ -5,17 +5,20 @@ import {
   useRef,
   useState,
 } from "react";
-import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import CustomButton from "../../../components/CustomButton";
 import CustomInput from "../../../components/CustomInput";
 import CustomText from "../../../components/CustomText";
 import ErrorComponent from "../../../components/ErrorComponent";
 import Icons from "../../../components/Icons";
 
 import fonts from "../../../assets/fonts";
-import { Images } from "../../../assets/images";
-import ImageFast from "../../../components/ImageFast";
 import { post } from "../../../services/ApiRequest";
 import { COLORS } from "../../../utils/COLORS";
 import { ToastMessage } from "../../../utils/ToastMessage";
@@ -102,9 +105,7 @@ const OtpCode = forwardRef(
         console.log("res?.data====", res?.data);
 
         if (res?.data?.success) {
-          if (currentIndex < 12) {
-            setCurrentIndex(6);
-          }
+          setCurrentIndex(11);
         } else {
           ToastMessage("Code Invalid", "error");
         }
@@ -118,25 +119,15 @@ const OtpCode = forwardRef(
     };
 
     const back = () => {
-      setCurrentIndex(4);
+      setCurrentIndex(9);
     };
 
     useImperativeHandle(ref, () => ({ submit, back, isLoading: loading }));
 
     const onSendAgain = async () => {
-      let body = {};
-      if (state?.phone) {
-        body = {
-          phone: {
-            number: state?.phone.trim(),
-            verifyVia: state?.verifyVia,
-          },
-        };
-      } else {
-        body = {
-          email: state?.email.trim(),
-        };
-      }
+      const body = state?.phone
+        ? { phone: state.phone.trim(), verifyVia: state?.verifyVia }
+        : { email: state?.email?.trim() };
       try {
         setResendLoad(true);
         const res = await post(`auth/send-otp`, body);
@@ -188,14 +179,15 @@ const OtpCode = forwardRef(
           <TouchableOpacity
             style={styles.row}
             onPress={() => {
-              setCurrentIndex(4);
+              setCurrentIndex(9);
             }}
           >
-            <ImageFast
-              source={Images.EmailIcon}
-              resizeMode={"contain"}
-              style={{ width: 11, height: 9.33, marginRight: 8 }}
-              tintColor={isDark ? undefined : colors.text}
+            <Icons
+              family="MaterialSymbolsRoundedFilled"
+              name={state?.email ? "mail" : "call"}
+              size={16}
+              color={isDark ? COLORS.white : colors.text}
+              marginRight={8}
             />
             <CustomText
               label={state?.email || state?.phone}
@@ -212,35 +204,63 @@ const OtpCode = forwardRef(
             />
           </TouchableOpacity>
 
-          <CustomButton
-            title="Send again"
-            marginTop={40}
-            loading={resendLoad}
-            width={137}
-            fontSize={12}
-            height={32}
-            rightIconWidth={14}
-            rightIconHeight={14}
-            backgroundColor={isDark ? COLORS.inputBg : colors.surfaceAlt}
-            color={
-              isTimerActive
-                ? (isDark ? COLORS.gray48 : colors.textSecondary)
-                : (isDark ? COLORS.white : colors.text)
-            }
-            rightIcon={Images.refresh}
-            rightIconTintColor={
-              isTimerActive
-                ? (isDark ? COLORS.gray48 : colors.textSecondary)
-                : (isDark ? COLORS.white : colors.text)
-            }
-            onPress={isTimerActive ? () => {} : onSendAgain}
-            indicatorColor={
-              isTimerActive
-                ? (isDark ? COLORS.gray48 : colors.textSecondary)
-                : (isDark ? COLORS.black : colors.background)
-            }
-            disabled={timer > 0}
-          />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            disabled={isTimerActive || resendLoad}
+            onPress={isTimerActive ? undefined : onSendAgain}
+            style={[
+              styles.resendBtn,
+              {
+                backgroundColor: isTimerActive
+                  ? isDark
+                    ? COLORS.white04
+                    : colors.surfaceAlt
+                  : isDark
+                  ? COLORS.white
+                  : colors.text,
+                opacity: isTimerActive ? 0.9 : 1,
+              },
+            ]}
+          >
+            {resendLoad ? (
+              <ActivityIndicator
+                size="small"
+                color={isTimerActive ? colors.text : colors.background}
+              />
+            ) : (
+              <View style={styles.resendInner}>
+                <CustomText
+                  label="Send again"
+                  fontFamily={fonts.semiBold}
+                  fontSize={12}
+                  lineHeight={12 * 1.4}
+                  color={
+                    isTimerActive
+                      ? isDark
+                        ? COLORS.white
+                        : colors.text
+                      : isDark
+                      ? COLORS.primaryColor
+                      : colors.background
+                  }
+                />
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="replay"
+                  size={14}
+                  color={
+                    isTimerActive
+                      ? isDark
+                        ? COLORS.white
+                        : colors.text
+                      : isDark
+                      ? COLORS.primaryColor
+                      : colors.background
+                  }
+                />
+              </View>
+            )}
+          </TouchableOpacity>
 
           <ErrorComponent
             errorTitle={
@@ -274,5 +294,20 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  resendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    height: 32,
+    borderRadius: 100,
+    alignSelf: "flex-start",
+    marginTop: 40,
+  },
+  resendInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
   },
 });

@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Animated, Easing, StyleSheet, TouchableOpacity, View } from "react-native";
 import PagerView from "react-native-pager-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -35,6 +35,8 @@ import {
 } from "../assets/svgs";
 import CustomText from "../components/CustomText";
 import CustomModal from "../components/CustomModal";
+import CustomModalGooglePlaces from "../components/CustomModalGooglePlaces";
+import { setLocation } from "../store/reducer/usersSlice";
 import Icons from "../components/Icons";
 import ImageFast from "../components/ImageFast";
 import BandMateMatching from "../screens/Main/BandMateMatching";
@@ -45,8 +47,22 @@ import Profile from "../screens/Main/Profile/Profile";
 import Shows from "../screens/Main/TvShow/Shows";
 import { COLORS } from "../utils/COLORS";
 import Shorts from "../screens/Main/Shorts/index";
-import HomeHeader from "../screens/Main/Home/molecules/HomeHeader";
-import TopTab from "../components/TopTab";
+import FeedHeader from "../screens/Main/Home/molecules/FeedHeader";
+import {
+  navToneAnim,
+  setNavRect,
+  setNavToneEnabled,
+} from "../utils/navTone";
+import FeedFilterSheet, {
+  DEFAULT_FEED_FILTERS,
+} from "../screens/Main/Home/molecules/FeedFilterSheet";
+import FilterModal from "../components/CarFilterModal";
+import {
+  enabledTopicNames,
+  loadFeedTopics,
+  persistFeedTopics,
+  resolveFeedTopics,
+} from "../utils/feedTopics";
 import CustomButton from "../components/CustomButton";
 import ViewerWatchScreen from "../screens/Main/LiveScreens/ViewerWatchScreen";
 
@@ -93,11 +109,12 @@ const TAB_TO_PAGER = {
   Profile: PAGER_PROFILE_INDEX,
 };
 
+// Material Symbols Rounded (filled) — Figma bottom nav
 const TAB_ICON_BY_ROUTE = {
-  Home: HomeSvg,
-  Matching,
-  Shows: Movie,
-  Events: ShowsSvg,
+  Home: "home",
+  Matching: "group",
+  Events: "stadium",
+  Shows: "live_tv",
 };
 
 const HomeWithCameraPager = ({ route, navigation }) => {
@@ -108,6 +125,7 @@ const HomeWithCameraPager = ({ route, navigation }) => {
   const {
     setIsTabBarVisible,
     headerAnim,
+    feedRowAnim,
     pagerScrollEnabled,
     registerPagerRef,
     setActivePagerPage,
@@ -124,6 +142,60 @@ const HomeWithCameraPager = ({ route, navigation }) => {
 
   const [currentPage, setCurrentPage] = useState(HOME_PAGE_INDEX);
   const [tab, setTab] = useState(null);
+  // "+" chip → the app's existing topic sheet in toggle mode: a switch per
+  // topic, on = shown as a header chip. Saved on device (utils/feedTopics).
+  const [topicSheetVisible, setTopicSheetVisible] = useState(false);
+  // Header tune button → Figma "Filters" sheet (sorting / time period / topics)
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+  const [feedFilters, setFeedFilters] = useState(DEFAULT_FEED_FILTERS);
+  const [topicPrefs, setTopicPrefs] = useState(() => resolveFeedTopics(null));
+  const enabledTopics = useMemo(() => enabledTopicNames(topicPrefs), [topicPrefs]);
+
+  useEffect(() => {
+    let alive = true;
+    loadFeedTopics().then((prefs) => alive && setTopicPrefs(prefs));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const handleTopicToggle = useCallback(
+    (name, enabled) => {
+      const selectedName = tab !== null ? enabledTopics[tab] : null;
+      const nextPrefs = topicPrefs.map((t) =>
+        t.name === name ? { ...t, enabled } : t,
+      );
+      const nextEnabled = enabledTopicNames(nextPrefs);
+      setTopicPrefs(nextPrefs);
+      persistFeedTopics(nextPrefs);
+      // keep the same chip selected if it is still shown
+      const nextIndex = selectedName ? nextEnabled.indexOf(selectedName) : -1;
+      setTab(nextIndex >= 0 ? nextIndex : null);
+    },
+    [tab, enabledTopics, topicPrefs],
+  );
+
+  // Figma: tapping the header location opens the location picker; the chosen
+  // area becomes the feed's area filter (posts published around that place).
+  const dispatch = useDispatch();
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const handleFeedLocationSelect = useCallback(
+    (loc) => {
+      if (!loc) return;
+      dispatch(
+        setLocation({
+          ...loc,
+          city: loc.city || null,
+          state: loc.state || null,
+          country: loc.country || null,
+          countryCode: loc.countryCode || null,
+          feedArea: true,
+        }),
+      );
+      setLocationModalVisible(false);
+    },
+    [dispatch],
+  );
   const [isCameraActive, setIsCameraActive] = useState(false);
   const isCameraActiveRef = useRef(false);
   const pagerProgress = useRef(new Animated.Value(HOME_PAGE_INDEX)).current;
@@ -166,6 +238,8 @@ const HomeWithCameraPager = ({ route, navigation }) => {
         prevPage === pageIndex ? prevPage : pageIndex,
       );
       setActivePagerPage(pageIndex);
+      // adaptive tab bar tone only follows media on the Home feed
+      setNavToneEnabled(pageIndex === PAGER_HOME_INDEX);
 
       pagerProgress.setValue(pageIndex);
       pagerProgressShared.setValue(pageIndex);
@@ -256,7 +330,7 @@ const HomeWithCameraPager = ({ route, navigation }) => {
             StyleSheet.absoluteFill,
             {
               backgroundColor:
-                themeMode === "dark" ? "rgba(24, 24, 24, 0.5)" : "transparent",
+                themeMode === "dark" ? "rgba(18, 18, 18, 0.97)" : "transparent",
               opacity: bgOpacity,
             },
           ]}
@@ -279,9 +353,7 @@ const HomeWithCameraPager = ({ route, navigation }) => {
             />
           )}
         </Animated.View>
-        <HomeHeader
-          title={"Home"}
-          isHome={currentPage === PAGER_HOME_INDEX}
+        <FeedHeader
           isShort={currentPage === PAGER_SHORTS_INDEX}
           isLive={
             currentPage === PAGER_SHOWS_FROM_SHORTS_INDEX ||
@@ -289,44 +361,14 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           }
           pagerProgress={pagerProgress}
           onSetPage={onSetPage}
+          tab={tab}
+          setTab={setTab}
+          tabNames={enabledTopics}
+          feedRowAnim={feedRowAnim}
+          onLocationPress={() => setLocationModalVisible(true)}
+          onAddTopicPress={() => setTopicSheetVisible(true)}
+          onFilterPress={() => setFilterSheetVisible(true)}
         />
-
-        <View style={styles.tabRow}>
-          <TouchableOpacity
-            onPress={() => setTab(null)}
-            activeOpacity={0.7}
-            style={{
-              backgroundColor: tab === null ? colors.text : colors.white04,
-              height: 34,
-              width: 40,
-              justifyContent: "center",
-              alignItems: "center",
-              borderRadius: 8,
-            }}
-          >
-            <Icons
-              family="MaterialCommunityIcons"
-              name="compass"
-              size={22}
-              color={
-                tab === null
-                  ? isDark
-                    ? COLORS.black
-                    : colors.background
-                  : colors.text
-              }
-            />
-          </TouchableOpacity>
-          <TopTab
-            rounded
-            setTab={setTab}
-            tab={tab}
-            borderRadius={8}
-            height={32}
-            tabNames={TAB_NAMES}
-            isBlur={currentPage === PAGER_SHORTS_INDEX && themeMode === "dark"}
-          />
-        </View>
       </Animated.View>
 
       <PagerView
@@ -355,6 +397,8 @@ const HomeWithCameraPager = ({ route, navigation }) => {
             onSetPage={onSetPage}
             isFocusedPage={currentPage === PAGER_HOME_INDEX && isFocused}
             sharedTab={tab}
+            sharedTabNames={enabledTopics}
+            feedFilters={feedFilters}
           />
         </View>
 
@@ -407,9 +451,42 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           />
         </View>
       </PagerView>
+
+      <CustomModalGooglePlaces
+        isVisible={locationModalVisible}
+        onClose={() => setLocationModalVisible(false)}
+        onLocationSelect={handleFeedLocationSelect}
+      />
+      <FilterModal
+        isVisible={topicSheetVisible}
+        onDisable={() => setTopicSheetVisible(false)}
+        title="Pick Your Interests"
+        toggleMode
+        enabledItems={enabledTopics}
+        onToggleItem={handleTopicToggle}
+      />
+      <FeedFilterSheet
+        visible={filterSheetVisible}
+        onDismiss={() => setFilterSheetVisible(false)}
+        filters={feedFilters}
+        onApply={setFeedFilters}
+        enabledTopics={enabledTopics}
+        onToggleTopic={handleTopicToggle}
+      />
     </View>
   );
 };
+
+// Figma `Create` menu (FAB): top → bottom
+const CREATE_MENU_ITEMS = [
+  { label: "Go Live", icon: "fiber_manual_record", filled: true, route: "PublishLive" },
+  { label: "Story", icon: "web_stories", filled: true, route: "CameraScreen" },
+  { label: "Radio", icon: "mic", filled: true, route: "CreateAudio" },
+  { label: "Poll", icon: "ballot", filled: true, route: "CreatePost", params: { postType: "poll" } },
+  { label: "Picture", icon: "photo_camera", filled: true, route: "CreatePost", params: { postType: "picture" } },
+  { label: "Post", icon: "edit", filled: true, route: "CreatePost" },
+];
+const CREATE_MENU_OFFSETS = [-310, -250, -190, -130, -70, -10];
 
 const TabBarVisibilityContext = createContext();
 
@@ -432,6 +509,29 @@ export const TabBarVisibilityProvider = ({ children }) => {
   ).current;
 
   const [requestedPagerPage, setRequestedPagerPage] = useState(null);
+
+  // Figma Home-Feed: the Feed/Shorts row collapses on scroll (Pinterest-style)
+  const feedRowAnim = useRef(new Animated.Value(1)).current;
+  const feedRowVisibleRef = useRef(true);
+  const setFeedRowVisible = useCallback(
+    (visible) => {
+      if (feedRowVisibleRef.current === visible) return;
+      feedRowVisibleRef.current = visible;
+      Animated.timing(feedRowAnim, {
+        toValue: visible ? 1 : 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    },
+    [feedRowAnim],
+  );
+
+  // Threads-style "+" button — hidden at the top of the feed, shows on scroll
+  const [isPlusVisible, setIsPlusVisibleState] = useState(false);
+  const setPlusVisible = useCallback((visible) => {
+    setIsPlusVisibleState((prev) => (prev === visible ? prev : visible));
+  }, []);
 
   const setActivePagerPage = useCallback((page) => {
     if (
@@ -515,6 +615,10 @@ export const TabBarVisibilityProvider = ({ children }) => {
       requestedPagerPage,
       clearRequestedPagerPage,
       navigateToPagerPage,
+      feedRowAnim,
+      setFeedRowVisible,
+      isPlusVisible,
+      setPlusVisible,
     }),
     [
       isTabBarVisible,
@@ -529,6 +633,10 @@ export const TabBarVisibilityProvider = ({ children }) => {
       requestedPagerPage,
       clearRequestedPagerPage,
       navigateToPagerPage,
+      feedRowAnim,
+      setFeedRowVisible,
+      isPlusVisible,
+      setPlusVisible,
     ],
   );
 
@@ -642,25 +750,52 @@ const PagerTabBarItem = memo(
         activeOpacity={1}
         onPress={onPress}
       >
-        {IconComponent && (
-          <IconComponent
-            width={30}
-            height={30}
-            fill={
-              isFocused
-                ? COLORS.black
-                : themeMode === "light"
-                ? COLORS.white
-                : colors.iconMuted
-            }
-            color={
-              isFocused
-                ? COLORS.black
-                : themeMode === "light"
-                ? COLORS.white
-                : colors.iconMuted
-            }
+        {IconComponent && isFocused && (
+          <Icons
+            family="MaterialSymbolsRoundedFilled"
+            name={IconComponent}
+            size={26}
+            color={COLORS.black}
           />
+        )}
+        {IconComponent && !isFocused && (
+          // iOS 26-style adaptive icon: cross-fades to dark while light media
+          // is behind the glass bar (utils/navTone)
+          <View style={styles.toneIconBox}>
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.toneIconLayer,
+                {
+                  opacity: navToneAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 0],
+                  }),
+                },
+              ]}
+            >
+              <Icons
+                family="MaterialSymbolsRoundedFilled"
+                name={IconComponent}
+                size={26}
+                color={themeMode === "light" ? COLORS.white : colors.iconMuted}
+              />
+            </Animated.View>
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.toneIconLayer,
+                { opacity: navToneAnim },
+              ]}
+            >
+              <Icons
+                family="MaterialSymbolsRoundedFilled"
+                name={IconComponent}
+                size={26}
+                color="#121212"
+              />
+            </Animated.View>
+          </View>
         )}
       </TouchableOpacity>
     );
@@ -680,6 +815,7 @@ const CustomTabBar = ({ state, navigation }) => {
   const [leftSelectedFeedType, setLeftSelectedFeedType] = useState("social");
 
   const tabTranslateY = useRef(new Animated.Value(0)).current;
+  const tabBarPillRef = useRef(null);
 
   useEffect(() => {
     Animated.timing(tabTranslateY, {
@@ -688,6 +824,24 @@ const CustomTabBar = ({ state, navigation }) => {
       useNativeDriver: true,
     }).start();
   }, [isTabBarVisible]);
+
+  // Threads-style "+": part of the bar while it's shown; when the bar slides
+  // away on scroll down the "+" stays behind as a floating button, and the
+  // bar comes back around it on scroll up.
+  const plusVisibleEffective = true;
+  const plusAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(plusAnim, {
+      toValue: plusVisibleEffective ? 1 : 0,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 10,
+    }).start();
+  }, [plusVisibleEffective, plusAnim]);
+  const plusScale = plusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 1],
+  });
 
   useEffect(() => {
     setOptimisticActivePage(activePagerPage);
@@ -703,15 +857,12 @@ const CustomTabBar = ({ state, navigation }) => {
 
   // Animation values for right menu
   const rotateAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim1 = useRef(new Animated.Value(0)).current;
-  const scaleAnim2 = useRef(new Animated.Value(0)).current;
-  const scaleAnim3 = useRef(new Animated.Value(0)).current;
-  const scaleAnim4 = useRef(new Animated.Value(0)).current;
-
-  const translateY1 = useRef(new Animated.Value(0)).current;
-  const translateY2 = useRef(new Animated.Value(0)).current;
-  const translateY3 = useRef(new Animated.Value(0)).current;
-  const translateY4 = useRef(new Animated.Value(0)).current;
+  const menuScale = useRef(
+    CREATE_MENU_ITEMS.map(() => new Animated.Value(0)),
+  ).current;
+  const menuTranslate = useRef(
+    CREATE_MENU_ITEMS.map(() => new Animated.Value(0)),
+  ).current;
 
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
@@ -741,61 +892,24 @@ const CustomTabBar = ({ state, navigation }) => {
           duration: 300,
           useNativeDriver: true,
         }),
-        Animated.spring(scaleAnim1, {
-          toValue: 1,
-          delay: 150,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(translateY1, {
-          toValue: -190,
-          delay: 150,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(scaleAnim2, {
-          toValue: 1,
-          delay: 100,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(translateY2, {
-          toValue: -130,
-          delay: 100,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(scaleAnim3, {
-          toValue: 1,
-          delay: 50,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(translateY3, {
-          toValue: -70,
-          delay: 50,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(scaleAnim4, {
-          toValue: 1,
-          delay: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(translateY4, {
-          toValue: -10,
-          delay: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
+        ...CREATE_MENU_ITEMS.flatMap((_, idx) => {
+          const delay = (CREATE_MENU_ITEMS.length - 1 - idx) * 40;
+          return [
+            Animated.spring(menuScale[idx], {
+              toValue: 1,
+              delay,
+              useNativeDriver: true,
+              tension: 100,
+              friction: 8,
+            }),
+            Animated.spring(menuTranslate[idx], {
+              toValue: CREATE_MENU_OFFSETS[idx],
+              delay,
+              useNativeDriver: true,
+              tension: 100,
+              friction: 8,
+            }),
+          ];
         }),
       ]).start();
     } else {
@@ -811,68 +925,28 @@ const CustomTabBar = ({ state, navigation }) => {
           duration: 200,
           useNativeDriver: true,
         }),
-        Animated.spring(scaleAnim1, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(translateY1, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(scaleAnim2, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(translateY2, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(scaleAnim3, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(translateY3, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(scaleAnim4, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(translateY4, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
+        ...CREATE_MENU_ITEMS.flatMap((_, idx) => [
+          Animated.spring(menuScale[idx], {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 8,
+          }),
+          Animated.spring(menuTranslate[idx], {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 8,
+          }),
+        ]),
       ]).start(() => setMenuOpen(false));
     }
   }, [
     menuOpen,
     overlayOpacity,
     rotateAnim,
-    scaleAnim1,
-    scaleAnim2,
-    scaleAnim3,
-    scaleAnim4,
-    translateY1,
-    translateY2,
-    translateY3,
-    translateY4,
+    menuScale,
+    menuTranslate,
   ]);
 
   const toggleLeftMenu = useCallback(() => {
@@ -983,7 +1057,7 @@ const CustomTabBar = ({ state, navigation }) => {
     leftTranslateY3,
   ]);
 
-  const handleOptionPress = (route) => {
+  const handleOptionPress = (route, params) => {
     Animated.parallel([
       Animated.spring(rotateAnim, {
         toValue: 0,
@@ -996,61 +1070,27 @@ const CustomTabBar = ({ state, navigation }) => {
         duration: 200,
         useNativeDriver: true,
       }),
-      Animated.spring(scaleAnim1, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(translateY1, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(scaleAnim2, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(translateY2, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(scaleAnim3, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(translateY3, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(scaleAnim4, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(translateY4, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
+      ...CREATE_MENU_ITEMS.flatMap((_, idx) => [
+        Animated.spring(menuScale[idx], {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 8,
+        }),
+        Animated.spring(menuTranslate[idx], {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 8,
+        }),
+      ]),
     ]).start(() => {
       setMenuOpen(false);
-      navigation.navigate(route);
+      navigation.navigate(route, params);
     });
   };
 
-  const handleProGatedPress = (route) => {
+  const handleProGatedPress = (route, params) => {
     Animated.parallel([
       Animated.spring(rotateAnim, {
         toValue: 0,
@@ -1063,57 +1103,23 @@ const CustomTabBar = ({ state, navigation }) => {
         duration: 200,
         useNativeDriver: true,
       }),
-      Animated.spring(scaleAnim1, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(translateY1, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(scaleAnim2, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(translateY2, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(scaleAnim3, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(translateY3, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(scaleAnim4, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.spring(translateY4, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
+      ...CREATE_MENU_ITEMS.flatMap((_, idx) => [
+        Animated.spring(menuScale[idx], {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 8,
+        }),
+        Animated.spring(menuTranslate[idx], {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 8,
+        }),
+      ]),
     ]).start(() => {
       setMenuOpen(false);
-      navigation.navigate(route);
+      navigation.navigate(route, params);
     });
   };
 
@@ -1225,120 +1231,55 @@ const CustomTabBar = ({ state, navigation }) => {
         </Animated.View>
       )}
 
-      {/* Floating Right Menu Options */}
+      {/* Floating Right Menu Options — Figma create menu: 6 items, 48px gold circles, 24 SemiBold labels, gap 10 */}
       {menuOpen && (
         <View style={[styles.menuContainer, { bottom: 50 + insets.bottom }]}>
-          <Animated.View
-            style={[
-              styles.menuOptionWrapper,
-              {
-                marginBottom: -46,
-                transform: [{ translateY: translateY1 }, { scale: scaleAnim1 }],
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.menuOption}
-              activeOpacity={0.8}
-              onPress={() => handleOptionPress("PublishLive")}
+          {CREATE_MENU_ITEMS.map((menuItem, idx) => (
+            <Animated.View
+              key={menuItem.label}
+              style={[
+                styles.menuOptionWrapper,
+                {
+                  marginBottom: idx === CREATE_MENU_ITEMS.length - 1 ? 20 : -46,
+                  transform: [
+                    { translateY: menuTranslate[idx] },
+                    { scale: menuScale[idx] },
+                  ],
+                },
+              ]}
             >
-              <CustomText
-                label="Live"
-                fontSize={24}
-                fontFamily={fonts.semiBold}
-                marginLeft={12}
-                marginRight={6}
-                color={COLORS.white}
-              />
-              <View style={styles.menuButton}>
-                <GoLiveSvg />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.menuOptionWrapper,
-              {
-                marginBottom: -46,
-                transform: [{ translateY: translateY2 }, { scale: scaleAnim2 }],
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.menuOption}
-              activeOpacity={0.8}
-              onPress={() => handleProGatedPress("CreateShort")}
-            >
-              <CustomText
-                label="Reel"
-                fontSize={24}
-                fontFamily={fonts.semiBold}
-                marginLeft={12}
-                marginRight={6}
-                color={COLORS.white}
-              />
-              <View style={styles.menuButton}>
-                <StorySvg />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.menuOptionWrapper,
-              {
-                marginBottom: -46,
-                transform: [{ translateY: translateY3 }, { scale: scaleAnim3 }],
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.menuOption}
-              activeOpacity={0.8}
-              onPress={() => handleProGatedPress("CreateEvent")}
-            >
-              <CustomText
-                label="Event"
-                fontSize={24}
-                fontFamily={fonts.semiBold}
-                marginLeft={12}
-                marginRight={6}
-                color={COLORS.white}
-              />
-              <View style={styles.menuButton}>
-                <ShowsSvg color={COLORS.white} fill={COLORS.white} />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.menuOptionWrapper,
-              {
-                marginBottom: 20,
-                transform: [{ translateY: translateY4 }, { scale: scaleAnim4 }],
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.menuOption}
-              activeOpacity={0.8}
-              onPress={() => handleOptionPress("CreatePost")}
-            >
-              <CustomText
-                label="Post"
-                fontSize={24}
-                fontFamily={fonts.semiBold}
-                marginLeft={12}
-                marginRight={6}
-                color={COLORS.white}
-              />
-              <View style={styles.menuButton}>
-                <CreatePostSvg />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
+              <TouchableOpacity
+                style={styles.menuOption}
+                activeOpacity={0.8}
+                onPress={() =>
+                  menuItem.pro
+                    ? handleProGatedPress(menuItem.route, menuItem.params)
+                    : handleOptionPress(menuItem.route, menuItem.params)
+                }
+              >
+                <CustomText
+                  label={menuItem.label}
+                  fontSize={24}
+                  fontFamily={fonts.semiBold}
+                  letterSpacing={-0.5}
+                  marginRight={10}
+                  color={COLORS.white}
+                />
+                <View style={styles.menuButton}>
+                  <Icons
+                    family={
+                      menuItem.filled
+                        ? "MaterialSymbolsRoundedFilled"
+                        : "MaterialSymbolsRounded"
+                    }
+                    name={menuItem.icon}
+                    size={24}
+                    color={COLORS.white}
+                  />
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
         </View>
       )}
 
@@ -1367,13 +1308,19 @@ const CustomTabBar = ({ state, navigation }) => {
               }
             >
               <View style={styles.menuButton}>
-                <FavouriteSvg />
+                <Icons
+                  family="MaterialSymbolsRoundedFilled"
+                  name="stars"
+                  size={24}
+                  color={COLORS.white}
+                />
               </View>
               <CustomText
-                label="Favourite"
+                label="Favorites"
                 fontSize={24}
                 fontFamily={fonts.semiBold}
-                marginLeft={6}
+                letterSpacing={-0.5}
+                marginLeft={10}
                 marginRight={12}
                 color={
                   leftSelectedFeedType === "favourite"
@@ -1404,13 +1351,19 @@ const CustomTabBar = ({ state, navigation }) => {
               }
             >
               <View style={styles.menuButton}>
-                <FriendSvg />
+                <Icons
+                  family="MaterialSymbolsRoundedFilled"
+                  name="groups"
+                  size={24}
+                  color={COLORS.white}
+                />
               </View>
               <CustomText
                 label="Friends"
                 fontSize={24}
                 fontFamily={fonts.semiBold}
-                marginLeft={6}
+                letterSpacing={-0.5}
+                marginLeft={10}
                 marginRight={12}
                 color={
                   leftSelectedFeedType === "friends" ? COLORS.white : "#A19375"
@@ -1439,13 +1392,19 @@ const CustomTabBar = ({ state, navigation }) => {
               }
             >
               <View style={styles.menuButton}>
-                <SocialFeedSvg />
+                <Icons
+                  family="MaterialSymbolsRoundedFilled"
+                  name="rss_feed"
+                  size={24}
+                  color={COLORS.white}
+                />
               </View>
               <CustomText
                 label="Social Feed"
                 fontSize={24}
                 fontFamily={fonts.semiBold}
-                marginLeft={6}
+                letterSpacing={-0.5}
+                marginLeft={10}
                 marginRight={12}
                 color={
                   leftSelectedFeedType === "social" ? COLORS.white : "#A19375"
@@ -1465,7 +1424,21 @@ const CustomTabBar = ({ state, navigation }) => {
           },
         ]}
       >
-        <View style={styles.tabContentContainer}>
+        <View
+          style={styles.tabContentContainer}
+          collapsable={false}
+          ref={(node) => {
+            tabBarPillRef.current = node;
+          }}
+          onLayout={() => {
+            // window rect of the glass pill → navTone probe line
+            requestAnimationFrame(() =>
+              tabBarPillRef.current?.measureInWindow?.((x, y, w, h) => {
+                if (h > 0) setNavRect({ y, height: h });
+              }),
+            );
+          }}
+        >
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurType={"light"}
@@ -1513,62 +1486,56 @@ const CustomTabBar = ({ state, navigation }) => {
             ))}
           </View>
         </View>
+      </Animated.View>
 
-        {/* Animated Plus Button */}
-        <Animated.View
-          style={[
-            styles.plusButton,
-            {
-              bottom: 14 + insets.bottom,
-              overflow: "hidden",
-              // backgroundColor: menuOpen
-              //   ? themeMode === "dark"
-              //     ? COLORS.white
-              //     : COLORS.black
-              //   : themeMode === "dark"
-              //   ? "#FFFFFF35"
-              //   : "rgba(0, 0, 0, 0.35)",
-            },
-          ]}
+      {/* Animated Plus Button */}
+      <Animated.View
+        pointerEvents={plusVisibleEffective ? "auto" : "none"}
+        style={[
+          styles.plusButton,
+          {
+            // Outside the sliding bar, so it stays put (floating) when the
+            // bar hides on scroll down and the bar returns around it on
+            // scroll up — Threads behaviour.
+            zIndex: 1000,
+            bottom: 14 + insets.bottom,
+            overflow: "hidden",
+            opacity: plusAnim,
+            transform: [
+              // Floating only on the Home feed; elsewhere it still hides
+              // together with the bar (Shorts, Live, …)
+              {
+                translateY:
+                  activePagerPage === PAGER_HOME_INDEX || menuOpen
+                    ? 0
+                    : tabTranslateY,
+              },
+              { scale: plusScale },
+            ],
+            // backgroundColor: menuOpen
+            //   ? themeMode === "dark"
+            //     ? COLORS.white
+            //     : COLORS.black
+            //   : themeMode === "dark"
+            //   ? "#FFFFFF35"
+            //   : "rgba(0, 0, 0, 0.35)",
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[styles.plusButtonTouchable, {}]}
+          activeOpacity={0.7}
+          onPress={toggleMenu}
         >
-          <BlurView
-            style={StyleSheet.absoluteFillObject}
-            blurType={"light"}
-            blurAmount={6}
-            reducedTransparencyFallbackColor="#FFFFFF35"
-          />
-          {themeMode === "light" && (
-            <View
-              pointerEvents="none"
-              style={[
-                styles.default,
-                {
-                  backgroundColor: "rgba(0, 0, 0, 0.32)",
-                },
-              ]}
+          <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+            <Icons
+              family="MaterialSymbolsRounded"
+              name="add"
+              size={28}
+              color="#121212"
             />
-          )}
-          <TouchableOpacity
-            style={[styles.plusButtonTouchable, {}]}
-            activeOpacity={0.7}
-            onPress={toggleMenu}
-          >
-            <Animated.View style={{ transform: [{ rotate: rotation }] }}>
-              <Icons
-                family="Feather"
-                name="plus"
-                size={26}
-                color={
-                  themeMode === "light"
-                    ? COLORS.white
-                    : menuOpen
-                    ? COLORS.black
-                    : COLORS.white
-                }
-              />
-            </Animated.View>
-          </TouchableOpacity>
-        </Animated.View>
+          </Animated.View>
+        </TouchableOpacity>
       </Animated.View>
 
       <CustomModal
@@ -1741,7 +1708,10 @@ const styles = StyleSheet.create({
     borderRadius: 99,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: COLORS.white,
   },
+  toneIconBox: { width: 26, height: 26 },
+  toneIconLayer: { alignItems: "center", justifyContent: "center" },
   plusButtonTouchable: {
     width: "100%",
     height: "100%",

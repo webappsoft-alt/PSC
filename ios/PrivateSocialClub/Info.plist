@@ -106,6 +106,12 @@
 		<string>ClashDisplay.ttf</string>
 		<string>Poppins-Thin.ttf</string>
 		<string>Poppins-BlackItalic.ttf</string>
+		<string>Poppins-SemiBoldItalic.ttf</string>
+		<string>Poppins-BoldItalic.ttf</string>
+		<string>Poppins-MediumItalic.ttf</string>
+		<string>Poppins-Italic.ttf</string>
+		<string>MaterialSymbolsRounded.ttf</string>
+		<string>MaterialSymbolsRoundedFilled.ttf</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

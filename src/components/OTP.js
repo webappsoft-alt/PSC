@@ -1,4 +1,4 @@
-import {Platform, StyleSheet, View} from "react-native";
+import { StyleSheet, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import {
   useClearByFocusCell,
@@ -11,7 +11,7 @@ import { COLORS } from "../utils/COLORS";
 import fonts from "../assets/fonts";
 import ErrorComponent from "./ErrorComponent";
 import CustomText from "./CustomText";
-import Text from "./ScaledText";
+import { useTheme } from "../contexts/ThemeContext";
 
 const CELL_COUNT = 4;
 
@@ -22,6 +22,7 @@ const OTPComponent = ({
   marginBottom = 8,
   marginTop = 0,
 }) => {
+  const { colors, isDark } = useTheme();
   const ref = useBlurOnFulfill({ value, cellCount: CELL_COUNT });
   const [props, getCellOnLayoutHandler] = useClearByFocusCell({
     value,
@@ -32,14 +33,18 @@ const OTPComponent = ({
   const [prevError, setPrevError] = useState(error);
 
   useEffect(() => {
-    if (prevError && !error) {
+    if (error) {
+      // An error always wins over the transient green "corrected" state.
+      setShowSuccessColor(false);
+      setPrevError(error);
+      return;
+    }
+    if (prevError) {
+      setPrevError(error);
       setShowSuccessColor(true);
-      const timer = setTimeout(() => {
-        setShowSuccessColor(false);
-      }, 2000);
+      const timer = setTimeout(() => setShowSuccessColor(false), 2000);
       return () => clearTimeout(timer);
     }
-    setPrevError(error);
   }, [error]);
 
   return (
@@ -59,13 +64,25 @@ const OTPComponent = ({
             key={index}
             style={[
               styles.cellRoot,
-              isFocused && styles.focusCell,
+              { backgroundColor: colors.surfaceAlt },
+              isFocused && [
+                styles.focusCell,
+                { borderColor: isDark ? COLORS.white : colors.text },
+              ],
               error && styles.errorCell,
               showSuccessColor && styles.successCell,
             ]}
           >
             <CustomText
-              color={!symbol ? COLORS.gray2 : COLORS.black}
+              color={
+                !symbol
+                  ? isDark
+                    ? COLORS.gray2
+                    : colors.iconMuted
+                  : isDark
+                  ? COLORS.white
+                  : colors.text
+              }
               fontSize={32}
               fontFamily={fonts.medium}
               lineHeight={32 * 1.4}
@@ -104,18 +121,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 12,
     padding: 12,
-    backgroundColor: COLORS.lightGray,
     borderWidth: 1,
     borderColor: "transparent",
   },
-  cellText: {
-    color: COLORS.primaryColor,
-    fontSize: 32,
-    textAlign: "center",
-    fontFamily: fonts.medium,
-  },
   focusCell: {
-    borderColor: COLORS.primaryColor,
     borderWidth: 1,
   },
   errorCell: {
@@ -123,15 +132,9 @@ const styles = StyleSheet.create({
     borderColor: "#EE1045CC",
     borderWidth: 1,
   },
-  errorText: {
-    color: "#EE1045",
-  },
   successCell: {
     backgroundColor: "#64CD750A",
     borderColor: "#64CD75",
     borderWidth: 1,
-  },
-  successText: {
-    color: "#64CD75",
   },
 });

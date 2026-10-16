@@ -1,5 +1,5 @@
 import colors from "@/constants/colors";
-import { Fonts } from "@/constants/fonts";
+import fonts from "../../../../assets/fonts";
 import { User } from "@/types";
 import { formatInstagramTime } from "@/utils/constants";
 import { BlurView } from "expo-blur";
@@ -289,7 +289,7 @@ const PostHeader: React.FC<HeaderProps> = ({
           {!hideViralWatermark && (
             <CustomText
               label="Viral."
-              fontFamily={Fonts.semiBoldItalic}
+              fontFamily={fonts.semiBoldItalic}
               fontSize={24}
               color="#FFFFFFA3"
             />

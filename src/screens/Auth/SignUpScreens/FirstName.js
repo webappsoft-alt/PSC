@@ -1,5 +1,5 @@
-import { forwardRef, useImperativeHandle, useState, useEffect } from "react";
-import { StyleSheet, View, TouchableOpacity } from "react-native";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { StyleSheet, View } from "react-native";
 
 import CustomInput from "../../../components/CustomInput";
 import CustomText from "../../../components/CustomText";
@@ -7,330 +7,115 @@ import ErrorComponent from "../../../components/ErrorComponent";
 
 import fonts from "../../../assets/fonts";
 import { COLORS } from "../../../utils/COLORS";
-import { useNavigation } from "@react-navigation/native";
-import { post } from "../../../services/ApiRequest";
-import { ToastMessage } from "../../../utils/ToastMessage";
-import Divider from "../../../components/Divider";
 import { useTheme } from "../../../contexts/ThemeContext";
 
-const StepTwo = forwardRef(
-  (
-    {
-      currentIndex,
-      setCurrentIndex,
-      state,
-      setState,
-      setLoadingState,
-      setBtnDisabled,
-    },
-    ref,
-  ) => {
+const MAX_LENGTH = 37;
+
+const Firstname = forwardRef(
+  ({ currentIndex, setCurrentIndex, state, setState, setBtnDisabled }, ref) => {
     const { colors, isDark } = useTheme();
-    const [firstName, setFirstName] = useState(state?.first_name || "");
-    const [usernameStatus, setUsernameStatus] = useState(null);
+    const [firstName, setFirstName] = useState(state?.full_name || "");
     const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
-
-    const [suggestions, setSuggestions] = useState([]);
-    const [selectedSuggestion, setSelectedSuggestion] = useState(null);
-    const [isManualChange, setIsManualChange] = useState(true);
-
-    const navigation = useNavigation();
 
     useEffect(() => {
       setBtnDisabled?.(!firstName.trim());
     }, [firstName]);
 
-    const randomSuffix = [
-      "official",
-      "real",
-      "x",
-      "hub",
-      "world",
-      "live",
-      "zone",
-      "gram",
-      "daily",
-      "pro",
-      "01",
-      "99",
-      "777",
-    ];
-
-    const generateSuggestions = (name) => {
-      if (!name) {
-        setSuggestions([]);
-        return;
-      }
-
-      const base = name.toLowerCase().replace(/\s/g, "");
-
-      const newSuggestions = new Set();
-
-      while (newSuggestions.size < 8) {
-        const random =
-          randomSuffix[Math.floor(Math.random() * randomSuffix.length)];
-        const number = Math.floor(Math.random() * 100);
-
-        const patterns = [
-          `${base}${number}`,
-          `${base}${random}`,
-          `${random}${base}`,
-          `${base}.${random}`,
-          `${base}${random}`,
-          `${base}_${number}`,
-        ];
-
-        const pick = patterns[Math.floor(Math.random() * patterns.length)];
-        newSuggestions.add(pick);
-      }
-
-      setSuggestions(Array.from(newSuggestions).slice(0, 8));
-    };
-
-    useEffect(() => {
-      if (isManualChange) {
-        generateSuggestions(firstName);
-      }
-    }, [firstName, isManualChange]);
+    const nameRegex = /^[A-Za-z\s'-]{2,37}$/;
 
     const errorCheck = (val) => {
       let newErrors = "";
-      const nameRegex = /^[A-Za-z\s'-_]{2,30}$/;
-
       if (!val.trim()) {
-        newErrors = "Please enter your first name";
+        newErrors = "Please enter your firstname";
       } else if (!nameRegex.test(val.trim())) {
         newErrors =
-          "Please enter a valid first name (letters only, 2–30 characters)";
+          "Please enter a valid firstname (letters only, 2-37 characters)";
       }
-
       return newErrors;
     };
 
-    const submit = async () => {
+    const submit = () => {
       const err = errorCheck(firstName);
-
       if (err) {
         setError(err);
         return;
       }
-
       setError("");
-
-      const body = {
-        username: firstName.trim(),
-      };
-
-      try {
-        setLoading(true);
-        if (setLoadingState) setLoadingState(true);
-
-        const res = await post(`auth/check-username`, body);
-
-        if (res?.error?.data?.success === false) {
-          const message =
-            res?.error?.message ||
-            "Username already exists. Please choose another one.";
-
-          setError(message);
-          setUsernameStatus("taken");
-
-          ToastMessage(message, "error");
-
-          setLoading(false);
-          if (setLoadingState) setLoadingState(false);
-          return;
-        }
-
-        if (res?.data?.success && !res?.error) {
-          setState({ ...state, first_name: firstName.trim() });
-          setUsernameStatus("available");
-
-          if (currentIndex < 12) {
-            setCurrentIndex(10);
-          }
-        } else {
-          setUsernameStatus("taken");
-        }
-
-        setLoading(false);
-        if (setLoadingState) setLoadingState(false);
-      } catch (error) {
-        setLoading(false);
-        setUsernameStatus("taken");
-
-        if (setLoadingState) setLoadingState(false);
-
-        const message = "Username already exists. Please choose another one.";
-
-        setError(message);
-        ToastMessage(message, "error");
-      }
+      setState({ ...state, full_name: firstName.trim() });
+      setCurrentIndex(5);
     };
 
     const back = () => {
-      setCurrentIndex(8);
+      setCurrentIndex(state?.userType === "Regular" ? 2 : 3);
     };
 
-    const selectSuggestion = (username) => {
-      setFirstName(username);
-      setSelectedSuggestion(username);
-      setIsManualChange(false); // STOP new suggestions
-      setError("");
-    };
-
-    useImperativeHandle(ref, () => ({ submit, back, isLoading: loading }));
+    useImperativeHandle(ref, () => ({ submit, back }));
 
     return (
       <View style={styles.container}>
         <View>
           <CustomText
-            label="Pick a username?"
+            label="What's your firstname?"
             fontFamily={fonts.semiBold}
             fontSize={24}
+            lineHeight={24 * 1.4}
+            letterSpacing={-0.24}
             marginTop={12}
-            letterSpacing={-1}
             marginBottom={6}
             color={isDark ? COLORS.white : colors.text}
           />
 
           <CustomInput
             placeholder="E.g. James"
-            autoCapitalize={"none"}
-            maxLength={30}
+            autoCapitalize="words"
+            maxLength={MAX_LENGTH}
             value={firstName}
             onChangeText={(text) => {
               setFirstName(text);
-              setSelectedSuggestion(null);
-              setIsManualChange(true); // allow new suggestions
-
               if (error) {
-                if (error.includes("already exists")) {
-                  setError("");
-                } else {
-                  const newError = errorCheck(text);
-                  if (!newError) {
-                    setError("");
-                  }
-                }
+                const newError = errorCheck(text);
+                if (!newError) setError("");
               }
             }}
             error={error}
+            marginBottom={5}
           />
 
-          {(usernameStatus == "available" || usernameStatus == "taken") && (
-            <ErrorComponent
-              errorTitle={
-                usernameStatus == "available"
-                  ? "Username is available"
-                  : usernameStatus == "taken"
-                  ? "Username is taken"
-                  : ""
-              }
-              color={
-                usernameStatus == "available"
-                  ? COLORS.green
-                  : usernameStatus == "taken"
-                  ? COLORS.red
-                  : ""
-              }
-              error={usernameStatus == "taken"}
-              isValid={usernameStatus == "available"}
-              marginBottom={2}
-            />
-          )}
-
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
+          <View style={styles.helperRow}>
             <ErrorComponent
               errorTitle="This will appear on your profile."
-              marginBottom={2}
+              color={isDark ? COLORS.gray2 : colors.textSecondary}
+              font={fonts.regular}
             />
-
             <CustomText
-              label={`${firstName.length}/30`}
+              label={`${firstName.length}/${MAX_LENGTH}`}
               color={isDark ? COLORS.gray64 : colors.textSecondary}
               fontSize={12}
+              lineHeight={12 * 1.4}
             />
           </View>
-
-          <ErrorComponent errorTitle="Inappropriate names are forbidded." />
-        </View>
-
-        <Divider thickness={1} color={isDark ? COLORS.inputBg : colors.border} marginVertical={16} />
-
-        {/* USERNAME SUGGESTIONS */}
-        <View style={styles.suggestionContainer}>
-          <View style={styles.suggestionWrap}>
-            {suggestions
-              .filter((item) => item.length <= 30)
-              .map((item, index) => {
-                const isSelected = selectedSuggestion === item;
-
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.suggestionItem,
-                      { borderColor: isDark ? COLORS.inputBg : colors.border },
-                      isSelected && {
-                        backgroundColor: isDark ? COLORS.white : colors.text,
-                        borderColor: isDark ? COLORS.white : colors.text,
-                      },
-                    ]}
-                    onPress={() => selectSuggestion(item)}
-                    activeOpacity={0.8}
-                  >
-                    <CustomText
-                      label={`@${item}`}
-                      fontFamily={fonts.medium}
-                      fontSize={12}
-                      color={isSelected ? (isDark ? COLORS.black : colors.background) : (isDark ? COLORS.gray64 : colors.textSecondary)}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-          </View>
+          <ErrorComponent
+            errorTitle="Inappropriate names are forbidden."
+            color={isDark ? COLORS.gray2 : colors.textSecondary}
+            font={fonts.regular}
+          />
         </View>
       </View>
     );
   },
 );
 
-export default StepTwo;
+export default Firstname;
 
 const styles = StyleSheet.create({
   container: {
     justifyContent: "space-between",
     flex: 1,
   },
-
-  suggestionContainer: {
-    marginTop: 4,
-  },
-
-  suggestionWrap: {
+  helperRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-
-  suggestionItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.inputBg,
-  },
-
-  selectedSuggestion: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 2,
   },
 });
