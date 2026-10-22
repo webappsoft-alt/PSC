@@ -23,6 +23,7 @@ import { logout } from "../../../store/reducer/AuthConfig";
 import {
   setUserData,
   addSavedAccount,
+  removeSavedAccount,
 } from "../../../store/reducer/usersSlice";
 import { useNavigation } from "@react-navigation/native";
 import { BlurView } from "@react-native-community/blur";
@@ -135,6 +136,10 @@ const Settings = () => {
       } catch (saveErr) {
         console.log("Error saving account to Redux:", saveErr);
       }
+    } else if (userData?._id) {
+      // Logins are remembered automatically for the profile selector;
+      // "don't save" forgets this account on the device.
+      dispatch(removeSavedAccount(String(userData._id)));
     }
 
     const fcmtoken = await AsyncStorage.getItem("fcmToken");

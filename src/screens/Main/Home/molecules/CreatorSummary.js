@@ -1,26 +1,35 @@
-import { BlurView } from "@react-native-community/blur";
 import { useNavigation } from "@react-navigation/native";
-import { useState } from "react";
-import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import fonts from "../../../../assets/fonts";
-import { Images } from "../../../../assets/images";
-import CustomModal from "../../../../components/CustomModal";
 import CustomText from "../../../../components/CustomText";
+import FloatingSheet, {
+  SheetCloseButton,
+  SheetIconButton,
+  SheetUserHeader,
+} from "../../../../components/FloatingSheet";
+import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
-import { COLORS } from "../../../../utils/COLORS";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import { COLORS } from "../../../../utils/COLORS";
 
+const LOCATION_BLUE = "#007BFF";
+
+/**
+ * Figma "Post-creator-summary": user header (32 avatar · ⋮ · ×) · info rows
+ * (16 icon + Medium 14/20; location blue, connectors @48%) · stats row
+ * (Medium 18 / Regular 14 @64%) · "In common" + avatar stack · bio
+ * (Regular 16 / 125% @64%). Figma inner gap 20 with tight text boxes
+ * (info rows 14, stats 29, in-common 14); with RN 1.4 line boxes the same
+ * centres come out as gap 12 (+5 before the info rows, −5 between a stat
+ * number and its label).
+ */
 const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
-  const { colors, isDark } = useTheme();
-  const naviagtion = useNavigation();
-  const [tab, setTab] = useState(0);
+  const { colors } = useTheme();
+  const navigation = useNavigation();
 
   const displayName =
     `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Display Name";
   const username = user?.username || "username";
-  const userAvatar = user?.profile?.avatar;
-  const profileColor = user?.profile?.profileColor || COLORS.gray48;
-  const isVerified = user?.role === "individual" || user?.role === "company"; // Base verification logic on role presence
 
   const location =
     user?.location?.city && user?.location?.country
@@ -35,396 +44,193 @@ const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
   const major = education?.primaryMajor || null;
   const school = education?.school || null;
 
+  const inCommon = Array.isArray(user?.mutualFriends)
+    ? user.mutualFriends.slice(0, 3)
+    : [];
+
+  const openProfile = () => {
+    onClose();
+    setTimeout(() => {
+      navigation.navigate("UserProfile", { userId: user?._id });
+    }, 600);
+  };
+
+  const Strong = ({ label }) => (
+    <CustomText
+      label={label}
+      fontFamily={fonts.medium}
+      fontSize={14}
+      color={colors.text}
+    />
+  );
+  const Muted = ({ label }) => (
+    <CustomText
+      label={label}
+      fontFamily={fonts.medium}
+      fontSize={14}
+      color={COLORS.gray48}
+    />
+  );
+
+  const stats = [
+    { label: "Likes", value: user?.stats?.upvotes },
+    { label: "Posts", value: user?.postsCount },
+    { label: "Followers", value: user?.followersCount },
+    { label: "Subs", value: user?.subsCount },
+  ];
+
   return (
-    <CustomModal
-      isBlur
-      isChange
-      isVisible={isVisible}
-      onDisable={onClose}
-      reducedTransparencyFallbackColor="rgba(0,0,0,0.1)"
-    >
-      <View
-        style={{
-          margin: 10,
-          borderRadius: 32,
-          padding: 4,
-          overflow: "hidden",
-          borderWidth: 1,
-          borderColor: isDark
-            ? "rgba(255, 255, 255, 0.16)"
-            : "rgba(0, 0, 0, 0.12)",
-        }}
-      >
-        <BlurView
-          blurType={isDark ? "dark" : "light"}
-          blurAmount={10}
-          reducedTransparencyFallbackColor={isDark ? "#FFFFFF29" : "#00000010"}
-          style={[StyleSheet.absoluteFillObject, { borderRadius: 26 }]}
+    <FloatingSheet
+      visible={isVisible}
+      onDismiss={onClose}
+      gap={12}
+      header={
+        <SheetUserHeader
+          avatar={user?.profile?.avatar}
+          profileColor={user?.profile?.profileColor}
+          displayName={displayName}
+          username={username}
+          role={user?.role}
+          onPressUser={openProfile}
+          right={
+            <>
+              <SheetIconButton name="more_vert" onPress={onMore} />
+              <SheetCloseButton onPress={onClose} />
+            </>
+          }
         />
-        <View
-          style={[
-            styles.modalContainer,
-            { backgroundColor: colors.background },
-          ]}
-        >
-          {/* Header Section */}
-          <View style={styles.header}>
-            <TouchableOpacity
-              onPress={() => {
-                onClose();
-                setTimeout(() => {
-                  naviagtion.navigate("UserProfile", { userId: user?._id });
-                }, 600);
-              }}
-              style={styles.userSection}
-            >
-              {userAvatar ? (
-                <ImageFast source={{ uri: userAvatar }} style={styles.avatar} />
-              ) : (
-                <View
-                  style={[styles.avatar, { backgroundColor: profileColor }]}
-                />
-              )}
-              <View style={styles.userInfo}>
-                <View style={styles.nameRow}>
-                  <CustomText
-                    label={displayName}
-                    fontFamily={fonts.medium}
-                    fontSize={16}
-                    color={colors.text}
-                  />
-                  {user?.role === "individual" && (
-                    <Image
-                      source={Images.verified}
-                      style={styles.verifiedBadge}
-                    />
-                  )}
-                  {user?.role === "company" && (
-                    <Image
-                      source={Images.grayStar}
-                      style={styles.verifiedBadge}
-                    />
-                  )}
-                </View>
-                <CustomText
-                  label={`${username}`}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-            <View style={styles.headerActions}>
-              {/* <TouchableOpacity onPress={onMore} style={styles.iconButton}> */}
-              <TouchableOpacity onPress={onMore}>
-                <Image
-                  source={Images.moreGray}
-                  style={[styles.actionIcon, { tintColor: colors.text }]}
-                />
-              </TouchableOpacity>
-              {/* </TouchableOpacity> */}
-              <TouchableOpacity onPress={onClose}>
-                <Image
-                  source={Images.crossBg || Images.cross}
-                  style={[styles.actionIcon, { tintColor: colors.text }]}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Details Section */}
-          <View style={styles.detailsSection}>
-            {/* Location */}
-            {location && (
-              <View style={styles.row}>
-                <Image
-                  source={Images.LocationPin}
-                  style={[styles.smallIcon, { tintColor: "#007BFF" }]}
-                />
-                <CustomText
-                  label={location}
-                  color={"#007BFF"}
-                  fontFamily={fonts.medium}
-                />
-              </View>
-            )}
-
-            {/* Work */}
-            {occupation && company && (
-              <View style={styles.row}>
-                <Image
-                  source={Images.suitcase}
-                  style={[styles.smallIcon, { tintColor: colors.text }]}
-                />
-                {occupation && (
-                  <CustomText
-                    label={occupation}
-                    fontFamily={fonts.medium}
-                    fontSize={14}
-                    color={colors.text}
-                  />
-                )}
-                {occupation && company && (
-                  <CustomText
-                    label=" at "
-                    fontFamily={fonts.medium}
-                    fontSize={14}
-                    color={colors.textSecondary}
-                    style={{ marginHorizontal: 4 }}
-                  />
-                )}
-                {company && (
-                  <>
-                    <Image
-                      source={Images.company}
-                      style={[
-                        styles.smallIcon,
-                        {
-                          width: 14,
-                          height: 14,
-                          borderRadius: 99,
-                          tintColor: colors.text,
-                        },
-                      ]}
-                    />
-                    <CustomText
-                      label={company}
-                      fontFamily={fonts.medium}
-                      fontSize={14}
-                      color={colors.text}
-                    />
-                  </>
-                )}
-              </View>
-            )}
-
-            {/* Education */}
-            {degree && major && school && (
-              <View style={styles.row}>
-                <Image
-                  source={Images.educationCap}
-                  style={[styles.smallIcon, { tintColor: colors.text }]}
-                />
-                {degree && (
-                  <CustomText
-                    label={degree}
-                    fontFamily={fonts.medium}
-                    fontSize={14}
-                    color={colors.text}
-                  />
-                )}
-                {degree && major && (
-                  <CustomText
-                    label=" in "
-                    fontFamily={fonts.medium}
-                    fontSize={14}
-                    color={colors.textSecondary}
-                    style={{ marginHorizontal: 4 }}
-                  />
-                )}
-                {major && (
-                  <CustomText
-                    label={major}
-                    fontFamily={fonts.medium}
-                    fontSize={14}
-                    color={colors.text}
-                  />
-                )}
-                {(degree || major) && school && (
-                  <CustomText
-                    label=" from "
-                    fontFamily={fonts.medium}
-                    fontSize={14}
-                    color={colors.textSecondary}
-                    style={{ marginHorizontal: 4 }}
-                  />
-                )}
-                {school && (
-                  <CustomText
-                    label={school}
-                    fontFamily={fonts.medium}
-                    fontSize={14}
-                    color={colors.text}
-                  />
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Stats Section */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
+      }
+    >
+      {/* Info rows */}
+      {(location || (occupation && company) || (degree && major && school)) && (
+        <View style={styles.info}>
+          {location ? (
+            <View style={styles.row}>
+              <Icons
+                family="MaterialSymbolsRoundedFilled"
+                name="location_on"
+                size={16}
+                color={LOCATION_BLUE}
+              />
               <CustomText
-                label={user?.stats?.upvotes || "0"}
+                label={location}
                 fontFamily={fonts.medium}
-                fontSize={18}
+                fontSize={14}
+                color={LOCATION_BLUE}
+              />
+            </View>
+          ) : null}
+          {occupation && company ? (
+            <View style={styles.row}>
+              <Icons
+                family="MaterialSymbolsRoundedFilled"
+                name="work"
+                size={16}
                 color={colors.text}
               />
-              <CustomText label="Likes" color={colors.textSecondary} />
+              <Strong label={occupation} />
+              <Muted label="at" />
+              <Strong label={company} />
             </View>
-            <View style={styles.statItem}>
-              <CustomText
-                label={user?.postsCount || "0"}
-                fontFamily={fonts.medium}
-                fontSize={18}
+          ) : null}
+          {degree && major && school ? (
+            <View style={styles.row}>
+              <Icons
+                family="MaterialSymbolsRoundedFilled"
+                name="school"
+                size={16}
                 color={colors.text}
               />
-              <CustomText label="Posts" color={colors.textSecondary} />
+              <Strong label={degree} />
+              <Muted label="in" />
+              <Strong label={major} />
+              <Muted label="from" />
+              <Strong label={school} />
             </View>
-            <View style={styles.statItem}>
-              <CustomText
-                label={user?.followersCount || "0"}
-                fontFamily={fonts.medium}
-                fontSize={18}
-                color={colors.text}
-              />
-              <CustomText label="Followers" color={colors.textSecondary} />
-            </View>
-            <View style={styles.statItem}>
-              <CustomText
-                label={user?.subsCount || "0"}
-                fontFamily={fonts.medium}
-                fontSize={18}
-                color={colors.text}
-              />
-              <CustomText label="Followings" color={colors.textSecondary} />
-            </View>
-          </View>
+          ) : null}
+        </View>
+      )}
 
-          {/* In Common Section */}
-          {/* <View style={styles.inCommonContainer}>
+      {/* Stats */}
+      <View style={styles.stats}>
+        {stats.map((s) => (
+          <View key={s.label} style={styles.stat}>
             <CustomText
-              label="In common"
-              color={COLORS.gray48}
-              marginRight={4}
+              label={String(s.value ?? 0)}
+              fontFamily={fonts.medium}
+              fontSize={18}
+              letterSpacing={-0.09}
+              color={colors.text}
+              textAlign="center"
             />
-            <View style={styles.avatarsRow}>
-              {[1, 2, 3].map((_, index) => (
-                <ImageFast
-                  key={index}
-                  source={Images.person}
-                  style={[
-                    styles.commonAvatar,
-                    { marginLeft: index > 0 ? -10 : 0, zIndex: 3 - index },
-                  ]}
-                />
-              ))}
-            </View>
-          </View> */}
-
-          {/* Bio Section */}
-          <View style={styles.bioSection}>
             <CustomText
-              label={user?.profile?.bio || user?.bio || "No bio available"}
-              color={colors.textSecondary}
-              fontSize={16}
+              label={s.label}
+              fontSize={14}
+              letterSpacing={-0.07}
+              color={COLORS.gray64}
+              textAlign="center"
+              marginTop={-5}
             />
+          </View>
+        ))}
+      </View>
+
+      {/* In common */}
+      {inCommon.length > 0 ? (
+        <View style={styles.row}>
+          <CustomText
+            label="In common"
+            fontSize={14}
+            color={COLORS.gray48}
+          />
+          <View style={styles.avatars}>
+            {inCommon.map((u, index) => (
+              <ImageFast
+                key={u?._id || index}
+                source={{ uri: u?.profile?.avatar }}
+                style={[
+                  styles.commonAvatar,
+                  {
+                    marginLeft: index > 0 ? -5 : 0,
+                    zIndex: 3 - index,
+                    borderColor: colors.background,
+                  },
+                ]}
+              />
+            ))}
           </View>
         </View>
-      </View>
-    </CustomModal>
+      ) : null}
+
+      {/* Bio — Figma: Regular 16 / 125% @64%, 20 below the previous block
+          (tight boxes ⇒ first-line centre 30 below the stat labels) */}
+      <CustomText
+        label={user?.profile?.bio || user?.bio || "No bio available"}
+        fontSize={16}
+        letterSpacing={-0.5}
+        color={COLORS.gray64}
+        numberOfLines={3}
+        marginTop={-3}
+      />
+    </FloatingSheet>
   );
 };
 
 export default CreatorSummary;
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    backgroundColor: COLORS.black, // Fallback or main background
-    borderRadius: 28,
-    width: "100%",
-    alignSelf: "center",
-    padding: 12,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  userSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  avatar: {
-    height: 48,
-    width: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.inputBg,
-  },
-  userInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  verifiedBadge: {
-    height: 18,
-    width: 18,
-    tintColor: COLORS.blue,
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  iconButton: {
-    padding: 4,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 20,
-    width: 36,
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  actionIcon: {
-    height: 32,
-    width: 32,
-  },
-  detailsSection: {
-    gap: 6,
-    marginBottom: 20,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  smallIcon: {
-    width: 16,
-    height: 16,
-    resizeMode: "contain",
-    marginRight: 8,
-    tintColor: COLORS.white,
-  },
-  statsContainer: {
-    flexDirection: "row",
-    // justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 20,
-    paddingHorizontal: 10,
-  },
-  statItem: {
-    alignItems: "center",
-    width: 73,
-  },
-  inCommonContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  avatarsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  // Figma: rows 14 tall, gap 8 → centres 22 apart; first centre 27 below header
+  info: { gap: 2, marginTop: 4 },
+  row: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
+  // Figma: stats 20 below the info rows (number centre 6.5 into the block)
+  stats: { flexDirection: "row", gap: 8, marginTop: -2 },
+  stat: { flex: 1, alignItems: "center" },
+  avatars: { flexDirection: "row", alignItems: "center" },
+  // Figma: in-common avatars are 14 (row 14 tall), stacked
   commonAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 1,
-    borderColor: COLORS.black,
-  },
-  bioSection: {
-    marginBottom: 8,
   },
 });

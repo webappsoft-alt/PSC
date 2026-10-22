@@ -32,6 +32,7 @@ const CustomText = ({
   right,
   left,
   numberOfLines,
+  onTextLayout,
   children,
   disabled,
   letterSpacing,
@@ -54,6 +55,7 @@ const CustomText = ({
     >
       <Text
         numberOfLines={numberOfLines}
+        onTextLayout={onTextLayout}
         style={[
           {
             fontSize: defaultFontSize,

@@ -2,26 +2,27 @@ import { BlurView } from "@react-native-community/blur";
 import { useNavigation } from "@react-navigation/native";
 import { getPalette } from "@somesoap/react-native-image-palette";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {ActivityIndicator,
+import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Image,
   StyleSheet,
   TouchableOpacity,
-  View} from "react-native";
+  View,
+} from "react-native";
 import { createThumbnail } from "react-native-create-thumbnail";
 import { ScrollView } from "react-native-gesture-handler";
 import Video from "react-native-video";
 import { useDispatch, useSelector } from "react-redux";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
-import { FullScreenSvg } from "../../../../assets/svgs";
 import Blur from "../../../../components/Blur";
 import CustomButton from "../../../../components/CustomButton";
 import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
-import ProgressiveBlur from "../../../../components/ProgressiveBlur";
+import MediaBottomBlur from "../../../../components/MediaBottomBlur";
 import { useTabBarVisibility } from "../../../../navigation/TabStack";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { del, get, post } from "../../../../services/ApiRequest";
@@ -34,12 +35,13 @@ import RepostModal from "./RepostModal";
 import ShareModal from "./ShareModal";
 import SummaryMore from "./SummaryMore";
 import ViewerModal from "./ViewerModal";
-import TaggedSheet from "./TaggedSheet";
+import TaggedSheet, { FollowSheet } from "./TaggedSheet";
 import {
   measureImageBands,
   registerNavMedia,
   unregisterNavMedia,
 } from "../../../../utils/navTone";
+import Svg, { Path } from "react-native-svg";
 import VotingComponent from "./VotingComponent";
 import Text from "../../../../components/ScaledText";
 import {
@@ -47,6 +49,21 @@ import {
   buildSubtitleLines,
   captionWords,
 } from "../../../../utils/subtitles";
+
+// Figma Detail fullscreen icon: 24 frame, 14×14 four-corner vector at 5,5,
+// white, bold rounded corners
+const FullscreenCorners = () => (
+  <Svg width={24} height={24} viewBox="0 0 24 24">
+    <Path
+      d="M5 9.5V5h4.5M14.5 5H19v4.5M19 14.5V19h-4.5M9.5 19H5v-4.5"
+      stroke="#FFFFFF"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);
 
 // Figma action bar — upvoted state
 const UPVOTE_GREEN = "#37B874";
@@ -77,6 +94,8 @@ const PostCard = ({
   showHeader = true,
   isView = false,
   profileColor,
+  // number of posts in this post's topic (feed "find 2.8k other posts about it.")
+  topicPostsCount,
 
   formatCount = (count) => {
     if (!count || count === 0) return "0";
@@ -121,16 +140,46 @@ const PostCard = ({
   const [showCreatorSummary, setShowCreatorSummary] = useState(false);
   const [showSummaryMore, setShowSummaryMore] = useState(false);
   const [showTagged, setShowTagged] = useState(false);
+  const [showFollowSheet, setShowFollowSheet] = useState(false);
   const taggedSponsors = Array.isArray(item?.sponsors) ? item.sponsors : [];
   // "In collaboration with" on Publish A Post is saved as `mentions`; the feed
   // API returns them populated as `mentionBy`.
   const taggedCollaborators = Array.isArray(item?.mentionBy)
     ? item.mentionBy
     : [];
+  const taggedPeople = useMemo(() => {
+    const seen = new Set();
+    return [...taggedSponsors, ...taggedCollaborators].filter((u) => {
+      const id = String(u?._id || "");
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.sponsors, item?.mentionBy]);
+  // Follow sheet (Figma "Follow-Button"): everyone tagged on the post except
+  // the author, who is listed under CREATOR
+  const followCollaborators = useMemo(
+    () =>
+      taggedPeople.filter(
+        (u) => String(u?._id) !== String(item?.author?._id),
+      ),
+    [taggedPeople, item?.author?._id],
+  );
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [currentDescIndex, setCurrentDescIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isTruncated, setIsTruncated] = useState(false);
+  // Client: the caption container must hug its content — each description
+  // page is measured and the pager takes the current page's height.
+  const [descPageHeights, setDescPageHeights] = useState({});
+  const onDescPageLayout = useCallback((index, e) => {
+    const h = e?.nativeEvent?.layout?.height;
+    if (!h) return;
+    setDescPageHeights((prev) =>
+      prev[index] === h ? prev : { ...prev, [index]: h },
+    );
+  }, []);
 
   // console.log("item?.author--",item?.author);
 
@@ -146,6 +195,22 @@ const PostCard = ({
   // 2s (which also bumps the Whisper job to the front of the queue) and
   // show the captions the moment the job finishes.
   const [liveCaptions, setLiveCaptions] = useState(null);
+
+  // Detail (Figma): avatar stack of the first 3 viewers (GET posts/:id/views)
+  const [viewerAvatars, setViewerAvatars] = useState([]);
+  useEffect(() => {
+    if (!isDetail || !item?._id) return undefined;
+    let alive = true;
+    get(`posts/${item._id}/views`)
+      .then((res) => {
+        const list = res?.data?.data?.viewers || res?.data?.viewers || [];
+        if (alive && Array.isArray(list)) setViewerAvatars(list.slice(0, 3));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [isDetail, item?._id]);
   const postHasVideo =
     !!item?.video ||
     (Array.isArray(item?.images) &&
@@ -453,9 +518,14 @@ const PostCard = ({
   const videoRefs = useRef([]);
 
   // Calculate image height based on aspect ratio
+  // Figma: feed media 367 wide (4px gutters) r8; Post Detail media 359 wide
+  // (8px gutters) r16.
+  const MEDIA_INSET = isDetail ? 16 : 8;
+  const MEDIA_RADIUS = isDetail ? 16 : 8;
+
   const getImageHeight = () => {
     // Figma: media 367×489 @ 375 frame → width = screen - 8, default 3:4 portrait
-    const mediaWidth = screenWidth - 8;
+    const mediaWidth = screenWidth - MEDIA_INSET;
     const sizeString = item?.size || "3:4 ratio";
     const aspectRatio = sizeString.replace(" ratio", "").trim();
 
@@ -517,7 +587,7 @@ const PostCard = ({
 
   // Get dynamic border radius for each image based on scroll position
   const getBorderRadiusStyle = (index) => {
-    const cardWidth = screenWidth - 8;
+    const cardWidth = screenWidth - MEDIA_INSET;
     const scrollProgress = scrollOffset / cardWidth;
     const currentIndex = Math.round(scrollProgress);
     const isScrolling = Math.abs(scrollProgress - currentIndex) > 0.01;
@@ -525,10 +595,10 @@ const PostCard = ({
     if (!isScrolling) {
       // Fully snapped - all corners have radius
       return {
-        borderTopLeftRadius: 8,
-        borderTopRightRadius: 8,
-        borderBottomLeftRadius: 8,
-        borderBottomRightRadius: 8,
+        borderTopLeftRadius: MEDIA_RADIUS,
+        borderTopRightRadius: MEDIA_RADIUS,
+        borderBottomLeftRadius: MEDIA_RADIUS,
+        borderBottomRightRadius: MEDIA_RADIUS,
       };
     }
 
@@ -536,27 +606,27 @@ const PostCard = ({
     if (index === Math.floor(scrollProgress)) {
       // Current/left image - remove right corners radius
       return {
-        borderTopLeftRadius: 8,
+        borderTopLeftRadius: MEDIA_RADIUS,
         borderTopRightRadius: 0,
-        borderBottomLeftRadius: 8,
+        borderBottomLeftRadius: MEDIA_RADIUS,
         borderBottomRightRadius: 0,
       };
     } else if (index === Math.ceil(scrollProgress)) {
       // Next/right image - remove left corners radius
       return {
         borderTopLeftRadius: 0,
-        borderTopRightRadius: 8,
+        borderTopRightRadius: MEDIA_RADIUS,
         borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 8,
+        borderBottomRightRadius: MEDIA_RADIUS,
       };
     }
 
     // Default - full radius for images not involved in current swipe
     return {
-      borderTopLeftRadius: 8,
-      borderTopRightRadius: 8,
-      borderBottomLeftRadius: 8,
-      borderBottomRightRadius: 8,
+      borderTopLeftRadius: MEDIA_RADIUS,
+      borderTopRightRadius: MEDIA_RADIUS,
+      borderBottomLeftRadius: MEDIA_RADIUS,
+      borderBottomRightRadius: MEDIA_RADIUS,
     };
   };
 
@@ -564,7 +634,7 @@ const PostCard = ({
   const handleScroll = (event) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     setScrollOffset(contentOffsetX);
-    const index = Math.round(contentOffsetX / (screenWidth - 8));
+    const index = Math.round(contentOffsetX / (screenWidth - MEDIA_INSET));
     setCurrentImageIndex(index);
   };
 
@@ -829,13 +899,16 @@ const PostCard = ({
     (videoProgress[captionVideoIndex]?.duration || 0) * 1000;
   const subtitleLines = useMemo(
     () =>
-      buildSubtitleLines(
-        captionWords(liveCaptions || item, captionDurationMs),
-      ),
+      buildSubtitleLines(captionWords(liveCaptions || item, captionDurationMs)),
     // duration only matters for the plain-text fallback; round it so the
     // lines aren't rebuilt on every progress tick
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [liveCaptions, item?.subtitles, item?.subtitlesText, Math.round(captionDurationMs / 1000)],
+    [
+      liveCaptions,
+      item?.subtitles,
+      item?.subtitlesText,
+      Math.round(captionDurationMs / 1000),
+    ],
   );
   const captionedVideoIndex = subtitleLines.length ? captionVideoIndex : -1;
   const captionForIndex =
@@ -976,7 +1049,16 @@ const PostCard = ({
         >
           <View>
             {showHeader && (
-              <View style={[styles.rowBetween, { paddingHorizontal: 8 }]}>
+              <View
+                style={[
+                  styles.rowBetween,
+                  { paddingHorizontal: 8 },
+                  // Figma: header row 32 (= avatar ring); the name column's
+                  // 1.4 line boxes are taller, so the row is pinned to 32
+                  // and the column overflows symmetrically
+                  !isDetail && { height: 32 },
+                ]}
+              >
                 {/* Left Section */}
                 <TouchableOpacity
                   style={styles.row}
@@ -1013,27 +1095,34 @@ const PostCard = ({
                       <CustomText
                         label={displayName}
                         fontSize={14}
-                        lineHeight={18}
                         letterSpacing={-0.07}
                         fontFamily={fonts.medium}
                       />
+                      {/* Figma: 16px Material "verified" (blue) / "star" badges */}
                       {item?.author?.role == "individual" && (
-                        <ImageFast
-                          source={Images.verified}
+                        <Icons
+                          family="MaterialSymbolsRoundedFilled"
+                          name="verified"
+                          size={16}
+                          color="#007BFF"
                           style={styles.verifiedIcon}
                         />
                       )}
                       {item?.author?.role == "company" && (
-                        <ImageFast
-                          source={Images.grayStar}
+                        <Icons
+                          family="MaterialSymbolsRounded"
+                          name="star"
+                          size={16}
+                          color={COLORS.gray48}
                           style={styles.verifiedIcon}
                         />
                       )}
                     </View>
+                    {/* Figma: username Regular 14 / −2% @48% */}
                     <CustomText
                       label={`${username}`}
-                      fontSize={12}
-                      lineHeight={16}
+                      fontSize={14}
+                      letterSpacing={-0.28}
                       color={COLORS.gray48}
                     />
                   </View>
@@ -1049,20 +1138,42 @@ const PostCard = ({
                     },
                   ]}
                 >
-                  {showFollowButton && !isOwner && (
+                  {showFollowButton && !isOwner && !isFollowingUser && (
                     <CustomButton
-                      title={isFollowingUser ? "Following" : "Follow"}
-                      width={isFollowingUser ? 92 : 64}
-                      onPress={handleFollowPress}
+                      title="Follow"
+                      width={64}
+                      // posts with collaborators open the Follow sheet so
+                      // the user picks who to follow; others follow directly
+                      onPress={() =>
+                        followCollaborators.length
+                          ? setShowFollowSheet(true)
+                          : handleFollowPress()
+                      }
                       height={28}
                       borderRadius={8}
                       fontSize={14}
                       fontFamily={fonts.medium}
-                      backgroundColor={
-                        isFollowingUser ? colors.surfaceAlt : COLORS.white
-                      }
-                      color={isFollowingUser ? colors.text : "#121212"}
+                      backgroundColor={COLORS.white}
+                      color="#121212"
                     />
+                  )}
+                  {/* Figma: already following → 36 × 32 r8 white 4% with a
+                      16 "how_to_reg" icon instead of a "Following" label */}
+                  {showFollowButton && !isOwner && isFollowingUser && (
+                    <TouchableOpacity
+                      onPress={handleFollowPress}
+                      style={[
+                        styles.followingIconBtn,
+                        { backgroundColor: colors.surfaceAlt },
+                      ]}
+                    >
+                      <Icons
+                        family="MaterialSymbolsRoundedFilled"
+                        name="how_to_reg"
+                        size={16}
+                        color={colors.text}
+                      />
+                    </TouchableOpacity>
                   )}
                   {/* {!showFollowButton && ( */}
                   <TouchableOpacity
@@ -1072,10 +1183,11 @@ const PostCard = ({
                       { backgroundColor: colors.surfaceAlt },
                     ]}
                   >
+                    {/* Figma: 32 circle, 16 icon */}
                     <Icons
                       family="MaterialSymbolsRounded"
                       name="more_vert"
-                      size={20}
+                      size={16}
                       color={colors.text}
                     />
                   </TouchableOpacity>
@@ -1086,11 +1198,13 @@ const PostCard = ({
 
             {/* reposted from */}
             {item?.parentPostId && (
-              <View style={[styles.row, { gap: 4, marginTop: 6 }]}>
+              <View style={[styles.row, { gap: 4, marginTop: 4 }]}>
+                {/* Figma: row 20 tall, 4 below the header row, gap 4 —
+                    20 arrow · Regular 12 / −0.5% @48% */}
                 <Icons
                   family="MaterialSymbolsRounded"
                   name="subdirectory_arrow_right"
-                  size={18}
+                  size={20}
                   color={colors.text}
                 />
                 <CustomText
@@ -1100,7 +1214,8 @@ const PostCard = ({
                       : "Reposted from"
                   }
                   color={COLORS.gray48}
-                  fontSize={13}
+                  fontSize={12}
+                  letterSpacing={-0.06}
                 />
                 <TouchableOpacity
                   onPress={() =>
@@ -1129,18 +1244,26 @@ const PostCard = ({
                         item?.parentPost?.author?.profile?.profileColor,
                     }}
                   />
+                  {/* Figma: Medium 14 / −0.5% white */}
                   <CustomText
                     label={item?.parentPost?.author?.firstName}
-                    fontSize={13}
-                    fontFamily={fonts.semiBold}
+                    fontSize={14}
+                    letterSpacing={-0.07}
+                    fontFamily={fonts.medium}
                     marginLeft={4}
                   />
                 </TouchableOpacity>
               </View>
             )}
-            {/* Figma: "in Partnership with ✋ Brand" (sponsoredBy) */}
-            {Array.isArray(item?.sponsors) && item.sponsors[0] && (
-              <View style={[styles.row, { gap: 4, marginTop: 6 }]}>
+            {/* Figma: "in Partnership with ✋ Brand" — everyone tagged on the
+                post: sponsors first, then collaborators (deduped). Shows the
+                first name and "& N others"; tap opens the Tagged sheet. */}
+            {taggedPeople.length > 0 && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowTagged(true)}
+                style={[styles.row, { gap: 4, marginTop: 6 }]}
+              >
                 <Icons
                   family="MaterialSymbolsRounded"
                   name="handshake"
@@ -1152,38 +1275,72 @@ const PostCard = ({
                   color={COLORS.gray48}
                   fontSize={13}
                 />
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate("UserProfile", {
-                      userId: item.sponsors[0]?._id,
-                    })
-                  }
-                  style={[styles.row, { paddingHorizontal: 0 }]}
-                >
-                  {item.sponsors[0]?.profile?.avatar ? (
-                    <ImageFast
-                      source={{ uri: item.sponsors[0].profile.avatar }}
-                      style={{ height: 16, width: 16, borderRadius: 99 }}
-                    />
-                  ) : null}
+                <View style={[styles.row, { paddingHorizontal: 0 }]}>
+                  {taggedPeople.slice(0, 3).map((u, i) => (
+                    <View
+                      key={u?._id || i}
+                      style={{
+                        marginLeft: i === 0 ? 0 : -6,
+                        borderRadius: 99,
+                        borderWidth: 1,
+                        borderColor: colors.background,
+                      }}
+                    >
+                      {u?.profile?.avatar ? (
+                        <ImageFast
+                          source={{ uri: u.profile.avatar }}
+                          style={{ height: 16, width: 16, borderRadius: 99 }}
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            height: 16,
+                            width: 16,
+                            borderRadius: 99,
+                            backgroundColor:
+                              u?.profile?.profileColor || COLORS.gray48,
+                          }}
+                        />
+                      )}
+                    </View>
+                  ))}
                   <CustomText
                     label={
-                      item.sponsors[0]?.firstName ||
-                      item.sponsors[0]?.username ||
-                      "Partner"
+                      (taggedPeople[0]?.firstName ||
+                        taggedPeople[0]?.username ||
+                        "Partner") +
+                      (taggedPeople.length > 1
+                        ? ` & ${taggedPeople.length - 1} other${
+                            taggedPeople.length > 2 ? "s" : ""
+                          }`
+                        : "")
                     }
                     fontSize={13}
                     fontFamily={fonts.semiBold}
                     marginLeft={4}
+                    numberOfLines={1}
                   />
-                </TouchableOpacity>
-              </View>
+                </View>
+              </TouchableOpacity>
             )}
+            {/* Glow Background */}
+
+            <View style={styles.investmentCard}>
+              <CustomText
+                label={"LOOKING FOR INVESTMENT"}
+                fontSize={10}
+                fontFamily={fonts.semiBold}
+                color={COLORS.white}
+              />
+            </View>
+
+            {item?.hashtags?.length > 0 && (
             <View
               style={[
                 styles.wrapper,
                 {
-                  marginTop: 8,
+                  // Figma top block: gap 10 between blocks
+                  marginTop: 10,
                 },
               ]}
             >
@@ -1201,7 +1358,6 @@ const PostCard = ({
                   <CustomText
                     label={`${item}`}
                     fontSize={12}
-                    lineHeight={16}
                     color={COLORS.gray64}
                     fontFamily={fonts.medium}
                     marginLeft={2}
@@ -1209,18 +1365,7 @@ const PostCard = ({
                 </View>
               ))}
             </View>
-
-            {/* Glow Background */}
-
-            <View style={styles.investmentCard}>
-              <CustomText
-                label={"LOOKING FOR INVESTMENT"}
-                fontSize={10}
-                lineHeight={14}
-                fontFamily={fonts.semiBold}
-                color={COLORS.white}
-              />
-            </View>
+            )}
 
             {isChange ? (
               <>
@@ -1244,36 +1389,43 @@ const PostCard = ({
                           showsHorizontalScrollIndicator={false}
                           onScroll={handleDescScroll}
                           scrollEventThrottle={16}
-                          style={{ width: screenWidth - 16 }}
+                          style={{
+                            width: screenWidth - 16,
+                            height: descPageHeights[currentDescIndex],
+                          }}
                         >
                           {description?.map((desc, index) => (
                             <View
                               key={index}
-                              style={{ width: screenWidth - 16 }}
+                              onLayout={(e) => onDescPageLayout(index, e)}
+                              style={{
+                                width: screenWidth - 16,
+                                alignSelf: "flex-start",
+                              }}
                             >
+                              {!isDetail && index === 0 && !isTruncated ? (
+                                <CustomText
+                                  fontSize={14}
+                                  letterSpacing={-0.14}
+                                  numberOfLines={3}
+                                  containerStyle={styles.truncationProbe}
+                                  onTextLayout={(e) => {
+                                    if (e.nativeEvent.lines.length > 2) {
+                                      setIsTruncated(true);
+                                    }
+                                  }}
+                                  label={desc}
+                                />
+                              ) : null}
                               <CustomText
-                                marginTop={8}
+                                marginTop={4}
                                 fontSize={14}
-                                lineHeight={18}
                                 letterSpacing={-0.14}
                                 color={COLORS.gray64}
                                 marginBottom={6}
                                 numberOfLines={!isDetail && 2}
                               >
-                                <Text
-                                  onTextLayout={(e) => {
-                                    if (
-                                      !isDetail &&
-                                      index === 0 &&
-                                      !isTruncated &&
-                                      e.nativeEvent.lines.length > 2
-                                    ) {
-                                      setIsTruncated(true);
-                                    }
-                                  }}
-                                >
-                                  {renderFormattedText(desc)}
-                                </Text>
+                                <Text>{renderFormattedText(desc)}</Text>
                               </CustomText>
                             </View>
                           ))}
@@ -1326,26 +1478,44 @@ const PostCard = ({
                       </View>
                     ) : (
                       <View style={{ paddingHorizontal: 8 }}>
-                        <CustomText
-                          marginTop={8}
-                          fontSize={14}
-                          lineHeight={18}
-                          letterSpacing={-0.14}
-                          color={COLORS.gray64}
-                          marginBottom={6}
-                          numberOfLines={!isDetail && 2}
-                        >
-                          <Text
+                        {/* invisible 3-line probe: >2 lines ⇒ the 2-line
+                            caption below is clamped ⇒ show "Read full post…"
+                            (onTextLayout never fires on a nested Text, and a
+                            2-line-clamped Text only ever reports 2 lines) */}
+                        {!isDetail && !isTruncated ? (
+                          <CustomText
+                            fontSize={14}
+                            letterSpacing={-0.14}
+                            numberOfLines={3}
+                            containerStyle={[
+                              styles.truncationProbe,
+                              { left: 8, right: 8 },
+                            ]}
                             onTextLayout={(e) => {
-                              if (
-                                !isDetail &&
-                                !isTruncated &&
-                                e.nativeEvent.lines.length > 2
-                              ) {
+                              if (e.nativeEvent.lines.length > 2) {
                                 setIsTruncated(true);
                               }
                             }}
-                          >
+                            label={
+                              typeof description === "string"
+                                ? description
+                                : Array.isArray(description) && description[0]
+                                ? description[0]
+                                : ""
+                            }
+                          />
+                        ) : null}
+                        <CustomText
+                          marginTop={4}
+                          fontSize={14}
+                          letterSpacing={-0.14}
+                          color={COLORS.gray64}
+                          // hug: no reserved "Read full post" row when the
+                          // caption fits (Figma block gap 10)
+                          marginBottom={!isDetail && isTruncated ? 6 : 10}
+                          numberOfLines={!isDetail && 2}
+                        >
+                          <Text>
                             {renderFormattedText(
                               typeof description === "string"
                                 ? description
@@ -1355,17 +1525,17 @@ const PostCard = ({
                             )}
                           </Text>
                         </CustomText>
-                        <View
-                          style={[
-                            styles.row,
-                            {
-                              justifyContent: "space-between",
-                              marginBottom: 12,
-                              paddingHorizontal: 0,
-                            },
-                          ]}
-                        >
-                          {!isDetail && isTruncated ? (
+                        {!isDetail && isTruncated ? (
+                          <View
+                            style={[
+                              styles.row,
+                              {
+                                justifyContent: "space-between",
+                                marginBottom: 12,
+                                paddingHorizontal: 0,
+                              },
+                            ]}
+                          >
                             <CustomText
                               color={COLORS.buttonColor}
                               label={"Read full post..."}
@@ -1376,10 +1546,8 @@ const PostCard = ({
                                 })
                               }
                             />
-                          ) : (
-                            <View />
-                          )}
-                        </View>
+                          </View>
+                        ) : null}
                       </View>
                     )}
                   </>
@@ -1404,7 +1572,6 @@ const PostCard = ({
                         numberOfLines={1}
                         style={{
                           fontSize: 12,
-                          lineHeight: 16,
                           fontFamily: fonts.medium,
                           color: colors.text,
                         }}
@@ -1416,7 +1583,22 @@ const PostCard = ({
                             color: COLORS.gray48,
                           }}
                         >
-                          {"  find other posts about it."}
+                          {" find "}
+                          {/* Figma / client: the count in full white, one
+                              weight above the regular text */}
+                          {topicPostsCount > 0 ? (
+                            <Text
+                              style={{
+                                fontFamily: fonts.medium,
+                                color: colors.text,
+                              }}
+                            >
+                              {formatCount(topicPostsCount)}
+                            </Text>
+                          ) : null}
+                          {topicPostsCount > 0
+                            ? " other posts about it."
+                            : "other posts about it."}
                         </Text>
                       </Text>
                     </View>
@@ -1448,17 +1630,17 @@ const PostCard = ({
                             styles.glowShadowContainer,
                             {
                               height: getImageHeight(),
-                              width: screenWidth - 8,
+                              width: screenWidth - MEDIA_INSET,
                               shadowColor: bgColor || "#FFFFFF",
                             },
                           ]}
                         >
-                          <View style={styles.ambientWrapper}>
+                          <View style={[styles.ambientWrapper, { borderRadius: MEDIA_RADIUS }]}>
                             {isCurrentMediaVideo ? (
                               <View
                                 style={{
                                   height: getImageHeight(),
-                                  width: screenWidth - 8,
+                                  width: screenWidth - MEDIA_INSET,
                                 }}
                               >
                                 <Video
@@ -1466,8 +1648,8 @@ const PostCard = ({
                                   source={{ uri: images[currentImageIndex] }}
                                   style={{
                                     height: getImageHeight(),
-                                    width: screenWidth - 8,
-                                    borderRadius: 8,
+                                    width: screenWidth - MEDIA_INSET,
+                                    borderRadius: MEDIA_RADIUS,
                                   }}
                                   resizeMode="cover"
                                   muted
@@ -1492,8 +1674,8 @@ const PostCard = ({
                                       StyleSheet.absoluteFill,
                                       {
                                         height: getImageHeight(),
-                                        width: screenWidth - 8,
-                                        borderRadius: 8,
+                                        width: screenWidth - MEDIA_INSET,
+                                        borderRadius: MEDIA_RADIUS,
                                       },
                                     ]}
                                     resizeMode="cover"
@@ -1505,8 +1687,8 @@ const PostCard = ({
                                 source={{ uri: images[currentImageIndex] }}
                                 style={{
                                   height: getImageHeight(),
-                                  width: screenWidth - 8,
-                                  borderRadius: 8,
+                                  width: screenWidth - MEDIA_INSET,
+                                  borderRadius: MEDIA_RADIUS,
                                 }}
                               />
                             )}
@@ -1527,7 +1709,7 @@ const PostCard = ({
                         onScroll={handleScroll}
                         scrollEventThrottle={16}
                         decelerationRate="fast"
-                        snapToInterval={screenWidth - 8}
+                        snapToInterval={screenWidth - MEDIA_INSET}
                         snapToAlignment="center"
                         disableIntervalMomentum={true}
                         onTouchStart={
@@ -1535,13 +1717,16 @@ const PostCard = ({
                             ? onMediaCarouselTouchStart
                             : undefined
                         }
-                        style={[styles.scrollView, { width: screenWidth - 8 }]}
+                        style={[
+                          styles.scrollView,
+                          { width: screenWidth - MEDIA_INSET, borderRadius: MEDIA_RADIUS },
+                        ]}
                       >
                         {images.map((imageUri, index) => (
                           <View
                             key={index}
                             style={{
-                              width: screenWidth - 8,
+                              width: screenWidth - MEDIA_INSET,
                               height: getImageHeight(),
                             }}
                           >
@@ -1563,7 +1748,7 @@ const PostCard = ({
                                   style={[
                                     {
                                       height: getImageHeight(),
-                                      width: screenWidth - 8,
+                                      width: screenWidth - MEDIA_INSET,
                                       backgroundColor: "rgba(0, 0, 0, 0.2)",
                                     },
                                     getBorderRadiusStyle(index),
@@ -1612,7 +1797,7 @@ const PostCard = ({
                                       style={[
                                         {
                                           height: getImageHeight(),
-                                          width: screenWidth - 8,
+                                          width: screenWidth - MEDIA_INSET,
                                         },
                                         getBorderRadiusStyle(index),
                                       ]}
@@ -1646,75 +1831,42 @@ const PostCard = ({
                                 style={[
                                   {
                                     height: getImageHeight(),
-                                    width: screenWidth - 8,
+                                    width: screenWidth - MEDIA_INSET,
                                   },
                                   getBorderRadiusStyle(index),
                                 ]}
                               />
                             )}
 
-                            <View
-                              style={[
-                                styles.topBlurContainer,
-                                {
-                                  width: "100%",
-                                },
-                              ]}
-                              pointerEvents="none"
-                            >
-                              <ProgressiveBlur
-                                intensity={80}
-                                direction="top"
-                                tint="light"
-                                height={60}
-                                imageUri={imageUri}
-                                style={{
-                                  borderTopLeftRadius:
-                                    getBorderRadiusStyle(index)
-                                      .borderTopLeftRadius,
-                                  borderTopRightRadius:
-                                    getBorderRadiusStyle(index)
-                                      .borderTopRightRadius,
-                                  borderBottomLeftRadius: 0,
-                                  borderBottomRightRadius: 0,
-                                }}
-                              />
-                            </View>
-
-                            <View
-                              style={[
-                                styles.bottomBlurContainer,
-                                {
-                                  width: "100%",
-                                },
-                              ]}
-                              pointerEvents="none"
-                            >
-                              <ProgressiveBlur
-                                intensity={80}
-                                direction="bottom"
-                                tint="light"
-                                height={48}
-                                imageUri={imageUri}
-                                style={{
-                                  borderBottomLeftRadius:
-                                    getBorderRadiusStyle(index)
-                                      .borderBottomLeftRadius,
-                                  borderBottomRightRadius:
-                                    getBorderRadiusStyle(index)
-                                      .borderBottomRightRadius,
-                                  borderTopLeftRadius: 0,
-                                  borderTopRightRadius: 0,
-                                }}
-                              />
-                            </View>
+                            {/* Figma: no top blur; bottom 56px progressive
+                                blur + 16% linear fill behind the controls */}
+                            <MediaBottomBlur
+                              uri={imageUri}
+                              isVideo={!!isVideoUrl(imageUri)}
+                              width={screenWidth - MEDIA_INSET}
+                              mediaHeight={getImageHeight()}
+                              borderBottomLeftRadius={
+                                getBorderRadiusStyle(index)
+                                  .borderBottomLeftRadius
+                              }
+                              borderBottomRightRadius={
+                                getBorderRadiusStyle(index)
+                                  .borderBottomRightRadius
+                              }
+                            />
                           </View>
                         ))}
                       </ScrollView>
 
                       {/* Overlay Elements */}
                       {isCurrentMediaVideo && hashtags?.length > 0 && (
-                        <View style={styles.cardBg}>
+                        <View
+                          style={[
+                            styles.cardBg,
+                            // Figma detail: chip 12pt inside the media's top-left
+                            isDetail && { left: MEDIA_INSET / 2 + 12, top: 12 },
+                          ]}
+                        >
                           <Blur />
                           <CustomText
                             label={`#${hashtags[0]}`}
@@ -1731,83 +1883,50 @@ const PostCard = ({
                           {
                             position: "absolute",
                             bottom: 0,
-                            left: 0,
-                            right: 0,
-                            minHeight: 48,
-                            paddingHorizontal: 8,
-                            paddingVertical: 8,
+                            // aligned to the media's edges (it's centred in a
+                            // full-width wrapper), so the buttons never touch
+                            // the media edge
+                            left: MEDIA_INSET / 2,
+                            right: MEDIA_INSET / 2,
+                            // rowBetween sets width 100%, which beat left/right
+                            // and pushed the duration past the media edge
+                            width: "auto",
+                            // Figma feed: 367 × 56 hug, pad L8 T16 R8 B8;
+                            // Figma detail: media frame padding 12
+                            minHeight: 56,
+                            paddingLeft: isDetail ? 12 : 8,
+                            paddingRight: isDetail ? 12 : 8,
+                            paddingTop: 16,
+                            // Detail (Figma): media frame pad 12; viewers row
+                            // (16) at the bottom, 12 above it this row
+                            paddingBottom: isDetail ? 12 + 16 + 12 : 8,
+                            // Figma: mute circle, caption pill and time pill
+                            // share one centre line
                             alignItems: "center",
                           },
                         ]}
                       >
-                        {/* Mute/Unmute Button - Only show for videos */}
+                        {/* Figma video row: [mute 32 circle] [subtitle pill,
+                            centred] [time pill] */}
                         {isCurrentMediaVideo ? (
-                          <View>
-                            <TouchableOpacity
-                              onPress={toggleMute}
-                              style={{
-                                height: 32,
-                                width: 36,
-                                justifyContent: "center",
-                                alignItems: "center",
-                                backgroundColor: "rgba(255, 255, 255, 0.04)",
-                                borderRadius: 100,
-                                overflow: "hidden",
-                              }}
-                            >
-                              <Blur />
-                              <Icons
-                                name={
-                                  isCurrentVideoMuted()
-                                    ? "volume_up"
-                                    : "volume_off"
-                                }
-                                family={"MaterialSymbolsRoundedFilled"}
-                                size={16}
-                                color={COLORS.white}
-                              />
-                            </TouchableOpacity>
-                            {isDetail && (
-                              <View
-                                style={[
-                                  styles.row,
-                                  { marginTop: 6, marginBottom: 6 },
-                                ]}
-                              >
-                                {item?.stats?.views > 0 && (
-                                  <ImageFast
-                                    source={Images.person}
-                                    style={styles.person}
-                                  />
-                                )}
-                                <CustomText
-                                  label={`${item?.stats?.views} viewers`}
-                                  marginLeft={8}
-                                  fontFamily={fonts.medium}
-                                  onPress={() => setShowViewerModal(true)}
-                                />
-                              </View>
-                            )}
-                          </View>
-                        ) : isDetail ? (
-                          <View
-                            style={[
-                              styles.row,
-                              { marginTop: 6, marginBottom: 6, marginLeft: 4 },
-                            ]}
+                          <TouchableOpacity
+                            onPress={toggleMute}
+                            style={[styles.videoPill, { overflow: "hidden" }]}
                           >
-                            <ImageFast
-                              source={Images.person}
-                              style={styles.person}
+                            <Blur />
+                            <Icons
+                              name={
+                                isCurrentVideoMuted() ? "volume_up" : "volume_off"
+                              }
+                              family={"MaterialSymbolsRoundedFilled"}
+                              size={16}
+                              color={COLORS.white}
                             />
-                            <CustomText
-                              label={`${item?.stats?.views} viewers`}
-                              marginLeft={8}
-                              fontFamily={fonts.medium}
-                              onPress={() => setShowViewerModal(true)}
-                            />
-                          </View>
-                        ) : taggedSponsors.length || taggedCollaborators.length ? (
+                          </TouchableOpacity>
+                        ) : isDetail ? (
+                          <View />
+                        ) : taggedSponsors.length ||
+                          taggedCollaborators.length ? (
                           <TouchableOpacity
                             style={[
                               styles.repostButton,
@@ -1816,6 +1935,7 @@ const PostCard = ({
                             onPress={() => setShowTagged(true)}
                           >
                             <Blur />
+                            <View pointerEvents="none" style={styles.mediaBtnTint} />
                             <Icons
                               family="MaterialSymbolsRoundedFilled"
                               name="group"
@@ -1829,14 +1949,8 @@ const PostCard = ({
 
                         {isCurrentMediaVideo && captionForIndex ? (
                           <View
-                            style={[
-                              styles.subtitlePill,
-                              images?.length > 1 && {
-                                transform: [{ translateY: -20 }],
-                              },
-                            ]}
+                            style={styles.subtitlePill}
                           >
-                            <Blur />
                             <Icons
                               family="MaterialSymbolsRoundedFilled"
                               name="record_voice_over"
@@ -1846,11 +1960,11 @@ const PostCard = ({
                             <CustomText
                               label={captionForIndex}
                               fontSize={12}
-                              lineHeight={16}
                               fontFamily={fonts.medium}
                               color={COLORS.white}
                               numberOfLines={1}
                               marginLeft={4}
+                              containerStyle={{ flexShrink: 1 }}
                             />
                           </View>
                         ) : null}
@@ -1858,14 +1972,7 @@ const PostCard = ({
                         {isCurrentMediaVideo ? (
                           <View style={{ alignItems: "flex-end" }}>
                             <View
-                              style={{
-                                height: 24,
-                                paddingHorizontal: 10,
-                                backgroundColor: "rgba(255, 255, 255, 0.04)",
-                                borderRadius: 100,
-                                justifyContent: "center",
-                                overflow: "hidden",
-                              }}
+                              style={[styles.videoPill, { overflow: "hidden" }]}
                             >
                               <Blur />
                               <CustomText
@@ -1879,18 +1986,15 @@ const PostCard = ({
                                 }
                                 fontFamily={fonts.medium}
                                 fontSize={12}
-                                lineHeight={16}
+                                letterSpacing={-0.06}
                               />
                             </View>
-                            <TouchableOpacity onPress={handleFullScreenPress}>
-                              {isDetail && <FullScreenSvg />}
-                            </TouchableOpacity>
                           </View>
                         ) : isDetail ? (
-                          <TouchableOpacity onPress={handleFullScreenPress}>
-                            <FullScreenSvg marginRight={12} />
-                          </TouchableOpacity>
-                        ) : item?.parentPostId ? (
+                          <View />
+                        ) : (
+                          // Figma: every image post shows the repost circle
+                          // at the media's bottom-right
                           <TouchableOpacity
                             style={[
                               styles.repostButton,
@@ -1899,6 +2003,7 @@ const PostCard = ({
                             onPress={() => setShowRepostModal(true)}
                           >
                             <Blur />
+                            <View pointerEvents="none" style={styles.mediaBtnTint} />
                             <Icons
                               family="MaterialSymbolsRounded"
                               name="repeat"
@@ -1906,18 +2011,86 @@ const PostCard = ({
                               color={colors.text}
                             />
                           </TouchableOpacity>
-                        ) : (
-                          <View />
                         )}
                       </View>
 
-                      {images?.length > 1 && (
-                        <View pointerEvents="none" style={styles.dotsOverlay}>
+                      {/* Detail (Figma): second row — 40×16 avatar stack
+                          (overlap −4) · 8 · "12.3K viewers" Medium 14 −0.5%
+                          … fullscreen icon; 12pt inside the media edges */}
+                      {isDetail && (
+                        <View
+                          style={[
+                            styles.detailViewersRow,
+                            {
+                              left: MEDIA_INSET / 2 + 12,
+                              right: MEDIA_INSET / 2 + 12,
+                            },
+                          ]}
+                        >
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            onPress={() => setShowViewerModal(true)}
+                            style={[styles.row, { gap: 8, paddingHorizontal: 0 }]}
+                          >
+                            {viewerAvatars.length > 0 && (
+                              <View style={styles.row}>
+                                {viewerAvatars.map((v, i) => (
+                                  <View
+                                    key={v?._id || i}
+                                    style={[
+                                      styles.person,
+                                      {
+                                        marginLeft: i === 0 ? 0 : -4,
+                                        overflow: "hidden",
+                                        backgroundColor:
+                                          v?.profile?.profileColor ||
+                                          COLORS.gray48,
+                                      },
+                                    ]}
+                                  >
+                                    {v?.profile?.avatar ? (
+                                      <ImageFast
+                                        source={{ uri: v.profile.avatar }}
+                                        style={styles.person}
+                                      />
+                                    ) : null}
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+                            <CustomText
+                              label={`${formatCount(item?.stats?.views || 0)} viewer${
+                                item?.stats?.views === 1 ? "" : "s"
+                              }`}
+                              fontSize={14}
+                              letterSpacing={-0.07}
+                              fontFamily={fonts.medium}
+                              color={COLORS.white}
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={handleFullScreenPress}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={styles.fullscreenBtn}
+                          >
+                            <FullscreenCorners />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      {/* feed: dots live below the media (dotsRow); detail
+                          keeps them under the media edge */}
+                      {images?.length > 1 && isDetail && (
+                        <View
+                          pointerEvents="none"
+                          style={[styles.dotsOverlay, { bottom: -17 }]}
+                        >
                           {images?.map((img, index) => (
                             <View
                               key={index}
                               style={[
                                 styles.dot,
+                                { backgroundColor: "rgba(255, 255, 255, 0.16)" },
                                 index === currentImageIndex && styles.dotActive,
                               ]}
                             />
@@ -1929,9 +2102,9 @@ const PostCard = ({
                     <View
                       style={{
                         height: getImageHeight(),
-                        width: screenWidth - 8,
+                        width: screenWidth - MEDIA_INSET,
                         backgroundColor: profileColor || COLORS.inputBg,
-                        borderRadius: 8,
+                        borderRadius: MEDIA_RADIUS,
                       }}
                     />
                   )}
@@ -1941,12 +2114,34 @@ const PostCard = ({
                 {null}
               </>
             )}
+            {!isDetail && images?.length > 1 && (
+              <View pointerEvents="none" style={styles.dotsRow}>
+                {images.map((img, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.feedDot,
+                      index === currentImageIndex && styles.feedDotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
             <View
               style={[
                 styles.rowButtons,
                 {
-                  marginTop: 4,
-                  paddingHorizontal: 8,
+                  // Detail (Figma): dots below the media, row inset 12
+                  // Figma feed: media → 12 → action bar; with a carousel the
+                  // dots row sits between them (media → 8 → dots → 8 → bar)
+                  marginTop: isDetail
+                    ? images?.length > 1
+                      ? 26
+                      : 8
+                    : images?.length > 1
+                    ? 8
+                    : 12,
+                  paddingHorizontal: isDetail ? 12 : 8,
                 },
               ]}
             >
@@ -1981,7 +2176,7 @@ const PostCard = ({
                   label={formatCount(localUpvotes.length)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  lineHeight={16}
+                  letterSpacing={-0.06}
                   color={hasUpvoted() ? UPVOTE_GREEN : colors.text}
                 />
               </TouchableOpacity>
@@ -2000,7 +2195,7 @@ const PostCard = ({
                 disabled={isVoting}
                 style={[
                   styles.rowbtn,
-                  styles.rowbtnSpread,
+                  styles.rowbtnSpreadRev,
                   { backgroundColor: colors.surfaceAlt },
                   hasDownvoted() && {
                     backgroundColor:
@@ -2012,7 +2207,7 @@ const PostCard = ({
                   label={formatCount(localDownvotes.length)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  lineHeight={16}
+                  letterSpacing={-0.06}
                   color={
                     hasDownvoted()
                       ? themeMode === "dark"
@@ -2030,7 +2225,7 @@ const PostCard = ({
                       ? themeMode === "dark"
                         ? COLORS.black
                         : COLORS.white
-                      : colors.text
+                      : colors.iconMuted
                   }
                 />
               </TouchableOpacity>
@@ -2056,13 +2251,13 @@ const PostCard = ({
                   family="MaterialSymbolsRounded"
                   name="chat_bubble"
                   size={16}
-                  color={colors.text}
+                  color={COLORS.gray48}
                 />
                 <CustomText
                   label={formatCount(commentsCount)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  lineHeight={16}
+                  letterSpacing={-0.06}
                   color={colors.text}
                 />
               </TouchableOpacity>
@@ -2087,13 +2282,13 @@ const PostCard = ({
                   family="MaterialSymbolsRounded"
                   name="north_east"
                   size={16}
-                  color={colors.text}
+                  color={COLORS.gray48}
                 />
                 <CustomText
                   label={formatCount(stats?.shares || 0)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  lineHeight={16}
+                  letterSpacing={-0.06}
                   color={colors.text}
                 />
               </TouchableOpacity>
@@ -2116,15 +2311,15 @@ const PostCard = ({
               >
                 <Icons
                   family="MaterialSymbolsRounded"
-                  name="sync_alt"
+                  name="repeat"
                   size={16}
-                  color={colors.text}
+                  color={COLORS.gray48}
                 />
                 <CustomText
                   label={formatCount(repostsCount)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  lineHeight={16}
+                  letterSpacing={-0.06}
                   color={colors.text}
                 />
               </TouchableOpacity>
@@ -2151,7 +2346,7 @@ const PostCard = ({
                 ]}
               >
                 <Icons
-                  family="MaterialSymbolsRounded"
+                  family="MaterialSymbolsRoundedFilled"
                   name="bookmark_add"
                   size={16}
                   color={
@@ -2159,14 +2354,14 @@ const PostCard = ({
                       ? themeMode === "dark"
                         ? COLORS.black
                         : COLORS.white
-                      : colors.text
+                      : colors.iconMuted
                   }
                 />
                 <CustomText
                   label={formatCount(localSaves)}
                   fontFamily={fonts.medium}
                   fontSize={12}
-                  lineHeight={16}
+                  letterSpacing={-0.06}
                   color={
                     isSaved
                       ? themeMode === "dark"
@@ -2178,7 +2373,13 @@ const PostCard = ({
               </TouchableOpacity>
             </View>
             {upvotes?.length > 0 && item?.friendLikes?.length > 0 && (
-              <View style={[styles.row, { gap: 4, marginTop: 4 }]}>
+              <View
+                style={[
+                  styles.row,
+                  { gap: 4, marginTop: 4 },
+                  isDetail && { paddingHorizontal: 16, marginTop: 8 },
+                ]}
+              >
                 {item?.friendLikes[0]?.profile?.avatar ||
                 userData?.profile?.avatar ? (
                   <ImageFast
@@ -2209,15 +2410,14 @@ const PostCard = ({
                         }`
                       : ""
                   }`}
-                  fontSize={12}
-                  lineHeight={16}
-                  letterSpacing={-0.06}
+                  // Detail (Figma): Medium 14 / −0.5%; feed: 12
+                  fontSize={isDetail ? 14 : 12}
+                  letterSpacing={isDetail ? -0.07 : -0.06}
                   fontFamily={fonts.medium}
                 />
                 <CustomText
                   label={"reacted to this post"}
                   fontSize={12}
-                  lineHeight={16}
                   letterSpacing={-0.06}
                   fontFamily={fonts.regular}
                   color={COLORS.gray48}
@@ -2225,7 +2425,9 @@ const PostCard = ({
               </View>
             )}
 
-            {item?.topComment?.author?.firstName && (
+            {/* Detail (Figma): no top-comment / "View all" — the comments
+                list is right below */}
+            {!isDetail && item?.topComment?.author?.firstName && (
               <View
                 style={[
                   styles.row,
@@ -2236,7 +2438,6 @@ const PostCard = ({
                   <CustomText
                     label={item?.topComment?.author?.firstName}
                     fontSize={12}
-                    lineHeight={16}
                     letterSpacing={-0.12}
                     fontFamily={fonts.medium}
                   />
@@ -2251,7 +2452,6 @@ const PostCard = ({
                   <CustomText
                     label={"With the most liked comment"}
                     fontSize={12}
-                    lineHeight={16}
                     letterSpacing={-0.12}
                     fontFamily={fonts.regular}
                     color={colors.text}
@@ -2271,7 +2471,6 @@ const PostCard = ({
                         0,
                     )}
                     fontSize={12}
-                    lineHeight={16}
                     fontFamily={fonts.medium}
                   />
                   <Icons
@@ -2283,27 +2482,26 @@ const PostCard = ({
                 </View>
               </View>
             )}
-            {commentsCount > 0 && (
+            {!isDetail && commentsCount > 0 && (
               <CustomText
                 label={`View all ${formatCount(commentsCount)} comments`}
                 fontSize={12}
-                lineHeight={16}
                 letterSpacing={-0.06}
                 color={COLORS.gray48}
                 fontFamily={fonts.regular}
                 marginBottom={4}
-                marginTop={4}
+                marginTop={2}
                 marginLeft={8}
               />
             )}
             <CustomText
               label={timeAgo}
               color={COLORS.gray48}
-              fontSize={10}
-              lineHeight={14}
-              letterSpacing={-0.05}
-              marginLeft={8}
-              marginTop={commentsCount > 0 ? 0 : 4}
+              // Detail (Figma): Regular 12 / −0.5% @48%; feed: 10
+              fontSize={isDetail ? 12 : 10}
+              letterSpacing={isDetail ? -0.06 : -0.05}
+              marginLeft={isDetail ? 16 : 8}
+              marginTop={commentsCount > 0 && !isDetail ? 0 : 4}
               fontFamily={fonts.regular}
             />
           </View>
@@ -2419,6 +2617,13 @@ const PostCard = ({
           item={item}
         />
 
+        <FollowSheet
+          visible={showFollowSheet}
+          onDismiss={() => setShowFollowSheet(false)}
+          creator={item?.author}
+          collaborators={followCollaborators}
+        />
+
         <TaggedSheet
           visible={showTagged}
           onDismiss={() => setShowTagged(false)}
@@ -2444,7 +2649,9 @@ const createStyles = (colors, themeMode) =>
   StyleSheet.create({
     mainContainer: {
       paddingTop: 12,
-      paddingBottom: 12,
+      // Figma (measured): time glyph → section end 9; the 10pt time text's
+      // 1.4 line box already adds ~3 below the glyph
+      paddingBottom: 9,
       backgroundColor: colors.background,
     },
     row: {
@@ -2468,11 +2675,35 @@ const createStyles = (colors, themeMode) =>
       flex: 1,
       minWidth: 0,
     },
-    // Action pills: icon and count spread apart, inset from the pill edges
+    // Figma action pills (56.5 × 28, r4):
+    //  upvote   icon left / count right, pad L4 R6
+    //  downvote count left / icon right, pad L8 R4
+    //  others   icon + 4 + count, left-aligned, pad L4
     rowbtnSpread: {
       justifyContent: "space-between",
-      paddingLeft: 10,
-      paddingRight: 10,
+      paddingLeft: 4,
+      paddingRight: 6,
+    },
+    rowbtnSpreadRev: {
+      justifyContent: "space-between",
+      paddingLeft: 8,
+      paddingRight: 4,
+    },
+    // Figma (node 7431-1316): comment pill — 16 icon · 2 · count,
+    // left-aligned, pad L6 R4 T2 B2
+    rowbtnComment: {
+      justifyContent: "flex-start",
+      gap: 2,
+      paddingLeft: 6,
+      paddingRight: 4,
+    },
+    // Figma (7431-1321/1326/1330): share / repost / save — 16 icon · 2 ·
+    // count, left-aligned, pad L4 R4 T2 B2
+    rowbtnLead: {
+      justifyContent: "flex-start",
+      gap: 2,
+      paddingLeft: 4,
+      paddingRight: 4,
     },
     rowBetween: {
       flexDirection: "row",
@@ -2480,9 +2711,10 @@ const createStyles = (colors, themeMode) =>
       alignItems: "center",
       justifyContent: "space-between",
     },
+    // Figma: 32 ring (2px profile colour + 2 pad) → 24 avatar
     avatar: {
-      height: 40,
-      width: 40,
+      height: 24,
+      width: 24,
       borderRadius: 99,
     },
     userInfo: {
@@ -2493,8 +2725,6 @@ const createStyles = (colors, themeMode) =>
       alignItems: "center",
     },
     verifiedIcon: {
-      height: 16,
-      width: 16,
       marginLeft: 4,
     },
     moreButton: {
@@ -2541,24 +2771,52 @@ const createStyles = (colors, themeMode) =>
       gap: 4,
       paddingVertical: 0,
     },
+    // Figma: dots centred ~17pt above the media bottom
+    // Figma feed carousel: dots 6 tall, 8 below the media, active 30 × 6 gold
+    dotsRow: {
+      marginTop: 8,
+      height: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+    },
+    feedDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: "rgba(161, 147, 117, 0.16)",
+    },
+    feedDotActive: {
+      width: 30,
+      backgroundColor: COLORS.buttonColor,
+    },
+    followingIconBtn: {
+      width: 36,
+      height: 32,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     dotsOverlay: {
       position: "absolute",
-      bottom: 20,
+      bottom: 14,
       alignSelf: "center",
       flexDirection: "row",
       alignItems: "center",
       gap: 4,
       zIndex: 2,
     },
+    // Figma: inactive 6 × 6 dark, active 32 × 6 white, gap 4
     dot: {
-      height: 5,
-      width: 5,
+      height: 6,
+      width: 6,
       borderRadius: 99,
-      backgroundColor: "rgba(255, 255, 255, 0.48)",
+      backgroundColor: "rgba(18, 18, 18, 0.56)",
     },
     dotActive: {
-      width: 24,
-      height: 5,
+      width: 32,
+      height: 6,
       backgroundColor: COLORS.white,
     },
     glowBg: {
@@ -2662,9 +2920,11 @@ const createStyles = (colors, themeMode) =>
       justifyContent: "center",
       borderRadius: 4,
       backgroundColor: "rgba(55, 184, 116, 0.48)",
-      marginTop: 8,
+      marginTop: 10,
       height: 20,
       marginHorizontal: 8,
+      width: 143,
+      alignItems: "center",
     },
     backButton: {
       borderRadius: 99,
@@ -2683,6 +2943,12 @@ const createStyles = (colors, themeMode) =>
       alignItems: "center",
       justifyContent: "center",
     },
+    truncationProbe: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      opacity: 0,
+    },
     tagWrapper: {
       gap: 4,
       flexWrap: "wrap",
@@ -2699,6 +2965,25 @@ const createStyles = (colors, themeMode) =>
       paddingLeft: 6,
       paddingRight: 8,
       height: 28,
+    },
+    detailViewersRow: {
+      position: "absolute",
+      // Figma: 16pt row at 12 from the media bottom (the 24pt fullscreen
+      // frame overhangs it by 4 each side, as in Figma)
+      bottom: 12,
+      height: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      zIndex: 3,
+    },
+    fullscreenBtn: {
+      width: 24,
+      height: 24,
+      marginVertical: -4,
+      marginRight: -5,
+      alignItems: "center",
+      justifyContent: "center",
     },
     person: {
       height: 16,
@@ -2721,18 +3006,38 @@ const createStyles = (colors, themeMode) =>
       flexDirection: "row",
       alignItems: "center",
     },
+    // Figma (7431-1381): caption pill hugs its text, centred between the
+    // mute and time pills (row is space-between) — h24, r100, pad L8 R10,
+    // 12 icon · 4 · Medium 12 white, fill #121212 @80%, no blur
     subtitlePill: {
-      flex: 1,
-      maxWidth: 250,
+      flexShrink: 1,
       height: 24,
       borderRadius: 100,
       backgroundColor: "rgba(18, 18, 18, 0.8)",
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 10,
+      paddingLeft: 8,
+      paddingRight: 10,
       marginHorizontal: 8,
       overflow: "hidden",
+    },
+    // Figma (7431-1378 / 7431-1387): mute + time pills — h32 hug, pad H10
+    // V2, r100, white @4% + background blur 16 (mute = 10 · 16 icon · 10 = 36)
+    videoPill: {
+      height: 32,
+      minWidth: 36,
+      paddingHorizontal: 10,
+      borderRadius: 100,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.04)",
+    },
+    // Figma (7431-1292): image post group / repost circles — #121212 @16%
+    // over a background blur 16
+    mediaBtnTint: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 100,
+      backgroundColor: "rgba(18, 18, 18, 0.16)",
     },
     topBlurContainer: {
       position: "absolute",

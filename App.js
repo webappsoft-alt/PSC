@@ -44,70 +44,12 @@ import { ensureVideoSdkRegistered } from "./src/services/videosdk";
 
 import { navigationRef } from "./src/navigation/navigationRef";
 import Navigation from "./src/navigation";
+import NoConnection from "./src/components/Auth/NoConnection";
 import { persistor, store } from "./src/store";
 import { toastRef } from "./src/utils/ToastMessage";
 import DetailPageWithId from "./src/screens/Main/Home/DetailPageWithId";
+import { prefetchTopicAnimations } from "./src/utils/feedTopics";
 
-const NetworkErrorScreen = ({ onRetry }) => {
-  return (
-    <View style={styles.errorContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
-
-      {/* Error Icon */}
-      <View style={styles.iconContainer}>
-        <Text style={styles.errorIcon}>📡</Text>
-      </View>
-
-      {/* Error Content */}
-      <View style={styles.contentContainer}>
-        <Text style={styles.errorTitle}>No Internet Connection</Text>
-        <Text style={styles.errorSubtitle}>
-          Please check your internet connection and try again
-        </Text>
-
-        <View style={styles.bulletPoints}>
-          <Text style={styles.bulletPoint}>• Check your WiFi connection</Text>
-          <Text style={styles.bulletPoint}>• Check your mobile data</Text>
-          <Text style={styles.bulletPoint}>
-            • Try moving to a better signal area
-          </Text>
-        </View>
-      </View>
-
-      {/* Retry Button */}
-      <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-        <Text style={styles.retryButtonText}>Retry Connection</Text>
-      </TouchableOpacity>
-
-      {/* Continue Without Internet Button */}
-      <TouchableOpacity
-        style={styles.continueButton}
-        onPress={() => {
-          Alert.alert(
-            "Limited Functionality",
-            "Some features may not work without internet connection.",
-            [
-              {
-                text: "Continue Anyway",
-                onPress: () => store.dispatch({ type: "FORCE_OFFLINE_MODE" }),
-              },
-            ]
-          );
-        }}
-      >
-        <Text style={styles.continueButtonText}>Continue Offline</Text>
-      </TouchableOpacity>
-
-      {/* Exit Button */}
-      <TouchableOpacity
-        style={styles.exitButton}
-        onPress={() => BackHandler.exitApp()}
-      >
-        <Text style={styles.exitButtonText}>Exit App</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 export const requestPermissionOnDemand = async (permissionType) => {
   if (Platform.OS !== "android") return true;
@@ -227,6 +169,12 @@ const AppContent = () => {
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   const [showNetworkError, setShowNetworkError] = useState(false);
 
+  // Copy the topic Lotties to local files at launch (Viral does the same in
+  // app/_layout) so the topic sheets paint their icons on the first frame.
+  useEffect(() => {
+    prefetchTopicAnimations().catch(() => {});
+  }, []);
+
   useEffect(() => {
     // Force LTR layout
     if (I18nManager.isRTL) {
@@ -250,6 +198,14 @@ const AppContent = () => {
 
   //   return () => unsubscribe();
   // }, []);
+
+  // Offline → the "No Connection" screen (Figma) over the app.
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setShowNetworkError(state.isConnected === false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     // Request permission and get token
@@ -360,7 +316,6 @@ const AppContent = () => {
         ]
       );
     } finally {
-      back;
       setIsCheckingConnection(false);
     }
   };
@@ -375,9 +330,6 @@ const AppContent = () => {
   //   );
   // }
 
-  if (showNetworkError) {
-    return <NetworkErrorScreen onRetry={retryConnection} />;
-  }
 
   return (
     <SafeAreaProvider>
@@ -418,6 +370,9 @@ const AppContent = () => {
                     </PublishSelectionProvider>
                   </CreateCameraProvider>
                 </SocketProvider>
+                {showNetworkError ? (
+                  <NoConnection onRetry={retryConnection} />
+                ) : null}
               </GestureHandlerRootView>
             </PersistGate>
           </Provider>

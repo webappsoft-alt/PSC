@@ -1,125 +1,86 @@
-import { PermissionsAndroid, Platform, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { PermissionsAndroid, Platform } from "react-native";
 import messaging from "@react-native-firebase/messaging";
 import { useNavigation } from "@react-navigation/native";
-import React from "react";
 
-import ScreenWrapper from "../../../components/ScreenWrapper";
-import CustomButton from "../../../components/CustomButton";
-import CustomText from "../../../components/CustomText";
-import ImageFast from "../../../components/ImageFast";
+import Icons from "../../../components/Icons";
+import PromptLayout, { PromptTexts } from "../../../components/Auth/PromptLayout";
+import { RingButton, SoftButton, useAuthPalette } from "../../../components/Auth/AuthKit";
+import { put } from "../../../services/ApiRequest";
+import { getToken } from "../../../utils/constants";
 
-import { Images } from "../../../assets/images";
-import { COLORS } from "../../../utils/COLORS";
-import fonts from "../../../assets/fonts";
-import { useTheme } from "../../../contexts/ThemeContext";
-
-const AllowNotification = () => {
-  const { colors, isDark } = useTheme();
-  const navigation = useNavigation();
-
-  const requestNotificationPermission = async () => {
-    proceedWithNotificationPermission();
-  };
-
-  const proceedWithNotificationPermission = async () => {
-    try {
-      if (Platform.OS === "android") {
-        const status = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-        );
-
-        if (status === PermissionsAndroid.RESULTS.GRANTED) {
-          console.log("Notification permission granted");
-          navigation.navigate("OnBoarding2", { push: true });
-        } else {
-          console.log("Notification permission denied");
-          navigation.navigate("OnBoarding2", { push: false });
-        }
-      } else if (Platform.OS === "ios") {
-        const authStatus = await messaging().requestPermission();
-        const enabled =
-          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-        if (enabled) {
-          console.log("Notification permission granted");
-          navigation.navigate("OnBoarding2", { push: true });
-        } else {
-          console.log("Notification permission denied");
-          navigation.navigate("OnBoarding2", { push: false });
-        }
-      }
-    } catch (error) {
-      console.error("Error requesting notification permission:", error);
-      navigation.navigate("OnBoarding2", { push: false });
+const askPermission = async () => {
+  try {
+    if (Platform.OS === "android") {
+      if (Platform.Version < 33) return true;
+      const status = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+      );
+      return status === PermissionsAndroid.RESULTS.GRANTED;
     }
+    const status = await messaging().requestPermission();
+    return (
+      status === messaging.AuthorizationStatus.AUTHORIZED ||
+      status === messaging.AuthorizationStatus.PROVISIONAL
+    );
+  } catch (e) {
+    return false;
+  }
+};
+
+/** Figma "Accept-notifications" (3098:5952). */
+const AllowNotification = () => {
+  const navigation = useNavigation();
+  const p = useAuthPalette();
+  const [loading, setLoading] = useState(null);
+
+  const finish = async (push, key) => {
+    setLoading(key);
+    try {
+      if (push) await getToken();
+      await put("user/profile", { notificationPreferences: { push } });
+    } catch (e) {
+      // Preference only — never block the onboarding on it.
+    }
+    setLoading(null);
+    navigation.navigate("ProfilePrivacy");
   };
 
   return (
-    <ScreenWrapper
-      paddingHorizontal={24}
-      backgroundColor="#FAFAFA"
-      statusBarColor="#FAFAFA"
-      barStyle="dark-content"
-      footerUnScrollable={() => (
-        <View style={{ padding: 14, marginBottom: 20 }}>
-          <CustomButton
-            title="Continue"
-            marginBottom={8}
-            backgroundColor={COLORS.primaryColor}
-            color={COLORS.white}
-            onPress={requestNotificationPermission}
+    <PromptLayout
+      variant="notif"
+      actions={
+        <>
+          <RingButton
+            title="Turn on notifications"
+            loading={loading === "yes"}
+            disabled={!!loading}
+            onPress={async () => finish(await askPermission(), "yes")}
           />
-          <CustomButton
-            title="Later"
-            backgroundColor="#1212120A"
-            color={COLORS.primaryColor}
-            onPress={() => navigation.navigate("OnBoarding2", { push: false })}
+          <SoftButton
+            title="Maybe later"
+            loading={loading === "no"}
+            disabled={!!loading}
+            onPress={() => finish(false, "no")}
           />
-        </View>
-      )}
+        </>
+      }
     >
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          //   paddingHorizontal: 30,
-        }}
-      >
-        <ImageFast
-          source={Images.bell}
-          style={{ height: 80, width: 80 }}
-          resizeMode="contain"
-          tintColor={COLORS.primaryColor}
-        />
-        <CustomText
-          label="Instant notifications"
-          fontSize={32}
-          marginTop={26}
-          fontFamily={fonts.semiBold}
-          color={COLORS.primaryColor}
-          textAlign={"center"}
-        />
-        <CustomText
-          lineHeight={14 * 1.4}
-          label="Receive notifications directly on your phone whenever a new event occurs."
-          color="rgba(18, 18, 18, 0.64)"
-          textAlign={"center"}
-          marginTop={12}
-        />
-        <CustomText
-          label="Manage your notification in Settings anytime."
-          marginTop={24}
-          lineHeight={14 * 1.4}
-          color="rgba(18, 18, 18, 0.64)"
-          textAlign={"center"}
-        />
-      </View>
-    </ScreenWrapper>
+      <PromptTexts
+        icon={
+          <Icons
+            family="MaterialSymbolsRoundedFilled"
+            name="notifications_active"
+            size={80}
+            color={p.gold64}
+          />
+        }
+        title="Instant notifications"
+        body="Receive notifications directly on your phone whenever a new event occurs."
+        note="Manage your notification in Settings anytime."
+      />
+    </PromptLayout>
   );
 };
 
 export default AllowNotification;
-
-const styles = StyleSheet.create({});

@@ -23,6 +23,12 @@ export const usersSlice = createSlice({
     isExtraFoodAndBeverage: false,
     totalWalletBalance: 0,
     savedAccounts: [],
+    // Profile selector (ported from Viral): the account in use, the local
+    // per-account PIN hashes and the "Don't show next time" switch.
+    activeAccountId: "",
+    profilePins: {},
+    pinSalt: "",
+    skipProfileSelector: false,
   },
 
   reducers: {
@@ -122,6 +128,27 @@ export const usersSlice = createSlice({
         state.savedAccounts.push(acc);
       }
     },
+    setActiveAccountId(state, action) {
+      state.activeAccountId = action.payload || "";
+    },
+    setProfilePin(state, action) {
+      const { userId, hash } = action.payload || {};
+      if (!userId) return;
+      if (!state.profilePins || typeof state.profilePins !== "object") {
+        state.profilePins = {};
+      }
+      if (hash) {
+        state.profilePins[userId] = hash;
+      } else {
+        delete state.profilePins[userId];
+      }
+    },
+    setPinSalt(state, action) {
+      state.pinSalt = action.payload || "";
+    },
+    setSkipProfileSelector(state, action) {
+      state.skipProfileSelector = !!action.payload;
+    },
     removeSavedAccount(state, action) {
       if (!Array.isArray(state.savedAccounts)) {
         state.savedAccounts = [];
@@ -136,6 +163,10 @@ export const usersSlice = createSlice({
 });
 
 export const {
+  setActiveAccountId,
+  setProfilePin,
+  setPinSalt,
+  setSkipProfileSelector,
   setUserData,
   setLocation,
   setUnseenBadge,

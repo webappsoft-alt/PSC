@@ -16,13 +16,19 @@ const TendingTopic = ({
   onSelectTrendingTopic,
 }) => {
   const { colors, isDark } = useTheme();
+  // Figma chips are Title Case ("Crypto"); the API stores tags lowercase.
+  const toTitle = (v = "") =>
+    String(v)
+      .split(" ")
+      .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+      .join(" ");
   return (
     <View style={[styles.mainContainer, { backgroundColor: colors.background }]}>
       <View style={styles.row}>
         <CustomText
           label={"TODAY\u2019S"}
+          // Figma: BoldItalic 16 / 18 / −6%
           fontSize={16}
-          lineHeight={19}
           color={COLORS.gray48}
           fontFamily={fonts.BoldItalic}
           fontStyle="italic"
@@ -31,9 +37,8 @@ const TendingTopic = ({
         <CustomText
           label={"MAIN TOPICS"}
           fontSize={16}
-          lineHeight={19}
           color={colors.text}
-          marginLeft={4}
+          marginLeft={2}
           fontFamily={fonts.BoldItalic}
           fontStyle="italic"
           letterSpacing={-0.96}
@@ -47,7 +52,7 @@ const TendingTopic = ({
 
           return (
             <TouchableOpacity
-              key={item._id || index}
+              key={`${item._id || item.tag}-${index}`}
               onPress={() => onSelectHashtag && onSelectHashtag(item._id)}
               activeOpacity={0.7}
               style={[
@@ -66,9 +71,8 @@ const TendingTopic = ({
                 color={textColor}
               />
               <CustomText
-                label={item.tag}
+                label={toTitle(item.tag)}
                 fontSize={12}
-                lineHeight={16}
                 color={textColor}
                 fontFamily={fonts.medium}
                 marginLeft={2}
@@ -112,9 +116,8 @@ const TendingTopic = ({
                 height={14}
               /> */}
               <CustomText
-                label={item.topic}
+                label={toTitle(item.topic)}
                 fontSize={12}
-                lineHeight={16}
                 fontFamily={fonts.medium}
                 color={textColor}
                 marginLeft={2}
@@ -130,14 +133,18 @@ const TendingTopic = ({
 export default React.memo(TendingTopic);
 
 const styles = StyleSheet.create({
-  mainContainer: { paddingHorizontal: 8, paddingVertical: 12 },
+  // Figma: pad V12, title → chips 12 (title caps are 11pt; CustomText's
+  // 16 × 1.4 = 22.4 line box adds ~5.7 above/below the caps, trimmed here
+  // so the visual gaps match)
+  mainContainer: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: 12 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 6,
   },
+  // Figma: chips wrap, gap 4 × 4; the two wraps are 8 apart
   wrapper: {
-    rowGap: 8,
+    rowGap: 4,
     columnGap: 4,
     flexWrap: "wrap",
     flexDirection: "row",

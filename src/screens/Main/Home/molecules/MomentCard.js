@@ -324,7 +324,6 @@ const MomentItem = ({
             <CustomText
               label={String(storiesCount)}
               fontSize={12}
-              lineHeight={16}
               letterSpacing={-0.06}
               color={COLORS.white}
               fontFamily={fonts.medium}
@@ -736,11 +735,11 @@ const MomentCard = ({ storiesData, myStoriesData }) => {
       style={[styles.mainContainer, { backgroundColor: colors.background }]}
     >
       <View style={[styles.row, styles.spaceBetween]}>
-        <View style={styles.row}>
+        {/* Figma: "TODAY'S" · 2 · "HIGHLIGHTS" */}
+        <View style={styles.titleRow}>
           <CustomText
             label={"TODAY\u2019S"}
             fontSize={16}
-            lineHeight={19}
             color={COLORS.gray48}
             fontFamily={fonts.BoldItalic}
             fontStyle="italic"
@@ -749,12 +748,10 @@ const MomentCard = ({ storiesData, myStoriesData }) => {
           <CustomText
             label={"HIGHLIGHTS"}
             fontSize={16}
-            lineHeight={19}
             color={colors.text}
             fontFamily={fonts.BoldItalic}
             fontStyle="italic"
             letterSpacing={-0.96}
-            marginLeft={2}
           />
         </View>
         <TouchableOpacity style={styles.row} onPress={handlePlayAll}>
@@ -764,12 +761,12 @@ const MomentCard = ({ storiesData, myStoriesData }) => {
             size={16}
             color={COLORS.gray48}
           />
+          {/* same 18pt line box as the title so the row stays 18 tall */}
           <CustomText
             label={"PLAY ALL"}
             fontSize={13}
             color={colors.text}
             fontFamily={fonts.medium}
-            activeOpacity={0.8}
           />
         </TouchableOpacity>
       </View>
@@ -806,14 +803,19 @@ export default React.memo(MomentCard);
 
 const createStyles = (colors, isDark) =>
   StyleSheet.create({
+    // Figma: section pad H8 V12, title → rings gap 16
+    // Figma: pad V12 around an 11pt-tall title box; CustomText's 22.4pt line
+    // box (16 × 1.4) adds ~5.7pt above and below the caps, so the paddings
+    // are trimmed to match the visual 12 / 16 / 12 rhythm measured on the frame.
     mainContainer: {
-      paddingTop: 8,
+      paddingTop: 6,
       paddingBottom: 12,
       paddingHorizontal: 8,
     },
     row: { flexDirection: "row", alignItems: "center", gap: 4 },
+    titleRow: { flexDirection: "row", alignItems: "center", gap: 2 },
     spaceBetween: { justifyContent: "space-between" },
-    listContent: { gap: 10, marginTop: 8 },
+    listContent: { gap: 10, marginTop: 10 },
     cardWrapper: {
       position: "relative",
     },

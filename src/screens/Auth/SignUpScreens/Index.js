@@ -1,191 +1,168 @@
-import { useEffect, useRef, useState } from "react";
-
-import { useNavigation } from "@react-navigation/native";
+import { useCallback, useRef, useState } from "react";
+import { BackHandler } from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import ScreenWrapper from "../../../components/ScreenWrapper";
-import AuthFooter from "../../../components/Auth/AuthFooter";
-import AuthHeader from "../../../components/Auth/AuthHeader";
+import {
+  AuthStepFooter,
+  AuthStepHeader,
+} from "../../../components/Auth/AuthKit";
 
-import ResetPassword from "./ResetPassword";
-import Firstname from "./Firstname";
-import Surname from "./Surname";
-import Username from "./Username";
+import UserType from "./UserType";
+import ProType from "./ProType";
+import DOB from "./DOB";
+import { EntityName, Firstname, Surname } from "./NameSteps";
 import Addressing from "./Addressing";
 import Gender from "./Gender";
-import JobTitle from "./JobTitle";
-import WorkingAt from "./WorkingAt";
-import Password from "./Password";
-import OtpCode from "./OtpCode";
 import Email from "./Email";
-import DOB from "./DOB";
-import Industry from "./Industry";
-import UserType from "./UserType";
-import ProRole from "./ProRole";
-import AddPictures from "./AddPictures";
-import Text from "../../../components/ScaledText";
+import OtpCode from "./OtpCode";
+import Password from "./Password";
+import ConfirmPassword from "./ConfirmPassword";
+import Username from "./Username";
+import { FLOWS, PROFILE_STEPS, flowOf } from "./flows";
+
+const SUBTITLES = {
+  UserType: "Choose your user type",
+  ProType: "Choose your user type",
+  DOB: "Date of Birth",
+  FoundingDate: "Founding date",
+  EntityName: "Entity name",
+  Firstname: "Firstname",
+  Surname: "Surname",
+  Addressing: "Addressing",
+  Gender: "Gender",
+  Email: "Email",
+  EmailCode: "Verifying your email",
+  Phone: "Phone Number",
+  PhoneCode: "Verifying your phone number",
+  Password: "Creating a strong password",
+  ConfirmPassword: "Confirming password",
+  Username: "Provide your Username",
+};
+
+const STEPS = {
+  UserType,
+  ProType,
+  DOB,
+  FoundingDate: DOB,
+  EntityName,
+  Firstname,
+  Surname,
+  Addressing,
+  Gender,
+  Email,
+  EmailCode: OtpCode,
+  Phone: Email,
+  PhoneCode: OtpCode,
+  Password,
+  ConfirmPassword,
+  Username,
+};
+
+const INITIAL_STATE = {
+  userType: "",
+  proType: "",
+  dob: "",
+  foundingDate: "",
+  firstName: "",
+  lastName: "",
+  entityName: "",
+  addressing: "firstname",
+  gender: "",
+  email: "",
+  phone: "",
+  verifyVia: "sms",
+  allowMarketing: true,
+  enhancedTailoredAds: false,
+  password: "",
+  username: "",
+};
 
 const SignUpScreens = () => {
   const navigation = useNavigation();
-  const [currentIndex, setCurrentIndex] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [btnDisabled, setBtnDisabled] = useState(true);
   const stepRef = useRef(null);
-  const steps = [
-    "DOB",
-    "UserType",
-    "ProRole",
-    "Firstname",
-    "Surname",
-    "Username",
-    "Addressing",
-    "Gender",
-    "Email",
-    "OtpCode",
-    "Password",
-    "ResetPassword",
-    "Industry",
-    "WorkingAt",
-    "JobTitle",
-    "AddPictures",
-  ];
-  const subtitles = {
-    1: "Date of Birth",
-    2: "Choose your user type",
-    3: "Choose your user type",
-    4: "Firstname",
-    5: "Surname",
-    6: "Username",
-    7: "Addressing",
-    8: "Gender",
-    9: "Email",
-    10: "Verifying your account",
-    11: "Creating a strong password",
-    12: "Confirming password",
-    13: "Industry",
-    14: "Working At",
-    15: "Job Title",
-    16: "Upload your photos",
-  };
-  const init = {
-    email: "",
-    phone: "",
-    password: "",
-    dob: "",
-    pin: "",
-    full_name: "",
-    last_name: "",
-    first_name: "",
-    addressing: "firstname",
-    gender: "",
-    verifyVia: "sms",
-    allowMarketing: true,
-    enhancedTailoredAds: false,
-    job_title: "",
-    working_at: "",
-    industry: "",
-    role: "",
-    allowdPersonalizedAds: false,
-    allowdMarketingEmails: false,
-    notificationPreferences: { email: false, push: false, sms: false },
-  };
-  const [state, setState] = useState(init);
+  const [state, setState] = useState(INITIAL_STATE);
+  const [stepKey, setStepKey] = useState("UserType");
+  const [btnDisabled, setBtnDisabled] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // A Customer (regular) never sees the ProRole step (3), so the header
-  // numbering collapses it: their path shows x/15 instead of x/16.
-  const isRegularPath = state?.userType === "Regular";
-  const displayTotal = isRegularPath ? steps.length - 1 : steps.length;
-  const displayStep =
-    isRegularPath && currentIndex > 3 ? currentIndex - 1 : currentIndex;
+  const flow = FLOWS[flowOf(state)];
+  const stepIndex = Math.max(0, flow.indexOf(stepKey));
+  const total = flow.length + PROFILE_STEPS;
 
-  // Reset loading state when step changes
-  useEffect(() => {
-    setIsLoading(false);
-  }, [currentIndex]);
-
-  const setLoadingState = (loading) => {
-    setIsLoading(loading);
+  const goTo = (key) => {
+    setLoading(false);
+    setBtnDisabled(true);
+    setStepKey(key);
   };
 
-  // Handle back navigation
-  const handleBackPress = () => {
-    if (currentIndex === 1) {
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      }
-    } else {
-      stepRef.current?.back?.();
+  /** Merges the step's answers and moves to the next step of the flow. */
+  const next = (patch = {}) => {
+    const merged = { ...state, ...patch };
+    setState(merged);
+    const nextFlow = FLOWS[flowOf(merged)];
+    const i = nextFlow.indexOf(stepKey);
+    if (i >= 0 && i < nextFlow.length - 1) goTo(nextFlow[i + 1]);
+  };
+
+  const back = () => {
+    if (loading) return;
+    if (stepIndex > 0) {
+      goTo(flow[stepIndex - 1]);
+    } else if (navigation.canGoBack()) {
+      navigation.goBack();
     }
   };
 
-  const stepProps = {
-    ref: stepRef,
-    currentIndex,
-    setCurrentIndex,
-    state,
-    setState,
-    setLoadingState,
-    setBtnDisabled,
-  };
+  // Android back button walks the steps backwards as well.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+        if (stepIndex > 0) {
+          back();
+          return true;
+        }
+        return false;
+      });
+      return () => sub.remove();
+    }, [stepIndex, loading, flow]),
+  );
 
-  const renderStepView = () => {
-    switch (currentIndex) {
-      case 1:
-        return <DOB {...stepProps} />;
-      case 2:
-        return <UserType {...stepProps} />;
-      case 3:
-        return <ProRole {...stepProps} />;
-      case 4:
-        return <Firstname {...stepProps} />;
-      case 5:
-        return <Surname {...stepProps} />;
-      case 6:
-        return <Username {...stepProps} />;
-      case 7:
-        return <Addressing {...stepProps} />;
-      case 8:
-        return <Gender {...stepProps} />;
-      case 9:
-        return <Email {...stepProps} />;
-      case 10:
-        return <OtpCode {...stepProps} />;
-      case 11:
-        return <Password {...stepProps} />;
-      case 12:
-        return <ResetPassword {...stepProps} />;
-      case 13:
-        return <Industry {...stepProps} />;
-      case 14:
-        return <WorkingAt {...stepProps} />;
-      case 15:
-        return <JobTitle {...stepProps} />;
-      case 16:
-        return <AddPictures {...stepProps} />;
-      default:
-        return <Text>No View</Text>;
-    }
-  };
+  const Step = STEPS[stepKey];
+  const subtitle = SUBTITLES[stepKey];
 
   return (
     <ScreenWrapper
-      paddingBottom={12}
       scrollEnabled
+      headerUnScrollable={() => (
+        <AuthStepHeader
+          subtitle={subtitle}
+          step={stepIndex + 1}
+          total={total}
+        />
+      )}
       footerUnScrollable={() => (
-        <AuthFooter
-          paddingHorizontal={12}
+        <AuthStepFooter
           onPress={() => stepRef.current?.submit?.()}
-          onBackPress={handleBackPress}
-          loading={isLoading}
-          btnDisabled={btnDisabled}
+          onBackPress={back}
+          loading={loading}
+          disabled={btnDisabled}
         />
       )}
     >
-      <AuthHeader
-        step={displayStep}
-        totalSteps={displayTotal}
-        subtitle={subtitles[currentIndex] || ""}
-      />
-      {renderStepView()}
+      {Step ? (
+        <Step
+          key={stepKey}
+          ref={stepRef}
+          stepKey={stepKey}
+          state={state}
+          setState={setState}
+          next={next}
+          goBack={back}
+          setBtnDisabled={setBtnDisabled}
+          setLoading={setLoading}
+        />
+      ) : null}
     </ScreenWrapper>
   );
 };

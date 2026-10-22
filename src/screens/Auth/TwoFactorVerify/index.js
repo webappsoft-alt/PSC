@@ -19,11 +19,14 @@ import { COLORS } from "../../../utils/COLORS";
 import { ToastMessage } from "../../../utils/ToastMessage";
 import { useTheme } from "../../../contexts/ThemeContext";
 import {
+  addSavedAccount,
+  setActiveAccountId,
   setIsEmail,
   setLoginValue,
   setUserData,
 } from "../../../store/reducer/usersSlice";
 import { setToken } from "../../../store/reducer/AuthConfig";
+import { buildSavedAccount } from "../../../utils/accountSession";
 
 const TwoFactorVerify = ({ navigation, route }) => {
   const { colors, isDark } = useTheme();
@@ -139,10 +142,25 @@ const TwoFactorVerify = ({ navigation, route }) => {
           dispatch(setIsEmail(true));
         }
 
-        // Navigate to main app
+        // Remember the account for the profile selector.
+        const saved = buildSavedAccount(
+          res?.data?.user || res?.data?.data?.user || res?.data?.data,
+          {
+            accessToken: res?.data?.tokens?.accessToken || res?.data?.token,
+            refreshToken:
+              res?.data?.tokens?.refreshToken || res?.data?.refreshToken,
+          },
+        );
+        if (saved) {
+          dispatch(addSavedAccount(saved));
+          dispatch(setActiveAccountId(saved.id));
+        }
+
+        // Same hand-off as the login screen (Welcome → app). This screen is
+        // in AuthStack, which has no "MainStack" route of its own.
         navigation.reset({
           index: 0,
-          routes: [{ name: "MainStack" }],
+          routes: [{ name: "WelcomeScreen" }],
         });
       } else {
         setError("OTP does not match. Please try again.");

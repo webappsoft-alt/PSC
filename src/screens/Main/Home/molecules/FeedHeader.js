@@ -27,7 +27,7 @@ export const FEED_HEADER_ROW1_HEIGHT = 36;
 export const FEED_HEADER_ROW2_HEIGHT = 40;
 export const FEED_HEADER_CHIPS_HEIGHT = 32;
 export const FEED_HEADER_ROW_GAP = 4;
-export const FEED_HEADER_BOTTOM_PAD = 6;
+export const FEED_HEADER_BOTTOM_PAD = 7;
 
 /** Height below the status-bar inset (overlay already pads insets.top). */
 export const FEED_HEADER_CONTENT_HEIGHT =
@@ -37,13 +37,18 @@ export const FEED_HEADER_CONTENT_HEIGHT =
   FEED_HEADER_ROW2_HEIGHT +
   FEED_HEADER_ROW_GAP +
   FEED_HEADER_CHIPS_HEIGHT +
-  FEED_HEADER_BOTTOM_PAD; // 4+36+4+40+4+32+6 = 126 → 44 (status bar) + 126 = Figma's 170
+  FEED_HEADER_BOTTOM_PAD; // 4+36+4+40+4+32+7 = 127 → 44 (status bar) + 127 = Figma's 171
 
 // Figma reference: paddingTop 48 = 44pt status bar + 4 → use real inset + 4 on device.
+/** How far rows 2–3 slide up when the Feed/Shorts row hides on scroll. */
+export const FEED_HEADER_COLLAPSE =
+  FEED_HEADER_ROW2_HEIGHT + FEED_HEADER_ROW_GAP;
+
 export const feedHeaderHeight = (topInset = 44) =>
   Math.max(topInset, 44) + FEED_HEADER_CONTENT_HEIGHT;
 
-const CIRCLE_BTN_SIZE = 36;
+// Figma: 32 circle, 1px white 16% outline, no fill, 20 icon
+const CIRCLE_BTN_SIZE = 32;
 
 const US_STATE_ABBR = {
   Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA",
@@ -61,7 +66,7 @@ const US_STATE_ABBR = {
 };
 
 const IconCircle = ({ name, size = 20, onPress, style, filled }) => {
-  const { colors } = useTheme();
+  const { themeMode } = useTheme();
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -71,7 +76,11 @@ const IconCircle = ({ name, size = 20, onPress, style, filled }) => {
           height: CIRCLE_BTN_SIZE,
           width: CIRCLE_BTN_SIZE,
           borderRadius: 99,
-          backgroundColor: colors.surfaceAlt,
+          borderWidth: 1,
+          borderColor:
+            themeMode === "light"
+              ? "rgba(18, 18, 18, 0.04)"
+              : "rgba(255, 255, 255, 0.04)",
           justifyContent: "center",
           alignItems: "center",
         },
@@ -172,15 +181,23 @@ const FeedHeader = ({
     ? 1
     : 0;
 
-  // Row 2 (Feed / Shorts) fades out AND collapses on scroll down so the topic
-  // chips slide up into its space; fades/expands back on scroll up.
-  const row2Opacity = feedRowAnim || 1;
-  const row2Height = feedRowAnim
+  // Row 2 (Feed / Shorts) fades out on scroll down while it and the topic
+  // chips slide up under row 1 (Pinterest-style); reverses on scroll up.
+  // Opacity + translateY only, so it runs on the native driver — no layout
+  // per frame, no jerk while the feed is scrolling/playing video.
+  const row2Opacity = feedRowAnim
+    ? feedRowAnim.interpolate({
+        inputRange: [0, 0.6, 1],
+        outputRange: [0, 0.15, 1],
+      })
+    : 1;
+  const collapseY = feedRowAnim
     ? feedRowAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, FEED_HEADER_ROW2_HEIGHT + FEED_HEADER_ROW_GAP],
+        outputRange: [-FEED_HEADER_COLLAPSE, 0],
       })
-    : FEED_HEADER_ROW2_HEIGHT + FEED_HEADER_ROW_GAP;
+    : 0;
+  // touch-through while hidden (state flips only at the ends of the fade)
   const [row2Hidden, setRow2Hidden] = useState(false);
   useEffect(() => {
     if (!feedRowAnim) return undefined;
@@ -207,9 +224,9 @@ const FeedHeader = ({
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Icons
-            family="MaterialSymbolsRounded"
+            size={22}
             name="search"
-            size={26}
+            family="Feather"
             color={COLORS.white}
           />
         </TouchableOpacity>
@@ -231,7 +248,6 @@ const FeedHeader = ({
             <CustomText
               label={locationLabel}
               fontSize={20}
-              lineHeight={24}
               fontFamily={fonts.semiBold}
               color={COLORS.white}
               letterSpacing={-1.2}
@@ -255,8 +271,9 @@ const FeedHeader = ({
             onPress={() => navigation.navigate("Notification")}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           >
+            {/* Figma: filled bell with sound waves, 24 */}
             <Icons
-              family="MaterialSymbolsRounded"
+              family="MaterialSymbolsRoundedFilled"
               name="notifications_active"
               size={24}
               color={COLORS.white}
@@ -268,10 +285,12 @@ const FeedHeader = ({
             onPress={() => navigation.navigate("Chat")}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           >
+            {/* Figma: tray with angled sides = Feather "inbox" (Material's
+                inbox is a square box); 22 fills the 24 box like the Figma glyph */}
             <Icons
-              family="MaterialSymbolsRounded"
+              family="Feather"
               name="inbox"
-              size={24}
+              size={22}
               color={COLORS.white}
             />
           </TouchableOpacity>
@@ -282,22 +301,25 @@ const FeedHeader = ({
       <Animated.View
         style={[
           styles.row2Wrap,
-          { opacity: row2Opacity, height: row2Height },
+          { opacity: row2Opacity, transform: [{ translateY: collapseY }] },
         ]}
         pointerEvents={row2Hidden ? "none" : "auto"}
       >
         <View style={styles.row2}>
-          <View style={styles.row}>
+          <View style={styles.titleRow}>
             <TouchableOpacity onPress={handleFeedPress} activeOpacity={0.7}>
               <Animated.Text
                 style={{
                   fontSize: 32,
-                  lineHeight: 38,
                   letterSpacing: -1.9,
                   fontFamily: fonts.semiBoldItalic,
                   fontStyle: "italic",
                   color: feedColor,
                   includeFontPadding: false,
+                  // the italic "d" overhangs the text box (negative tracking
+                  // trims its advance) and iOS clips it — give it room
+                  paddingRight: 6,
+                  marginRight: -2,
                 }}
               >
                 Feed
@@ -311,7 +333,8 @@ const FeedHeader = ({
                   fontFamily: fonts.semiBoldItalic,
                   fontStyle: "italic",
                   color: shortsColor,
-                  marginLeft: 8,
+                  marginLeft: 2, // Figma: ~4pt gap after the italic "d"
+                  paddingRight: 3,
                   includeFontPadding: false,
                 }}
               >
@@ -326,9 +349,12 @@ const FeedHeader = ({
               style={[
                 styles.row,
                 {
-                  gap: 8,
+                  gap: 10,
                   position: "absolute",
                   right: 0,
+                  // Figma: circles 92–124 in the 40pt row → 4 from the top,
+                  // 8 above the chips (absolute children aren't centred)
+                  top: (FEED_HEADER_ROW2_HEIGHT - CIRCLE_BTN_SIZE) / 2,
                   opacity: homeIconsOpacity,
                 },
               ]}
@@ -343,6 +369,7 @@ const FeedHeader = ({
               style={{
                 position: "absolute",
                 right: 0,
+                top: (FEED_HEADER_ROW2_HEIGHT - 24) / 2,
                 opacity: shortsIconsOpacity,
               }}
               pointerEvents={isShort || isLive ? "auto" : "none"}
@@ -364,6 +391,7 @@ const FeedHeader = ({
       </Animated.View>
 
       {/* ───────── Row 3: topic chips ───────── */}
+      <Animated.View style={{ transform: [{ translateY: collapseY }] }}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -390,7 +418,6 @@ const FeedHeader = ({
           <CustomText
             label="For You"
             fontSize={14}
-            lineHeight={18}
             fontFamily={fonts.BoldItalic}
             fontStyle="italic"
             letterSpacing={-0.56}
@@ -409,7 +436,7 @@ const FeedHeader = ({
           <Icons
             family="MaterialSymbolsRounded"
             name="add"
-            size={18}
+            size={16}
             color={COLORS.white}
           />
         </TouchableOpacity>
@@ -431,7 +458,6 @@ const FeedHeader = ({
               <CustomText
                 label={name.toUpperCase()}
                 fontSize={14}
-                lineHeight={18}
                 fontFamily={fonts.BoldItalic}
                 fontStyle="italic"
                 letterSpacing={-0.56}
@@ -440,7 +466,12 @@ const FeedHeader = ({
             </TouchableOpacity>
           );
         })}
+        {/* Figma: 1px #262626 section line under the chips (the list starts
+            1px below the header, so the line sits in the header's last px);
+            inside this wrapper so it slides up with the chips on collapse */}
       </ScrollView>
+        <View style={styles.bottomLine} />
+      </Animated.View>
     </View>
   );
 };
@@ -457,11 +488,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   row1: {
+    // stays above rows 2–3 while they slide up underneath it
+    zIndex: 2,
     height: FEED_HEADER_ROW1_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
+    paddingLeft: 15,
+    paddingRight: 10,
     marginBottom: FEED_HEADER_ROW_GAP,
   },
   locationWrap: {
@@ -478,23 +512,41 @@ const styles = StyleSheet.create({
   row1Right: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 10,
   },
   row2Wrap: {
     overflow: "hidden",
+    // Figma: circles end at 124, chips start at 132
+    marginBottom: FEED_HEADER_ROW_GAP,
+  },
+  // Figma: "Feed" glyphs sit 3pt below the circles' top edge, "Shorts"
+  // shares the "Feed" baseline
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
   },
   row2: {
     height: FEED_HEADER_ROW2_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingLeft: 12,
+    paddingLeft: 8,
     paddingRight: 8,
   },
   row2Right: {
-    width: 90,
-    height: CIRCLE_BTN_SIZE + 4,
+    width: CIRCLE_BTN_SIZE * 2 + 10,
+    height: FEED_HEADER_ROW2_HEIGHT,
     justifyContent: "center",
+  },
+  bottomLine: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    // the chips wrapper ends FEED_HEADER_BOTTOM_PAD above the header's
+    // bottom edge → place the 1px line in the header's last pixel
+    bottom: -(FEED_HEADER_BOTTOM_PAD - 1),
+    height: 1,
+    backgroundColor: COLORS.authHeader,
   },
   chipsContent: {
     gap: 4,

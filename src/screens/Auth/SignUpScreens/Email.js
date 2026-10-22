@@ -1,368 +1,297 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
-import ErrorComponent from "../../../components/ErrorComponent";
-import CustomInput from "../../../components/CustomInput";
 import CustomPhoneInput from "../../../components/CustomPhoneInput";
 import CustomText from "../../../components/CustomText";
 import Icons from "../../../components/Icons";
 import { SlidingSegmentControl } from "../../../components/Auth/SlidingSegmentControl";
+import {
+  AuthHint,
+  AuthTextField,
+  HINT_ROW_EXTRA,
+  OptionCard,
+  capTop,
+  ls,
+  textGap,
+  useAuthPalette,
+} from "../../../components/Auth/AuthKit";
 
 import fonts from "../../../assets/fonts";
 import { post } from "../../../services/ApiRequest";
-import { COLORS } from "../../../utils/COLORS";
 import { isValidEmail, isValidPhone } from "../../../utils/constants";
 import { ToastMessage } from "../../../utils/ToastMessage";
-import { useNavigation } from "@react-navigation/native";
-import { useTheme } from "../../../contexts/ThemeContext";
 
-const SelectCard = ({
-  icon,
-  iconFamily = "MaterialSymbolsRoundedFilled",
-  title,
-  desc,
-  selected,
-  onPress,
-}) => {
-  const { colors, isDark } = useTheme();
-  return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={onPress}
-      style={[
-        styles.selectCard,
-        {
-          borderColor: isDark
-            ? "rgba(255, 255, 255, 0.08)"
-            : "rgba(18, 18, 18, 0.08)",
-        },
-      ]}
-    >
-      <View style={styles.selectCardText}>
-        <View style={styles.selectCardTitleRow}>
-          {icon ? (
-            <Icons
-              family={iconFamily}
-              name={icon}
-              size={18}
-              color={isDark ? COLORS.white : colors.text}
-              marginRight={6}
-            />
-          ) : null}
-          <CustomText
-            label={title}
-            fontFamily={fonts.medium}
-            fontSize={16}
-            lineHeight={16 * 1.4}
-            color={isDark ? COLORS.white : colors.text}
-          />
-        </View>
-        <CustomText
-          label={desc}
-          fontFamily={fonts.regular}
-          fontSize={14}
-          lineHeight={14 * 1.4}
-          color={isDark ? COLORS.gray64 : colors.textSecondary}
-        />
-      </View>
-      <Icons
-        family={
-          selected ? "MaterialSymbolsRoundedFilled" : "MaterialSymbolsRounded"
-        }
-        name={selected ? "check_circle" : "radio_button_unchecked"}
-        size={24}
-        color={
-          selected
-            ? COLORS.buttonColor
-            : isDark
-            ? COLORS.gray64
-            : colors.textSecondary
-        }
-      />
-    </TouchableOpacity>
-  );
+/** "Hello Mr. Sola" / "Hi Ana" / "Hello Sola Group" from the earlier answers. */
+const greetingOf = (s) => {
+  if (s?.proType === "company" && s?.entityName) return `Hello ${s.entityName}`;
+  if (s?.addressing === "lastname" && s?.lastName) {
+    const title =
+      s?.gender === "female" ? "Ms." : s?.gender === "male" ? "Mr." : "";
+    return `Hello ${title ? `${title} ` : ""}${s.lastName}`;
+  }
+  return s?.firstName ? `Hi ${s.firstName}` : "Hello";
 };
 
+/** Phone as typed in CustomPhoneInput ("+31 612 345 678") → "+31612345678". */
+const normalizePhone = (v) => String(v || "").replace(/[\s()-]/g, "");
+
+/**
+ * Email / Phone Number tabs (40 track, 32 pill), greeting Regular 16 48%,
+ * question, field, two 48% hints, divider, then the opt-in (email) or the
+ * verification-channel (phone) cards.
+ *
+ * Both are mandatory (as in Viral): the "Email" step comes first with the
+ * Phone tab disabled, then — after its code — the "Phone" step with the
+ * Email tab disabled.
+ */
 const Email = forwardRef(
-  (
-    {
-      currentIndex,
-      setCurrentIndex,
-      state,
-      setState,
-      setLoadingState,
-      setBtnDisabled,
-    },
-    ref,
-  ) => {
-    const { colors, isDark } = useTheme();
-    const navigation = useNavigation();
+  ({ stepKey, state, next, setBtnDisabled, setLoading }, ref) => {
+  const p = useAuthPalette();
+  const navigation = useNavigation();
+  const method = stepKey === "Phone" ? "phone" : "email";
+  const [email, setEmail] = useState(state?.email || "");
+  const [phone, setPhone] = useState(state?.phone || "");
+  const [verifyVia, setVerifyVia] = useState(state?.verifyVia || "sms");
+  const [allowMarketing, setAllowMarketing] = useState(
+    state?.allowMarketing ?? true,
+  );
+  const [tailoredAds, setTailoredAds] = useState(
+    state?.enhancedTailoredAds ?? false,
+  );
+  const [error, setError] = useState("");
 
-    const [email, setEmail] = useState(state?.email || "");
-    const [phoneNumber, setPhoneNumber] = useState(state?.phone || "");
-    const [contactMethod, setContactMethod] = useState(
-      state?.phone ? "phone" : "email",
-    );
-    const [verifyVia, setVerifyVia] = useState(state?.verifyVia || "sms");
-    const [allowMarketing, setAllowMarketing] = useState(
-      state?.allowMarketing ?? true,
-    );
-    const [enhancedTailoredAds, setEnhancedTailoredAds] = useState(
-      state?.enhancedTailoredAds ?? false,
-    );
-    const [error, setError] = useState("");
-    const [isLoading, setLoading] = useState(false);
+  const isEmail = method === "email";
 
-    useEffect(() => {
-      if (contactMethod === "email") {
-        setBtnDisabled?.(!email.trim());
-      } else {
-        setBtnDisabled?.(!phoneNumber.trim());
-      }
-    }, [email, phoneNumber, contactMethod]);
+  useEffect(() => {
+    setBtnDisabled?.(isEmail ? !email.trim() : !phone.trim());
+  }, [email, phone, method]);
 
-    const greeting =
-      state?.addressing === "lastname" && state?.last_name
-        ? `Hello ${state?.gender === "female" ? "Ms." : "Mr."} ${
-            state.last_name
-          }`
-        : state?.full_name
-        ? `Hi ${state.full_name}`
-        : "Hello";
+  const submit = async () => {
+    if (isEmail && !isValidEmail(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!isEmail && !isValidPhone(phone)) {
+      setError("Please enter a valid phone number");
+      return;
+    }
+    setError("");
+    const identifier = isEmail
+      ? { email: email.trim().toLowerCase() }
+      : { phone: normalizePhone(phone) };
 
-    const submit = async () => {
-      const isEmail = contactMethod === "email";
-
-      if (isEmail && !isValidEmail(email)) {
-        setError("Please enter a valid email address");
-        return;
-      }
-      if (!isEmail && !isValidPhone(phoneNumber)) {
-        setError("Please enter a valid phone number");
-        return;
-      }
-      setError("");
-
-      const identifier = isEmail
-        ? { email: email.trim() }
-        : { phone: phoneNumber.trim() };
-
-      setState({
-        ...state,
-        email: isEmail ? email.trim() : "",
-        phone: isEmail ? "" : phoneNumber.trim(),
-        verifyVia,
-        allowMarketing,
-        enhancedTailoredAds,
+    setLoading?.(true);
+    try {
+      const res = await post("auth/send-otp", {
+        ...identifier,
+        ...(!isEmail && { verifyVia }),
       });
-
-      try {
-        setLoading(true);
-        if (setLoadingState) setLoadingState(true);
-
-        const res = await post(`auth/send-otp`, {
-          ...identifier,
-          ...(!isEmail && { verifyVia }),
-        });
-
-        if (res?.data?.success) {
-          Alert.alert("OTP Received", res.data?.code?.toString(), [
-            { text: "OK", onPress: () => setCurrentIndex(10) },
-          ]);
-        } else {
-          setError(
-            res?.data?.message || "Failed to send OTP. Please try again.",
-          );
-        }
-
-        setLoading(false);
-        if (setLoadingState) setLoadingState(false);
-      } catch (err) {
-        ToastMessage(err?.message, "error");
-        if (err?.message?.includes("already registered")) {
-          navigation.reset({ index: 0, routes: [{ name: "Login" }] });
-        }
-        setError("Error sending OTP. Please try again.");
-        setLoading(false);
-        if (setLoadingState) setLoadingState(false);
+      setLoading?.(false);
+      if (!res?.data?.success) {
+        setError(res?.data?.message || "Failed to send the code.");
+        return;
       }
-    };
+      const patch = isEmail
+        ? {
+            email: identifier.email,
+            allowMarketing,
+            enhancedTailoredAds: tailoredAds,
+          }
+        : { phone: identifier.phone, verifyVia };
+      // Delivery is not wired yet for every channel, so show the code.
+      Alert.alert("Verification code", String(res?.data?.code ?? ""), [
+        { text: "OK", onPress: () => next(patch) },
+      ]);
+    } catch (err) {
+      setLoading?.(false);
+      const message = err?.message || "Failed to send the code.";
+      setError(message);
+      if (/already registered/i.test(message)) {
+        ToastMessage(`${message}. Please log in.`, "error");
+        navigation.navigate("Login");
+      }
+    }
+  };
 
-    const back = () => {
-      setCurrentIndex(8);
-    };
+  useImperativeHandle(ref, () => ({ submit }));
 
-    useImperativeHandle(ref, () => ({ submit, back, isLoading: isLoading }));
+  const hintColor = p.t48;
 
-    return (
-      <View style={styles.container}>
+  return (
+    <View>
+      <SlidingSegmentControl
+        items={[
+          { key: "email", label: "Email", disabled: !isEmail },
+          { key: "phone", label: "Phone Number", disabled: isEmail },
+        ]}
+        selectedKey={method}
+        onChange={() => {}}
+        trackColor={p.t04}
+        pillColor={p.text}
+        activeLabelColor={p.isDark ? "#121212" : "#FFFFFF"}
+        inactiveLabelColor={p.t64}
+        disabledLabelColor={p.t64}
+        style={styles.tabs}
+      />
+
+      <CustomText
+        label={greetingOf(state)}
+        fontSize={16}
+        letterSpacing={ls(-3, 16)}
+        color={p.t48}
+        marginTop={20 - capTop(16)}
+      />
+      <CustomText
+        label={isEmail ? "What is your email?" : "What is your phone number?"}
+        fontSize={24}
+        fontFamily={fonts.semiBold}
+        letterSpacing={ls(-1, 24)}
+        color={p.text}
+        marginTop={textGap(12, 16, 24)}
+        marginBottom={12 - 0.35 * 24}
+      />
+
+      {isEmail ? (
+        <AuthTextField
+          value={email}
+          onChangeText={(t) => {
+            setEmail(t);
+            if (error) setError("");
+          }}
+          placeholder="E.g. abc@email.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          textContentType="emailAddress"
+          autoComplete="email"
+          error={error}
+        />
+      ) : (
         <View>
-          <SlidingSegmentControl
-            items={[
-              { key: "phone", label: "Phone Number" },
-              { key: "email", label: "Email" },
-            ]}
-            selectedKey={contactMethod}
-            onChange={(key) => {
-              setContactMethod(key);
-              setError("");
+          <CustomPhoneInput
+            value={phone}
+            setValue={(v) => {
+              setPhone(v);
+              if (error) setError("");
             }}
-            trackColor={colors.surfaceAlt}
-            pillColor={colors.text}
-            activeLabelColor={colors.background}
-            inactiveLabelColor={isDark ? COLORS.gray64 : colors.textSecondary}
-            style={styles.toggle}
+            withLabel="PHONE NUMBER"
+            height={56}
+            borderRadius={12}
+            marginBottom={0}
+            error={!!error}
           />
-
-          <CustomText
-            label={greeting}
-            fontFamily={fonts.regular}
-            fontSize={16}
-            lineHeight={16 * 1.4}
-            color={isDark ? COLORS.gray64 : colors.textSecondary}
-          />
-          <CustomText
-            label={
-              contactMethod === "email"
-                ? "What is your email?"
-                : "What is your phone number?"
-            }
-            fontFamily={fonts.semiBold}
-            fontSize={24}
-            lineHeight={24 * 1.4}
-            letterSpacing={-0.24}
-            marginBottom={8}
-            color={isDark ? COLORS.white : colors.text}
-          />
-
-          {contactMethod === "email" ? (
-            <CustomInput
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (error) setError("");
-              }}
-              error={error}
-              marginBottom={8}
-              placeholder="E.g. abc@email.com"
-              autoCapitalize="none"
-              keyboardType="email-address"
+          <View pointerEvents="none" style={styles.callIcon}>
+            <Icons
+              family="MaterialSymbolsRoundedFilled"
+              name="call"
+              size={16}
+              color={p.gold}
             />
-          ) : (
-            <View>
-              <CustomPhoneInput
-                value={phoneNumber}
-                setValue={(val) => {
-                  setPhoneNumber(val);
-                  if (error) setError("");
-                }}
-                withLabel="PHONE NUMBER"
-                marginBottom={8}
-              />
-              <View pointerEvents="none" style={styles.phoneRightIcon}>
+          </View>
+        </View>
+      )}
+
+      {error ? <AuthHint text={error} color={p.error} /> : null}
+      <AuthHint
+        text={
+          isEmail
+            ? "Please enter a valid email address."
+            : "Please enter a valid phone number"
+        }
+        color={hintColor}
+        marginTop={error ? 8 - 2 * HINT_ROW_EXTRA : 8 - HINT_ROW_EXTRA}
+      />
+      <AuthHint
+        text={`We will later use this ${
+          isEmail ? "email" : "phone number"
+        } to verify your account.`}
+        color={hintColor}
+        marginTop={8 - 2 * HINT_ROW_EXTRA}
+      />
+
+      <View
+        style={[
+          styles.divider,
+          { backgroundColor: p.t04, marginTop: 16 - HINT_ROW_EXTRA },
+        ]}
+      />
+
+      <View style={styles.cards}>
+        {isEmail ? (
+          <>
+            <OptionCard
+              title="I want to"
+              description="receive the latest news about PSC, and promotional offers."
+              selected={allowMarketing}
+              onPress={() => setAllowMarketing((v) => !v)}
+            />
+            <OptionCard
+              title="I am Okay To"
+              description="have a more tailor-made experience while keeping my data anonymous to content providers."
+              selected={tailoredAds}
+              onPress={() => setTailoredAds((v) => !v)}
+            />
+          </>
+        ) : (
+          <>
+            <OptionCard
+              icon={
                 <Icons
                   family="MaterialSymbolsRoundedFilled"
-                  name="call"
-                  size={18}
-                  color={COLORS.buttonColor}
+                  name="sms"
+                  size={14}
+                  color={p.t64}
                 />
-              </View>
-            </View>
-          )}
-
-          <ErrorComponent
-            errorTitle={`Please enter a valid ${
-              contactMethod === "email" ? "email address" : "phone number"
-            }.`}
-            color={isDark ? COLORS.gray2 : colors.textSecondary}
-            font={fonts.regular}
-            marginBottom={4}
-          />
-          <ErrorComponent
-            errorTitle={`We will later use this ${
-              contactMethod === "email" ? "email" : "phone number"
-            } to verify your account.`}
-            color={isDark ? COLORS.gray2 : colors.textSecondary}
-            font={fonts.regular}
-            marginBottom={16}
-          />
-
-          {contactMethod === "email" ? (
-            <>
-              <SelectCard
-                title="I Want To"
-                desc="receive the latest news about PSC, and promotional offers."
-                selected={allowMarketing}
-                onPress={() => setAllowMarketing(!allowMarketing)}
-              />
-              <SelectCard
-                title="I Am Okay To"
-                desc="have a more tailor-made experience while keeping my data anonymous to content providers."
-                selected={enhancedTailoredAds}
-                onPress={() => setEnhancedTailoredAds(!enhancedTailoredAds)}
-              />
-            </>
-          ) : (
-            <>
-              <SelectCard
-                icon="sms"
-                title="Verify Using SMS"
-                desc="Receive a verification code on your phone using the SMS method."
-                selected={verifyVia === "sms"}
-                onPress={() => setVerifyVia("sms")}
-              />
-              <SelectCard
-                icon="whatsapp"
-                iconFamily="MaterialCommunityIcons"
-                title="Verify Using Whatsapp"
-                desc="Receive a verification code on your Whatsapp using data method."
-                selected={verifyVia === "whatsapp"}
-                onPress={() => setVerifyVia("whatsapp")}
-              />
-            </>
-          )}
-        </View>
+              }
+              title="Verify using SMS"
+              description="Receive a verification code on your phone using the SMS method."
+              selected={verifyVia === "sms"}
+              onPress={() => setVerifyVia("sms")}
+            />
+            <OptionCard
+              icon={
+                <Icons
+                  family="MaterialCommunityIcons"
+                  name="whatsapp"
+                  size={14}
+                  color={p.text}
+                />
+              }
+              title="Verify using Whatsapp"
+              description="Receive a verification code on your Whatsapp using data method."
+              selected={verifyVia === "whatsapp"}
+              onPress={() => setVerifyVia("whatsapp")}
+            />
+          </>
+        )}
       </View>
-    );
+    </View>
+  );
   },
 );
 
 export default Email;
 
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: "space-between",
-    flex: 1,
+  tabs: {
+    marginTop: 16,
   },
-  toggle: {
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  phoneRightIcon: {
+  callIcon: {
     position: "absolute",
     right: 12,
     top: 12,
-    height: 32,
     width: 32,
+    height: 32,
     borderRadius: 100,
-    backgroundColor: "rgba(161, 147, 117, 0.16)",
+    backgroundColor: "rgba(85, 85, 85, 0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
-  selectCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 8,
+  divider: {
+    height: 1,
   },
-  selectCardText: {
-    flex: 1,
-    marginRight: 12,
-  },
-  selectCardTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  cards: {
+    marginTop: 16,
+    gap: 8,
   },
 });

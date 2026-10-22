@@ -3,6 +3,14 @@ import { useTheme } from "../contexts/ThemeContext";
 import { COLORS } from "../utils/COLORS";
 
 /** Same as Viral's CustomSwitch: the platform switch, accent-coloured when on. */
+// iOS 26 draws the (Liquid Glass) switch 64pt wide, but React Native still
+// lays it out with the old 51pt box, so it spills 13pt past its slot and gets
+// clipped at the edge of rows/sheets. Reserve the real width.
+const IOS_SWITCH_OVERFLOW =
+  Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26
+    ? 13
+    : 0;
+
 const CustomSwitch = ({
   setValue,
   value,
@@ -19,7 +27,11 @@ const CustomSwitch = ({
     <View
       style={[
         styles.switchContainer,
-        { marginLeft, marginRight, marginBottom },
+        {
+          marginLeft,
+          marginRight: (marginRight || 0) + IOS_SWITCH_OVERFLOW,
+          marginBottom,
+        },
       ]}
     >
       <Switch

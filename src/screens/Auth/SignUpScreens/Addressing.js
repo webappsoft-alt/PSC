@@ -2,135 +2,120 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 
 import CustomText from "../../../components/CustomText";
-import Icons from "../../../components/Icons";
-
+import {
+  AuthStepTitle,
+  SelectIcon,
+  belowBase,
+  capTop,
+  ls,
+  textGap,
+  useAuthPalette,
+} from "../../../components/Auth/AuthKit";
 import fonts from "../../../assets/fonts";
-import { COLORS } from "../../../utils/COLORS";
-import { useTheme } from "../../../contexts/ThemeContext";
 
-const Addressing = forwardRef(
-  ({ currentIndex, setCurrentIndex, state, setState, setBtnDisabled }, ref) => {
-    const { colors, isDark } = useTheme();
-    const [selected, setSelected] = useState(state?.addressing || "firstname");
+const OPTIONS = [
+  {
+    key: "firstname",
+    title: "Using your Firstname",
+    tone: "Friendly",
+    example: "E.g. Hi Ana, how was your day?",
+  },
+  {
+    key: "lastname",
+    title: "Using your Lastname",
+    tone: "Corporate",
+    example: "E.g. Hello Mr. Johnson, how was your day?",
+  },
+];
 
-    useEffect(() => {
-      setBtnDisabled?.(!selected);
-    }, [selected]);
+/**
+ * Card: 1px FFFFFF 4% stroke, radius 12, padding 16/12, row gap 16;
+ * title Medium 16 (-0.5%) → tone Medium 14 → example Regular 12 48%, 16 apart.
+ */
+const Addressing = forwardRef(({ state, next, setBtnDisabled }, ref) => {
+  const p = useAuthPalette();
+  const [selected, setSelected] = useState(state?.addressing || "firstname");
 
-    const submit = () => {
-      setState({ ...state, addressing: selected });
-      setCurrentIndex(8);
-    };
+  useEffect(() => {
+    setBtnDisabled?.(!selected);
+  }, [selected]);
 
-    const back = () => {
-      setCurrentIndex(6);
-    };
+  useImperativeHandle(ref, () => ({
+    submit: () => next({ addressing: selected }),
+  }));
 
-    useImperativeHandle(ref, () => ({ submit, back }));
-
-    const options = [
-      {
-        key: "firstname",
-        title: "Using Your Firstname",
-        subtitle: "Friendly",
-        example: `E.g. Hi ${state?.full_name || "Ana"}, how was your day?`,
-      },
-      {
-        key: "lastname",
-        title: "Using Your Lastname",
-        subtitle: "Corporate",
-        example: `E.g. Hello Mr. ${
-          state?.last_name || "Johnson"
-        }, how was your day?`,
-      },
-    ];
-
-    return (
-      <View style={styles.container}>
-        <View>
-          <CustomText
-            label="How Would You Like To Be Addressed?"
-            fontFamily={fonts.semiBold}
-            fontSize={24}
-            lineHeight={24 * 1.4}
-            letterSpacing={-0.24}
-            marginTop={12}
-            marginBottom={16}
-            color={isDark ? COLORS.white : colors.text}
-          />
-
-          {options.map((item) => {
-            const isSelected = selected === item.key;
-            return (
-              <TouchableOpacity
-                key={item.key}
-                activeOpacity={0.7}
-                onPress={() => setSelected(item.key)}
-                style={[styles.card, { backgroundColor: colors.surfaceAlt }]}
-              >
-                <View style={styles.cardText}>
-                  <CustomText
-                    label={item.title}
-                    fontFamily={fonts.medium}
-                    fontSize={16}
-                    lineHeight={16 * 1.4}
-                    color={isDark ? COLORS.white : colors.text}
-                  />
-                  <CustomText
-                    label={item.subtitle}
-                    fontFamily={fonts.semiBold}
-                    fontSize={14}
-                    lineHeight={14 * 1.4}
-                    color={isDark ? COLORS.white : colors.text}
-                  />
-                  <CustomText
-                    label={item.example}
-                    fontFamily={fonts.regular}
-                    fontSize={12}
-                    lineHeight={12 * 1.4}
-                    marginTop={4}
-                    color={isDark ? COLORS.gray64 : colors.textSecondary}
-                  />
-                </View>
-                <Icons
-                  family="MaterialSymbolsRounded"
-                  name={
-                    isSelected ? "radio_button_checked" : "radio_button_unchecked"
-                  }
-                  size={22}
-                  color={
-                    isSelected
-                      ? COLORS.buttonColor
-                      : isDark
-                      ? COLORS.gray64
-                      : colors.textSecondary
+  return (
+    <View>
+      <AuthStepTitle
+        label="How Would You Like To Be Addressed?"
+        marginBottom={24}
+      />
+      <View style={{ gap: 8 }}>
+        {OPTIONS.map((o) => {
+          const on = selected === o.key;
+          return (
+            <TouchableOpacity
+              key={o.key}
+              activeOpacity={0.85}
+              onPress={() => setSelected(o.key)}
+              style={[styles.card, { borderColor: p.t04 }]}
+            >
+              <View style={styles.texts}>
+                <CustomText
+                  label={o.title}
+                  fontSize={16}
+                  fontFamily={fonts.medium}
+                  letterSpacing={ls(-0.5, 16)}
+                  color={p.text}
+                />
+                <CustomText
+                  label={o.tone}
+                  fontSize={14}
+                  fontFamily={fonts.medium}
+                  color={p.text}
+                  marginTop={textGap(16, 16, 14)}
+                />
+                <CustomText
+                  label={o.example}
+                  fontSize={12}
+                  color={p.t48}
+                  marginTop={textGap(16, 14, 12)}
+                />
+              </View>
+              <View style={styles.radio}>
+                <SelectIcon
+                  type="radio"
+                  selected={on}
+                  unselectedColor={
+                    p.isDark ? "rgba(18, 18, 18, 0.32)" : p.t32
                   }
                 />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
-    );
-  },
-);
+    </View>
+  );
+});
 
 export default Addressing;
 
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: "space-between",
-    flex: 1,
-  },
   card: {
     flexDirection: "row",
     alignItems: "flex-start",
+    gap: 16,
+    borderWidth: 1,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
+    paddingHorizontal: 11,
+    paddingTop: 15 - capTop(16),
+    paddingBottom: 15 - belowBase(12),
   },
-  cardText: {
+  texts: {
     flex: 1,
-    marginRight: 12,
+  },
+  radio: {
+    marginTop: 15 - (15 - capTop(16)),
   },
 });

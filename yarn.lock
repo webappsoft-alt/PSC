@@ -1470,6 +1470,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@callstack/liquid-glass@npm:^0.8.2":
+  version: 0.8.2
+  resolution: "@callstack/liquid-glass@npm:0.8.2"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 10c0/3eb3340b335eba263d75a2301fa5afc7e1202a5b306915949abdb4d23bd10ed8edeebf6604a281ff4dbfb6ab363e8c987caf6f2d9418c0eef5ffdd4b32865954
+  languageName: node
+  linkType: hard
+
 "@callstack/react-theme-provider@npm:3.0.3":
   version: 3.0.3
   resolution: "@callstack/react-theme-provider@npm:3.0.3"
@@ -4601,6 +4611,7 @@ __metadata:
     "@babel/core": "npm:^7.25.2"
     "@babel/preset-env": "npm:^7.25.3"
     "@babel/runtime": "npm:^7.25.0"
+    "@callstack/liquid-glass": "npm:^0.8.2"
     "@gorhom/bottom-sheet": "npm:^5.2.6"
     "@ptomasroos/react-native-multi-slider": "npm:^2.2.2"
     "@react-native-async-storage/async-storage": "npm:^2.2.0"

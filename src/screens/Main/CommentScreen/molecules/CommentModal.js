@@ -12,7 +12,7 @@ import LottieView from "lottie-react-native";
 import { patch, put } from "../../../../services/ApiRequest";
 
 import CustomText from "../../../../components/CustomText";
-import TopTab from "../../../../components/TopTab";
+import Icons from "../../../../components/Icons";
 
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
@@ -78,25 +78,31 @@ const CommentItem = ({ item, onReply, onLongPress, onLike, userData }) => {
 
           <View style={styles.userInfo}>
             <View style={styles.nameRow}>
+              {/* Figma: Medium 14 / −0.5% · 3×3 dot white 16% · username */}
               <CustomText
                 label={item?.user?.firstName}
                 fontSize={14}
+                lineHeight={18}
+                letterSpacing={-0.07}
                 color={colors.text}
                 fontFamily={fonts.medium}
               />
               <View
                 style={{
-                  height: 4,
-                  width: 4,
+                  height: 3,
+                  width: 3,
                   borderRadius: 99,
-                  backgroundColor: colors.surfaceAlt,
+                  backgroundColor: "rgba(255, 255, 255, 0.16)",
                 }}
               />
               <View style={styles.authorBadge}>
+                {/* Figma: chip h20 pad H6 r100 white 4%; Regular 12 −0.5% @64% */}
                 <CustomText
                   label={item?.user?.username?.toLowerCase()}
                   fontSize={12}
-                  color={colors.textSecondary}
+                  lineHeight={16}
+                  letterSpacing={-0.06}
+                  color={GRAY_COLOR}
                 />
               </View>
               {item?.isAuthor && (
@@ -115,8 +121,10 @@ const CommentItem = ({ item, onReply, onLongPress, onLike, userData }) => {
           )}
           <CustomText
             label={moment(item?.createdAt).fromNow()}
-            fontSize={14}
-            color={colors.textSecondary}
+            fontSize={12}
+            lineHeight={16}
+            letterSpacing={-0.06}
+            color={GRAY_COLOR}
           />
         </View>
       </View>
@@ -146,11 +154,13 @@ const CommentItem = ({ item, onReply, onLongPress, onLike, userData }) => {
       {/* Attachment image */}
       {item?.attachment?.type === "image" && (
         <View style={styles.attachmentRow}>
+          <View style={styles.attachmentFrame}>
           <ImageFast
             isView
             source={{ uri: item.attachment.url }}
             style={styles.attachmentImage}
           />
+          </View>
         </View>
       )}
 
@@ -164,14 +174,17 @@ const CommentItem = ({ item, onReply, onLongPress, onLike, userData }) => {
           loop
           style={{ width: 40, height: 40, marginTop: 4 }}
         />
-      ) : (
+      ) : item?.comment ? (
+        // Figma: Regular 14 / −1% white
         <CustomText
           label={item.comment}
           fontSize={14}
+          lineHeight={20}
+          letterSpacing={-0.14}
           color={colors.text}
-          marginTop={6}
+          marginTop={8}
         />
-      )}
+      ) : null}
 
       {/* Action Row or Posting Status */}
       {item?.isPosting ? (
@@ -189,9 +202,10 @@ const CommentItem = ({ item, onReply, onLongPress, onLike, userData }) => {
             <CustomText
               label="Reply"
               fontSize={14}
-              color={colors.textSecondary}
-              marginTop={2}
-              marginBottom={6}
+              lineHeight={20}
+              letterSpacing={-0.14}
+              color={GRAY_COLOR}
+              marginBottom={8}
             />
           </TouchableOpacity>
 
@@ -203,20 +217,24 @@ const CommentItem = ({ item, onReply, onLongPress, onLike, userData }) => {
                 onPress={() => onLike && onLike(item)}
                 activeOpacity={0.7}
               >
-                <Image
-                  source={isLiked ? Images.heartFill : Images.whiteHeart}
-                  style={[
-                    styles.statIcon,
-                    { tintColor: colors.iconMuted },
-                    isLiked && { tintColor: COLORS.red },
-                  ]}
+                <Icons
+                  family={
+                    isLiked
+                      ? "MaterialSymbolsRoundedFilled"
+                      : "MaterialSymbolsRounded"
+                  }
+                  name="favorite"
+                  size={14}
+                  color={isLiked ? COLORS.red : GRAY_COLOR}
                 />
-
+                {/* Figma: Medium 12 / −1% white */}
                 <CustomText
-                  label={`${item?.stats?.likes?.toLocaleString()} like${
+                  label={`${(item?.stats?.likes || 0).toLocaleString()} like${
                     item.stats?.likes == 1 ? "" : "s"
                   }`}
                   fontSize={12}
+                  lineHeight={16}
+                  letterSpacing={-0.12}
                   color={isLiked ? COLORS.red : colors.text}
                   marginLeft={4}
                   fontFamily={fonts.medium}
@@ -228,17 +246,33 @@ const CommentItem = ({ item, onReply, onLongPress, onLike, userData }) => {
                 activeOpacity={hasReplies ? 0.7 : 1}
                 disabled={!hasReplies}
               >
-                <Image source={Images.whiteComment} style={[styles.statIcon, { tintColor: colors.iconMuted }]} />
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="chat_bubble"
+                  size={14}
+                  color={GRAY_COLOR}
+                />
                 <CustomText
-                  label={`${item?.stats?.replies?.toLocaleString()} replies`}
+                  label={`${(item?.stats?.replies || 0).toLocaleString()} replies`}
                   fontSize={12}
+                  lineHeight={16}
+                  letterSpacing={-0.12}
                   color={colors.text}
                   fontFamily={fonts.medium}
                   marginLeft={4}
                 />
               </TouchableOpacity>
             </View>
-            {/* <CustomText label="Report" fontSize={12} color={colors.textSecondary} /> */}
+            {/* Figma: "Report" Regular 12 @64%, right — opens the comment
+                options, where Report lives */}
+            <CustomText
+              label="Report"
+              fontSize={12}
+              lineHeight={16}
+              letterSpacing={-0.06}
+              color={GRAY_COLOR}
+              onPress={() => onLongPress(item)}
+            />
           </View>
         </>
       )}
@@ -327,10 +361,12 @@ const ReplyItem = ({ item, onReply, onLike, userData }) => {
       {/* Attachment image for reply */}
       {item?.attachment?.type === "image" && (
         <View style={styles.attachmentRow}>
+          <View style={styles.attachmentFrame}>
           <ImageFast
             source={{ uri: item.attachment.url }}
             style={styles.attachmentImage}
           />
+          </View>
         </View>
       )}
 
@@ -484,16 +520,32 @@ const CommentModal = ({
   return (
     <View style={[styles.container, { marginBottom: marginBottom }]}>
       {/* Top Tabs */}
-      <TopTab
-        tab={tab}
-        setTab={handleTabChange}
-        tabNames={tabNames}
-        rounded
-        marginTop={12}
-        height={28}
-        paddingHorizontal={10}
-        scrollViewPaddingHorizontal={12}
-      />
+      {/* Figma: tab 28 high, pad H10, r100; active white 4% + Medium 12
+          white, inactive no fill + white 64% */}
+      <View style={styles.sortTabs}>
+        {tabNames.map((name, index) => {
+          const active = tab === index;
+          return (
+            <TouchableOpacity
+              key={name}
+              activeOpacity={0.7}
+              onPress={() => handleTabChange(index)}
+              style={[
+                styles.sortTab,
+                active && { backgroundColor: colors.surfaceAlt },
+              ]}
+            >
+              <CustomText
+                label={name}
+                fontSize={12}
+                lineHeight={16}
+                fontFamily={fonts.medium}
+                color={active ? colors.text : GRAY_COLOR}
+              />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
       <Divider marginVertical={12} thickness={1} color={colors.surfaceAlt} />
 
       {/* Comments List */}
@@ -649,6 +701,20 @@ const createStyles = (colors, isDark) => StyleSheet.create({
   listContent: {
     paddingHorizontal: 12,
   },
+  sortTabs: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 12,
+  },
+  sortTab: {
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   commentContainer: {
     marginBottom: 12,
     paddingBottom: 12,
@@ -674,26 +740,28 @@ const createStyles = (colors, isDark) => StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
+  // Figma: 16 × 16, r100
   avatar: {
-    height: 32,
-    width: 32,
-    borderRadius: 16,
+    height: 16,
+    width: 16,
+    borderRadius: 100,
     backgroundColor: colors.surfaceAlt,
   },
   userInfo: {
-    marginLeft: 8,
+    marginLeft: 4,
     flex: 1,
   },
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
   },
   authorBadge: {
     backgroundColor: colors.surfaceAlt,
     paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 99,
+    height: 20,
+    justifyContent: "center",
+    borderRadius: 100,
   },
   imagesRow: {
     flexDirection: "row",
@@ -720,6 +788,15 @@ const createStyles = (colors, isDark) => StyleSheet.create({
   },
   attachmentRow: {
     marginTop: 12,
+    flexDirection: "row",
+  },
+  attachmentFrame: {
+    width: 120,
+    height: 120,
+    padding: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
   },
   attachmentImage: {
     width: 112,
@@ -733,7 +810,7 @@ const createStyles = (colors, isDark) => StyleSheet.create({
   },
   statsLeft: {
     flexDirection: "row",
-    gap: 16,
+    gap: 12,
   },
   statItem: {
     flexDirection: "row",

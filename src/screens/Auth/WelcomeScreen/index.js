@@ -1,15 +1,19 @@
-import React, { useCallback, useEffect, useRef } from "react";
-import { useNavigation } from "@react-navigation/native";
-import { StyleSheet, View } from "react-native";
-import ScreenWrapper from "../../../components/ScreenWrapper";
-import CustomText from "../../../components/CustomText";
-import CustomButton from "../../../components/CustomButton";
-import ImageFast from "../../../components/ImageFast";
-import { Images } from "../../../assets/images";
-import { COLORS } from "../../../utils/COLORS";
-import fonts from "../../../assets/fonts";
-import { useTheme } from "../../../contexts/ThemeContext";
+import { useCallback, useEffect, useRef } from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useSelector } from "react-redux";
+
+import CustomText from "../../../components/CustomText";
+import Icons from "../../../components/Icons";
+import ImageFast from "../../../components/ImageFast";
+import PromptLayout from "../../../components/Auth/PromptLayout";
+import {
+  ClubLockup,
+  belowBase,
+  capTop,
+  useAuthPalette,
+} from "../../../components/Auth/AuthKit";
+import fonts from "../../../assets/fonts";
 
 // Greets the user the way they chose at registration (Addressing step):
 // "lastname" -> corporate ("Hello Mr. Johnson"), otherwise friendly ("Hi James").
@@ -18,6 +22,7 @@ const getGreeting = (user) => {
   const lastName = user?.lastName?.trim();
   const addressing = user?.profile?.addressing;
 
+  if (user?.role === "company" && firstName) return `Hello ${firstName}`;
   if (addressing === "lastname" && lastName) {
     const title =
       user?.gender === "male" ? "Mr. " : user?.gender === "female" ? "Ms. " : "";
@@ -28,16 +33,21 @@ const getGreeting = (user) => {
   return "Hello";
 };
 
+/**
+ * Figma "Accept-notifications" 2314:8778 (Welcome): club lockup, avatar 120
+ * in a F5F5F5 ring, greeting, "Welcome back!" pill — then into the app.
+ */
 const WelcomeScreen = () => {
-  const { colors, isDark } = useTheme();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const p = useAuthPalette();
   const userData = useSelector((state) => state?.users?.userData);
   const user = userData?.user || userData;
   const avatar = user?.profile?.avatar;
-  const navigation = useNavigation();
+  const fresh = !!route?.params?.fresh;
   const hasLeft = useRef(false);
 
-  // Hand off to the main app. WelcomeScreen lives inside AuthStack, so reset
-  // the root navigator (its parent), which owns the "MainStack" route.
+  // WelcomeScreen lives in AuthStack; the root navigator owns "MainStack".
   const goToHome = useCallback(() => {
     if (hasLeft.current) return;
     hasLeft.current = true;
@@ -51,98 +61,83 @@ const WelcomeScreen = () => {
   }, [goToHome]);
 
   return (
-    <ScreenWrapper
-      paddingHorizontal={24}
-      backgroundImage={isDark ? Images.authBg : undefined}
-      imageBottom={0}
-    >
-      <View style={{ alignItems: "center", justifyContent: "center", flex: 1 }}>
-        <CustomText
-          label={"Private"}
-          color={isDark ? COLORS.white : colors.text}
-          fontFamily={fonts.medium}
-          fontSize={40}
-          lineHeight={40 * 1.4}
-        />
-        <CustomText
-          label={"Social Club."}
-          color={COLORS.buttonColor}
-          fontFamily={fonts.medium}
-          fontSize={40}
-          lineHeight={40 * 1.4}
-        />
-
-        <View style={[styles.badge, { backgroundColor: isDark ? "#FFFFFF29" : "rgba(18, 18, 18, 0.08)", borderColor: isDark ? "rgba(255, 255, 255, 0.16)" : "rgba(18, 18, 18, 0.12)" }]}>
-          <CustomText
-            label={"GITEX Exclusive Access"}
-            color={isDark ? COLORS.white : colors.text}
-            fontFamily={fonts.medium}
-            fontSize={10}
-            lineHeight={10 * 1.4}
-          />
-        </View>
-
-        <View style={{ alignItems: "center", marginTop: 40 }}>
-          {/* <View style={styles.avatarOuter}> */}
-          <View style={[styles.avatarInner, { borderColor: isDark ? COLORS.white : colors.border }]}>
+    <PromptLayout variant="notif">
+      <View style={styles.center}>
+        <ClubLockup gap={32} />
+        <View style={[styles.avatarRing, { marginTop: 48 }]}>
+          {avatar ? (
             <ImageFast
-              source={avatar ? { uri: avatar } : Images.profile}
-              style={{ width: 110, height: 110, borderRadius: 99 }}
+              source={{ uri: avatar }}
+              style={styles.avatar}
+              resizeMode="cover"
             />
-          </View>
-
-          <CustomText
-            label={getGreeting(user)}
-            color={isDark ? COLORS.white : colors.text}
-            fontFamily={fonts.semiBold}
-            fontSize={24}
-            lineHeight={24 * 1.4}
-            marginTop={18}
-          />
-
-          <CustomButton
-            title={"Welcome back!"}
-            backgroundColor={isDark ? "#2B2B2B" : colors.surfaceAlt}
-            color={isDark ? COLORS.white : colors.text}
-            width={200}
-            height={43}
-            borderRadius={28}
-            marginTop={12}
-            onPress={goToHome}
-          />
+          ) : (
+            <View style={[styles.avatar, styles.avatarEmpty, { backgroundColor: p.t08 }]}>
+              <Icons
+                family="MaterialSymbolsRoundedFilled"
+                name="person"
+                size={56}
+                color={p.t64}
+              />
+            </View>
+          )}
         </View>
+        <CustomText
+          label={getGreeting(user)}
+          fontSize={24}
+          fontFamily={fonts.medium}
+          color={p.text}
+          textAlign="center"
+          marginTop={24 - capTop(24)}
+        />
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={goToHome}
+          style={[
+            styles.pill,
+            { backgroundColor: p.t16, marginTop: 24 - belowBase(24) },
+          ]}
+        >
+          <CustomText
+            label={fresh ? "Welcome!" : "Welcome back!"}
+            fontSize={18}
+            fontFamily={fonts.medium}
+            color={p.text}
+          />
+        </TouchableOpacity>
       </View>
-    </ScreenWrapper>
+    </PromptLayout>
   );
 };
 
 export default WelcomeScreen;
 
 const styles = StyleSheet.create({
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: "#FFFFFF29",
-    borderColor: "rgba(255, 255, 255, 0.16)",
-    borderWidth: 1,
-    borderRadius: 99,
-    marginTop: 16,
+  center: {
+    alignItems: "center",
   },
-  avatarOuter: {
-    width: 160,
-    height: 160,
-    borderRadius: 160 / 2,
-    backgroundColor: "#FFFFFF33",
+  avatarRing: {
+    width: 120,
+    height: 120,
+    borderRadius: 100,
+    borderWidth: 3.16,
+    borderColor: "#F5F5F5",
+    padding: 6 - 3.16,
+  },
+  avatar: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 100,
+  },
+  avatarEmpty: {
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarInner: {
-    borderRadius: 99,
-    borderWidth: 3,
-    borderColor: COLORS.white,
+  pill: {
+    height: 43,
+    borderRadius: 100,
+    paddingHorizontal: 32,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
-    padding: 3,
   },
 });

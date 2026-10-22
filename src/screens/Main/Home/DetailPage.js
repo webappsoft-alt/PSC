@@ -25,7 +25,6 @@ import { useDispatch, useSelector } from "react-redux";
 import fonts from "../../../assets/fonts";
 import { Images } from "../../../assets/images";
 import Blur from "../../../components/Blur";
-import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
 import Icons from "../../../components/Icons";
 import ImageFast from "../../../components/ImageFast";
@@ -811,15 +810,17 @@ const DetailPage = () => {
               onPress={() => navigation.goBack()}
               style={styles.backButton}
             >
-              {/* <Blur /> */}
-              <Image
-                source={Images.back}
-                style={{ height: 24, width: 24, tintColor: colors.text }}
+              <Icons
+                family="MaterialSymbolsRounded"
+                name="chevron_left"
+                size={26}
+                color={colors.text}
               />
             </TouchableOpacity>
+            {/* Figma: 32 ring (2px profile colour) → 24px avatar at 4,4 */}
             <View
               style={{
-                padding: 4,
+                padding: 2,
                 borderColor: profileColor,
                 borderWidth: 2,
                 borderRadius: 99,
@@ -850,44 +851,67 @@ const DetailPage = () => {
             </View>
             <View style={styles.userInfo}>
               <View style={styles.nameRow}>
-                <CustomText label={displayName} />
+                {/* Figma: Medium 14 / −0.5% white */}
+                <CustomText
+                  label={displayName}
+                  fontSize={14}
+                  lineHeight={18}
+                  letterSpacing={-0.07}
+                  fontFamily={fonts.medium}
+                  color={colors.text}
+                />
                 {author?.role == "individual" && (
-                  <Image source={Images.verified} style={styles.verifiedIcon} />
+                  <Icons
+                    family="MaterialSymbolsRoundedFilled"
+                    name="verified"
+                    size={16}
+                    color="#007BFF"
+                    style={{ marginLeft: 4 }}
+                  />
                 )}
                 {author?.role == "company" && (
                   <Image source={Images.grayStar} style={styles.verifiedIcon} />
                 )}
               </View>
-              <CustomText label={`${username}`} color={colors.textSecondary} />
+              <CustomText
+                label={`${username}`}
+                fontSize={14}
+                lineHeight={18}
+                letterSpacing={-0.07}
+                color={COLORS.gray48}
+              />
             </View>
           </View>
 
           {/* Right Section */}
           <View
-            style={[
-              styles.row,
-              {
-                width: !isOwner && "28%",
-                justifyContent: "flex-end",
-              },
-            ]}
+            style={[styles.row, { gap: 8, justifyContent: "flex-end" }]}
           >
+            {/* Figma: Follow 64 hug × 32, pad H10, r8, white 4%; Medium 14 */}
             {!isOwner && (
-              <CustomButton
-                title={isFollowingUser ? "Following" : "Follow"}
-                width={isFollowingUser ? "80%" : "64%"}
+              <TouchableOpacity
+                activeOpacity={0.7}
                 onPress={handleFollowPress}
-                height={32}
-                borderRadius={8}
-                fontSize={14}
-                backgroundColor={colors.surfaceAlt}
-                color={colors.text}
-              />
+                style={[styles.followBtn, { backgroundColor: colors.surfaceAlt }]}
+              >
+                <CustomText
+                  label={isFollowingUser ? "Following" : "Follow"}
+                  fontSize={14}
+                  lineHeight={18}
+                  fontFamily={fonts.medium}
+                  color={colors.text}
+                />
+              </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={() => setShowModal(true)}>
-              <Image
-                source={Images.moreIcon}
-                style={[styles.moreIcon, { tintColor: colors.text }]}
+            <TouchableOpacity
+              onPress={() => setShowModal(true)}
+              style={[styles.moreBtn, { backgroundColor: colors.surfaceAlt }]}
+            >
+              <Icons
+                family="MaterialSymbolsRounded"
+                name="more_vert"
+                size={20}
+                color={colors.text}
               />
             </TouchableOpacity>
           </View>
@@ -1001,18 +1025,16 @@ const DetailPage = () => {
 
               {/* Input Container */}
               <View style={styles.inputRow}>
-                <Image
-                  source={Images.CommentEmojie}
-                  style={{ height: 44, width: 44, marginRight: 6 }}
-                />
+                {/* Figma: pill fill × 48, pad L16, gap 8, r100, white 4%,
+                    1px inside stroke #121212 4%, background blur */}
                 <View style={[styles.inputWrapper, { overflow: "hidden" }]}>
                   {isDark && <Blur blurAmount={3} blurType="dark" />}
                   <TextInput
                     ref={inputRef}
                     value={commentText}
                     style={styles.input}
-                    placeholder="Type message"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholder="Hello"
+                    placeholderTextColor={COLORS.gray48}
                     onChangeText={setCommentText}
                     multiline
                     maxLength={500}
@@ -1039,29 +1061,40 @@ const DetailPage = () => {
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <TouchableOpacity
-                      onPress={handleImagePick}
-                      disabled={isUploadingImage}
-                    >
-                      {isUploadingImage ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={colors.text}
-                          style={{ marginHorizontal: 8 }}
-                        />
-                      ) : (
-                        <Image
-                          resizeMode="contain"
-                          source={Images.commentCam}
-                          style={{
-                            height: 22,
-                            width: 22,
-                            marginHorizontal: 8,
-                            tintColor: colors.textSecondary,
-                          }}
-                        />
-                      )}
-                    </TouchableOpacity>
+                    isUploadingImage ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.text}
+                        style={{ marginHorizontal: 8 }}
+                      />
+                    ) : (
+                      <View style={styles.inputIcons}>
+                        {/* GIF: picks a GIF/image from the library (same
+                            upload as the camera button) */}
+                        <TouchableOpacity
+                          onPress={handleImagePick}
+                          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                        >
+                          <Icons
+                            family="MaterialSymbolsRounded"
+                            name="gif_box"
+                            size={24}
+                            color={COLORS.gray48}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleImagePick}
+                          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                        >
+                          <Icons
+                            family="MaterialSymbolsRounded"
+                            name="photo_camera"
+                            size={24}
+                            color={COLORS.gray48}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    )
                   )}
                 </View>
 
@@ -1077,15 +1110,15 @@ const DetailPage = () => {
                     (!commentText?.trim() && !selectedImageUrl) || isSubmitting
                   }
                 >
-                  <Blur blurAmount={12} blurType={isDark ? "dark" : "light"} />
+                  {/* Figma: 44 circle #A19375, #121212 arrow */}
                   {isSubmitting ? (
-                    <ActivityIndicator size="small" color={COLORS.white} />
+                    <ActivityIndicator size="small" color="#121212" />
                   ) : (
                     <Icons
-                      name={"arrow-right"}
-                      family={"Feather"}
-                      size={18}
-                      color={COLORS.white}
+                      name="arrow_forward"
+                      family="MaterialSymbolsRounded"
+                      size={24}
+                      color="#121212"
                     />
                   )}
                 </TouchableOpacity>
@@ -1163,13 +1196,14 @@ const DetailPage = () => {
 
         {/* Comments header */}
         <View style={styles.commentsHeader}>
+          {/* Figma: Medium 18 / 0% white */}
           <CustomText
-            fontFamily={fonts.semiBold}
+            fontFamily={fonts.medium}
             label={`${comments.length || 0} Comment${
               comments.length !== 1 ? "s" : ""
             }`}
-            fontSize={20}
-            lineHeight={20 * 1.4}
+            fontSize={18}
+            lineHeight={24}
             color={colors.text}
           />
           {loading && <ActivityIndicator size="small" color={colors.text} />}
@@ -1282,8 +1316,8 @@ const createStyles = (colors, isDark) =>
       alignItems: "center",
       justifyContent: "space-between",
       paddingHorizontal: 12,
-      paddingTop: 8,
-      paddingBottom: 4,
+      paddingTop: 16,
+      paddingBottom: 0,
     },
     commentsContainer: {
       flex: 1,
@@ -1324,38 +1358,43 @@ const createStyles = (colors, isDark) =>
     inputRow: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
+      gap: 8,
     },
     inputWrapper: {
       flexDirection: "row",
       alignItems: "center",
       flex: 1,
-      minHeight: 48,
-      maxHeight: 48,
-      borderRadius: 99,
+      height: 48,
+      borderRadius: 100,
       backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: "rgba(18, 18, 18, 0.04)",
       paddingLeft: 16,
-      paddingRight: 12,
-      paddingVertical: 8,
-      marginRight: 8,
+      paddingRight: 16,
+      gap: 8,
     },
+    inputIcons: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    // Figma: Regular 16 / 20 / −1%
     input: {
       flex: 1,
       fontSize: 16,
-      paddingHorizontal: 8,
+      lineHeight: 20,
+      letterSpacing: -0.16,
       color: colors.text,
       fontFamily: fonts.regular,
       padding: 0,
-      paddingTop: 8,
-      paddingBottom: 8,
     },
     sendBtn: {
       width: 44,
       height: 44,
       justifyContent: "center",
       alignItems: "center",
-      borderRadius: 99,
-      backgroundColor: COLORS.buttonColor,
+      borderRadius: 100,
+      backgroundColor: "#A19375",
       overflow: "hidden",
     },
     sendBtnDisabled: {
@@ -1379,8 +1418,10 @@ const createStyles = (colors, isDark) =>
       right: -6,
     },
 
+    // Figma: 12 below the input row
     emojiStripContent: {
       paddingHorizontal: 4,
+      paddingTop: 12,
     },
     emojiItem: {
       paddingHorizontal: 6,
@@ -1395,7 +1436,8 @@ const createStyles = (colors, isDark) =>
       width: "100%",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingBottom: 4,
+      // Figma header: pad L12 R12 B8
+      paddingBottom: 8,
       paddingHorizontal: 12,
     },
     row: {
@@ -1403,8 +1445,8 @@ const createStyles = (colors, isDark) =>
       alignItems: "center",
     },
     avatar: {
-      height: 32,
-      width: 32,
+      height: 24,
+      width: 24,
       borderRadius: 99,
       backgroundColor: colors.surfaceAlt,
     },
@@ -1420,10 +1462,19 @@ const createStyles = (colors, isDark) =>
       width: 14,
       marginLeft: 4,
     },
-    moreIcon: {
+    followBtn: {
+      height: 32,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    moreBtn: {
       height: 32,
       width: 32,
-      marginLeft: 8,
+      borderRadius: 100,
+      alignItems: "center",
+      justifyContent: "center",
     },
     backButton: {
       borderRadius: 99,

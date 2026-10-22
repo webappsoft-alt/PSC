@@ -27,7 +27,34 @@ export function buildSubtitleLines(words) {
     startMs: line[0].startMs,
     endMs: line[line.length - 1].endMs,
     text: line.map((w) => w.word).join(" "),
+    words: line,
   }));
+}
+
+/**
+ * Line on screen at `positionMs` plus the index of the word being spoken
+ * (Figma: the current word is highlighted in yellow inside the pill).
+ * Returns { text, words, activeIndex } or null.
+ */
+export function activeSubtitleLine(lines, positionMs) {
+  if (!lines?.length || !Number.isFinite(positionMs)) return null;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const next = lines[i + 1];
+    const end = Math.min(
+      line.endMs + HOLD_MS,
+      next ? next.startMs - LEAD_MS : Infinity,
+    );
+    if (positionMs >= line.startMs - LEAD_MS && positionMs <= end) {
+      const words = line.words || [];
+      let activeIndex = -1;
+      for (let j = 0; j < words.length; j += 1) {
+        if (positionMs >= words[j].startMs) activeIndex = j;
+      }
+      return { text: line.text, words, activeIndex };
+    }
+  }
+  return null;
 }
 
 export function activeSubtitleText(lines, positionMs) {

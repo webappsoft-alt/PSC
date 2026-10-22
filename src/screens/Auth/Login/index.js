@@ -1,241 +1,187 @@
 import { useState } from "react";
-import {
-  StatusBar,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import { useSelector } from "react-redux";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "@react-navigation/native";
+import { useDispatch } from "react-redux";
 
-import AuthFooter from "../../../components/Auth/AuthFooter";
-import CustomInput from "../../../components/CustomInput";
-import CustomPhoneInput from "../../../components/CustomPhoneInput";
+import ScreenWrapper from "../../../components/ScreenWrapper";
 import CustomText from "../../../components/CustomText";
-import ErrorComponent from "../../../components/ErrorComponent";
-import Header from "../../../components/Header";
 import Icons from "../../../components/Icons";
-import { SlidingSegmentPager } from "../../../components/Auth/SlidingSegmentControl";
+import {
+  AuthError,
+  AuthHint,
+  AuthStepFooter,
+  AuthStepTitle,
+  AuthTextField,
+  HINT_ROW_EXTRA,
+  ls,
+  useAuthPalette,
+} from "../../../components/Auth/AuthKit";
 
 import fonts from "../../../assets/fonts";
-import { COLORS } from "../../../utils/COLORS";
-import { isValidEmail, isValidPhone } from "../../../utils/constants";
-import { useTheme } from "../../../contexts/ThemeContext";
+import { post } from "../../../services/ApiRequest";
+import { applySession } from "../../../utils/accountSession";
 
+const MAX_LENGTH = 37;
+
+/**
+ * "Login to PSC" (Figma: NEW on-boarding / Simplified login).
+ * One "Phone, email, or username" field + password.
+ */
 const Login = () => {
   const navigation = useNavigation();
-  const route = useRoute();
-  const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
+  const dispatch = useDispatch();
+  const p = useAuthPalette();
 
-  const savedAccounts = useSelector((state) => state?.users?.savedAccounts);
-  const hasSavedAccounts =
-    Array.isArray(savedAccounts) && savedAccounts.length > 0;
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const paramEmail = route?.params?.email;
-  const paramPhone = route?.params?.phone;
+  const canSubmit = identifier.trim().length > 0 && password.length > 0;
 
-  const [email, setEmail] = useState(paramEmail || "");
-  const [phoneNumber, setPhoneNumber] = useState(paramPhone || "");
-  const [contactMethod, setContactMethod] = useState(
-    paramEmail ? "email" : paramPhone ? "phone" : route?.params?.tab || "phone",
-  );
+  const onContinue = async () => {
+    if (!canSubmit || loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      const fcmToken = await AsyncStorage.getItem("fcmToken");
+      const res = await post("auth/login", {
+        identifier: identifier.trim(),
+        password,
+        fcmToken: fcmToken || "",
+      });
+      const data = res?.data;
 
-  const canContinue = () => {
-    if (contactMethod === "email") return isValidEmail(email);
-    return isValidPhone(phoneNumber);
-  };
+      if (data?.requiresMfa) {
+        if (data?.otp?.code) {
+          alert(`2FA Verification Code: ${data.otp.code}`);
+        }
+        if (data?.token) await AsyncStorage.setItem("token", data.token);
+        navigation.navigate("TwoFactorVerify", {
+          token: data?.token,
+          email: data?.user?.email,
+        });
+        return;
+      }
 
-  const handleContinue = () => {
-    if (contactMethod === "email") {
-      navigation.navigate("LoginPassword", { email: email.trim() });
-    } else {
-      navigation.navigate("LoginPassword", { phone: phoneNumber });
+      if (!data?.tokens?.accessToken) {
+        setError(data?.message || "Invalid credentials");
+        return;
+      }
+
+      await applySession(dispatch, data?.user, data?.tokens);
+      navigation.reset({ index: 0, routes: [{ name: "WelcomeScreen" }] });
+    } catch (err) {
+      // ApiRequest throws { status, data, message }.
+      setError(err?.message || "Invalid credentials");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const headerTitle =
-    contactMethod === "email" ? "Enter Your Email" : "Enter Your Phone Number";
+  const onBack = () => {
+    if (navigation.canGoBack()) navigation.goBack();
+  };
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: colors.background, paddingTop: insets.top },
-      ]}
+    <ScreenWrapper
+      scrollEnabled
+      headerUnScrollable={() => (
+        <View style={styles.top}>
+          <View style={[styles.topCircle, { backgroundColor: p.t08 }]} />
+        </View>
+      )}
+      footerUnScrollable={() => (
+        <AuthStepFooter
+          onPress={onContinue}
+          onBackPress={onBack}
+          loading={loading}
+          disabled={!canSubmit}
+        />
+      )}
     >
-      <StatusBar
-        barStyle={colors.statusBarStyle}
-        backgroundColor="transparent"
-        translucent
+      <AuthStepTitle label="Login to PSC" marginTop={32} marginBottom={32} />
+
+      <AuthTextField
+        placeholder="Enter your phone, email, or username"
+        label="PHONE, EMAIL, OR USERNAME"
+        value={identifier}
+        onChangeText={(t) => {
+          setIdentifier(t);
+          if (error) setError("");
+        }}
+        maxLength={MAX_LENGTH}
+        autoCapitalize="none"
+        textContentType="username"
+        autoComplete="username"
+        returnKeyType="next"
+        error={!!error}
+      />
+      <AuthHint
+        text={`Maximum characters ${identifier.length}/${MAX_LENGTH}`}
+        marginTop={6 - HINT_ROW_EXTRA}
       />
 
-      <Header title={headerTitle} textTransform="none" />
-
-      <View style={styles.content}>
-        <SlidingSegmentPager
-          items={[
-            { key: "phone", label: "Phone Number" },
-            { key: "email", label: "Email" },
-          ]}
-          selectedKey={contactMethod}
-          onChange={setContactMethod}
-          trackColor={colors.surfaceAlt}
-          pillColor={colors.text}
-          activeLabelColor={colors.background}
-          inactiveLabelColor={isDark ? COLORS.gray64 : colors.textSecondary}
-          style={styles.toggle}
-          renderPage={(key) => (
-            <View>
-              <CustomText
-                label={
-                  key === "email"
-                    ? "What is your email?"
-                    : "What is your phone number?"
-                }
-                fontFamily={fonts.semiBold}
-                fontSize={24}
-                lineHeight={24 * 1.4}
-                letterSpacing={-0.24}
-                marginBottom={8}
-                color={isDark ? COLORS.white : colors.text}
-              />
-
-              {key === "email" ? (
-                <CustomInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="E.g. abc@email.com"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  marginBottom={8}
-                />
-              ) : (
-                <View>
-                  <CustomPhoneInput
-                    value={phoneNumber}
-                    setValue={setPhoneNumber}
-                    withLabel="PHONE NUMBER"
-                    marginBottom={8}
-                  />
-                  <View
-                    pointerEvents="none"
-                    style={styles.phoneRightIcon}
-                  >
-                    <Icons
-                      family="MaterialSymbolsRoundedFilled"
-                      name="call"
-                      size={18}
-                      color={COLORS.buttonColor}
-                    />
-                  </View>
-                </View>
-              )}
-
-              <ErrorComponent
-                errorTitle={`Please enter a valid ${
-                  key === "email" ? "email address" : "phone number"
-                }`}
-                color={isDark ? COLORS.gray2 : colors.textSecondary}
-                marginBottom={4}
-                font={fonts.regular}
-              />
-              <ErrorComponent
-                errorTitle={`We will later use this ${
-                  key === "email" ? "email" : "phone number"
-                } to verify your account.`}
-                color={isDark ? COLORS.gray2 : colors.textSecondary}
-                font={fonts.regular}
-              />
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate("LoginQRCode")}
-                style={styles.qrRow}
-              >
-                <Icons
-                  family="MaterialSymbolsRounded"
-                  name="qr_code_scanner"
-                  size={22}
-                  color={isDark ? COLORS.white : colors.text}
-                />
-                <CustomText
-                  label="Use QR-Code"
-                  fontFamily={fonts.medium}
-                  fontSize={16}
-                  lineHeight={16 * 1.4}
-                  marginLeft={10}
-                  color={isDark ? COLORS.white : colors.text}
-                />
-              </TouchableOpacity>
-
-              {hasSavedAccounts && (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => navigation.navigate("PreviousAccounts")}
-                  style={styles.previousAccounts}
-                >
-                  <CustomText
-                    label="Sign in with previous account"
-                    color={COLORS.buttonColor}
-                    fontFamily={fonts.medium}
-                    fontSize={14}
-                    lineHeight={14 * 1.4}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+      <View style={{ marginTop: 12 - HINT_ROW_EXTRA }}>
+        <AuthTextField
+        placeholder="********"
+          label="PASSWORD"
+          value={password}
+          onChangeText={(t) => {
+            setPassword(t);
+            if (error) setError("");
+          }}
+          secure
+          textContentType="password"
+          autoComplete="password"
+          returnKeyType="done"
+          onSubmitEditing={onContinue}
+          error={!!error}
         />
       </View>
+      <AuthError text={error} marginTop={6 - HINT_ROW_EXTRA} />
 
-      <AuthFooter
-        paddingHorizontal={12}
-        onPress={handleContinue}
-        btnBackgroundColor={isDark ? COLORS.white : colors.text}
-        btnColor={isDark ? COLORS.primaryColor : colors.background}
-        btnDisabled={!canContinue()}
-      />
-    </View>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate("ForgotPass")}
+        style={[styles.forgotRow, { marginTop: 12 - HINT_ROW_EXTRA }]}
+      >
+        <CustomText
+          label="Forgot my password"
+          fontSize={12}
+          letterSpacing={ls(-3, 12)}
+          color={p.gold}
+          fontFamily={fonts.regular}
+        />
+        <Icons
+          family="MaterialSymbolsRounded"
+          name="arrow_outward"
+          size={12}
+          color={p.gold}
+        />
+      </TouchableOpacity>
+    </ScreenWrapper>
   );
 };
 
 export default Login;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 12,
-  },
-  toggle: {
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  phoneRightIcon: {
-    position: "absolute",
-    right: 12,
-    top: 12,
-    height: 32,
-    width: 32,
-    borderRadius: 100,
-    backgroundColor: "rgba(161, 147, 117, 0.16)",
+  top: {
     alignItems: "center",
-    justifyContent: "center",
+    paddingTop: 4,
+    paddingBottom: 12,
   },
-  previousAccounts: {
-    alignSelf: "center",
-    marginTop: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+  topCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 100,
   },
-  qrRow: {
+  forgotRow: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "center",
-    marginTop: 24,
+    alignSelf: "flex-start",
+    gap: 4,
   },
 });

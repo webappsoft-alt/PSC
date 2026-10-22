@@ -4,6 +4,9 @@ export const Images = {
   Matching: require("./Matching.png"),
   onBo: require("./onBo.png"),
   onBoardingSign: require("./onBoardingSign.png"),
+  // Registration slides (Figma NEW on-boarding: Move-People / Sightseeing)
+  onBoardPeople: require("./onBoardPeople.jpg"),
+  onBoard6: require("./onBoard6.png"),
 
   buttonBg: require("./buttonBg.png"),
   EmailIcon: require("./EmailIcon.png"),

@@ -14,6 +14,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 
 import CustomInput from "./CustomInput";
+import Icons from "./Icons";
 import CustomModal from "./CustomModal";
 import CustomText from "./CustomText";
 
@@ -933,10 +934,11 @@ const CustomModalGooglePlaces = ({
     <CustomModal isChange isVisible={isVisible} onDisable={closeModal}>
       <View style={styles.modalContainer}>
         <View style={[styles.modalHeader, { marginTop: insests.top - 10 }]}>
+          {/* Client: search bar and close button are both 40px */}
           <CustomInput
             search
             width="86%"
-            height={44}
+            height={40}
             borderRadius={100}
             marginBottom={0.1}
             isClear={() => setSearchQuery("")}
@@ -947,14 +949,25 @@ const CustomModalGooglePlaces = ({
             backgroundColor={isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(18, 18, 18, 0.04)"}
           />
           <TouchableOpacity
-            style={[styles.crossContainer,{}]}
+            style={[
+              styles.crossContainer,
+              {
+                height: 40,
+                width: 40,
+                borderRadius: 100,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.surfaceAlt,
+              },
+            ]}
             onPress={closeModal}
             activeOpacity={0.7}
           >
-            <Image
-              onPress={closeModal}
-              source={Images.crossBg}
-              style={{ height: 40, width: 40,tintColor: colors.text }}
+            <Icons
+              family="MaterialSymbolsRounded"
+              name="close"
+              size={20}
+              color={colors.text}
             />
           </TouchableOpacity>
         </View>

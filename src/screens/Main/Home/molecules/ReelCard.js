@@ -1,7 +1,6 @@
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
-  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -11,12 +10,11 @@ import { createThumbnail } from "react-native-create-thumbnail";
 import Video from "react-native-video";
 import ImageFast from "../../../../components/ImageFast";
 import fonts from "../../../../assets/fonts";
-import { Images } from "../../../../assets/images";
+import Icons from "../../../../components/Icons";
 import CustomText from "../../../../components/CustomText";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { get } from "../../../../services/ApiRequest";
 import { COLORS } from "../../../../utils/COLORS";
-import Divider from "../../../../components/Divider";
 
 const ReelCard = ({ onSetPage, isScreenActive = true }) => {
   const navigation = useNavigation();
@@ -104,13 +102,24 @@ const ReelCard = ({ onSetPage, isScreenActive = true }) => {
             }}
             style={styles.row}
           >
+            {/* Figma: "See more" SemiBold 12 white 48% · 16 circle white 4%
+                with a gold chevron (same as Trending Individuals) */}
             <CustomText
               label={"SEE MORE"}
               fontFamily={fonts.semiBold}
               fontSize={12}
-              color={COLORS.gray2}
+              color={COLORS.gray48}
             />
-            <Image source={Images.forwardBg} style={styles.icon} />
+            <View
+              style={[styles.seeMoreIcon, { backgroundColor: colors.surface }]}
+            >
+              <Icons
+                family="MaterialSymbolsRounded"
+                name="chevron_right"
+                size={12}
+                color={COLORS.gray48}
+              />
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -159,7 +168,11 @@ const ReelCard = ({ onSetPage, isScreenActive = true }) => {
         </ScrollView>
       </View>
 
-      <Divider marginBottom={12} marginTop={8} thickness={4} />
+      {/* Section's own 1px feed separator — rendered only when the section
+          is, so an empty section never leaves a doubled line behind */}
+      <View
+        style={{ height: 1, marginTop: 8, backgroundColor: COLORS.authHeader }}
+      />
     </>
   );
 };
@@ -167,6 +180,14 @@ const ReelCard = ({ onSetPage, isScreenActive = true }) => {
 export default React.memo(ReelCard);
 
 const styles = StyleSheet.create({
+  seeMoreIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   reelContainer: {
     height: 220,
     width: 140,

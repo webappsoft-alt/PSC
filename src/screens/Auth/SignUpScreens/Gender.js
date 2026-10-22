@@ -1,91 +1,96 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
-import CustomDropdown from "../../../components/CustomDropdown";
-import CustomText from "../../../components/CustomText";
-import ErrorComponent from "../../../components/ErrorComponent";
+import FloatingSheet from "../../../components/FloatingSheet";
+import Icons from "../../../components/Icons";
+import {
+  AuthHint,
+  AuthStepTitle,
+  AuthTextField,
+  OptionRow,
+  useAuthPalette,
+} from "../../../components/Auth/AuthKit";
 
-import fonts from "../../../assets/fonts";
-import { COLORS } from "../../../utils/COLORS";
-import { useTheme } from "../../../contexts/ThemeContext";
+const GENDERS = [
+  { key: "male", label: "Male" },
+  { key: "female", label: "Female" },
+  { key: "other", label: "Other" },
+];
 
-const GENDERS = ["Male", "Female", "Other"];
+/** "What is your gender?" — 48 field with chevron, picker in the app's bottom sheet. */
+const Gender = forwardRef(({ state, next, setBtnDisabled }, ref) => {
+  const p = useAuthPalette();
+  const [gender, setGender] = useState(state?.gender || "");
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
 
-const Gender = forwardRef(
-  ({ currentIndex, setCurrentIndex, state, setState, setBtnDisabled }, ref) => {
-    const { colors, isDark } = useTheme();
-    const [gender, setGender] = useState(
-      state?.gender
-        ? state.gender.charAt(0).toUpperCase() + state.gender.slice(1)
-        : "",
-    );
-    const [error, setError] = useState("");
+  useEffect(() => {
+    setBtnDisabled?.(!gender);
+  }, [gender]);
 
-    useEffect(() => {
-      setBtnDisabled?.(!gender);
-    }, [gender]);
-
-    const submit = () => {
+  useImperativeHandle(ref, () => ({
+    submit: () => {
       if (!gender) {
         setError("Please select an option.");
         return;
       }
-      setError("");
-      setState({ ...state, gender: gender.toLowerCase() });
-      setCurrentIndex(9);
-    };
+      next({ gender });
+    },
+  }));
 
-    const back = () => {
-      setCurrentIndex(7);
-    };
+  const label = GENDERS.find((g) => g.key === gender)?.label || "";
 
-    useImperativeHandle(ref, () => ({ submit, back }));
-
-    return (
-      <View style={styles.container}>
-        <View>
-          <CustomText
-            label="What is your gender?"
-            fontFamily={fonts.semiBold}
-            fontSize={24}
-            lineHeight={24 * 1.4}
-            letterSpacing={-0.24}
-            marginTop={12}
-            marginBottom={6}
-            color={isDark ? COLORS.white : colors.text}
+  return (
+    <View>
+      <AuthStepTitle label="What is your gender?" />
+      <AuthTextField
+        onPress={() => setOpen(true)}
+        value={label}
+        placeholder="E.g. Male"
+        error={error}
+        right={
+          <Icons
+            family="MaterialSymbolsRounded"
+            name="chevron_right"
+            size={24}
+            color={p.t64}
           />
+        }
+      />
+      <AuthHint
+        text={error || "Please select an option."}
+        color={error ? p.error : undefined}
+      />
 
-          <CustomDropdown
-            data={GENDERS}
-            value={gender}
-            setValue={(val) => {
-              setGender(val);
-              if (error) setError("");
-            }}
-            placeholder="E.g. Male"
-            modalTitle="Select Gender"
-            error={error}
-            marginBottom={4}
-          />
-
-          {!error && (
-            <ErrorComponent
-              errorTitle="Please select an option."
-              color={isDark ? COLORS.gray2 : colors.textSecondary}
-              font={fonts.regular}
+      <FloatingSheet
+        visible={open}
+        onDismiss={() => setOpen(false)}
+        title="Gender"
+        subtitle="Please select an option."
+      >
+        <View style={styles.options}>
+          {GENDERS.map((g) => (
+            <OptionRow
+              key={g.key}
+              title={g.label}
+              selected={gender === g.key}
+              onPress={() => {
+                setGender(g.key);
+                setError("");
+                setOpen(false);
+              }}
             />
-          )}
+          ))}
         </View>
-      </View>
-    );
-  },
-);
+      </FloatingSheet>
+    </View>
+  );
+});
 
 export default Gender;
 
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: "space-between",
-    flex: 1,
+  options: {
+    gap: 8,
   },
 });

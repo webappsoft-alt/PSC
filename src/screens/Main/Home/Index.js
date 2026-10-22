@@ -79,6 +79,7 @@ const FeedPostItem = memo(
     onEditPress,
     onHidePost,
     onHideUserPosts,
+    topicPostsCount,
   }) => {
     const author = post?.author || {};
     const displayName =
@@ -168,6 +169,7 @@ const FeedPostItem = memo(
           item={post}
           onSwipeRight={handleOpenComments}
           shouldPlay={shouldPlay}
+          topicPostsCount={topicPostsCount}
         />
         <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
       </>
@@ -641,8 +643,16 @@ const Home = ({
 
     const result = [];
     let postsAdded = 0;
+    // The same post can come back in both the followed and unfollowed lists;
+    // keys must be unique, so skip repeats.
+    const seen = new Set();
 
     const addPost = (post) => {
+      const id = post?._id;
+      if (id) {
+        if (seen.has(id)) return;
+        seen.add(id);
+      }
       result.push({
         type: "post",
         data: post,
@@ -684,6 +694,15 @@ const Home = ({
     [navigation],
   );
 
+  // topic → number of posts, for "find 2.8k other posts about it."
+  const topicCounts = useMemo(() => {
+    const map = {};
+    (trendingTopics || []).forEach((t) => {
+      if (t?.topic) map[t.topic] = t.count || 0;
+    });
+    return map;
+  }, [trendingTopics]);
+
   const renderItem = useCallback(
     ({ item, index }) => {
       if (item.type === "reelCard") {
@@ -691,7 +710,6 @@ const Home = ({
           <>
             {/* <Divider marginBottom={12} marginTop={8} thickness={4} /> */}
             <ReelCard onSetPage={onSetPage} isScreenActive={activeFocus} />
-            <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
           </>
         );
       }
@@ -700,7 +718,6 @@ const Home = ({
           <>
             {/* <Divider marginBottom={12} marginTop={8} thickness={4} /> */}
             <TrendingIndividual />
-            <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
           </>
         );
       }
@@ -749,12 +766,14 @@ const Home = ({
           onEditPress={handleEditPost}
           onHidePost={handleHidePost}
           onHideUserPosts={handleHideUserPosts}
+          topicPostsCount={topicCounts[post?.topic]}
         />
       );
     },
     [
       activeFocus,
       formatCount,
+      topicCounts,
       handleDeletePost,
       handleEditPost,
       handleHidePost,
@@ -805,8 +824,8 @@ const Home = ({
   }, [refreshing, error, skeletonLoading]);
 
   const keyExtractor = useCallback((item, index) => {
-    if (item.type === "post") return item.data._id;
-    return item.type;
+    if (item.type === "post") return `post-${item.data?._id || index}`;
+    return `${item.type}-${index}`;
   }, []);
 
   const onScroll = useMemo(

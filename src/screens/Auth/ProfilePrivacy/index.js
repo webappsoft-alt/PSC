@@ -1,163 +1,184 @@
-import { useNavigation } from "@react-navigation/native";
 import { useState } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
-import fonts from "../../../assets/fonts";
-import { Images } from "../../../assets/images";
-import CustomButton from "../../../components/CustomButton";
-import CustomText from "../../../components/CustomText";
-import ScreenWrapper from "../../../components/ScreenWrapper";
-import { put } from "../../../services/ApiRequest";
-import { COLORS } from "../../../utils/COLORS";
-import { useTheme } from "../../../contexts/ThemeContext";
+import { Platform, StyleSheet, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
-const PRIVACY_OPTIONS = [
+import CustomModal from "../../../components/CustomModal";
+import CustomText from "../../../components/CustomText";
+import Icons from "../../../components/Icons";
+import PromptLayout from "../../../components/Auth/PromptLayout";
+import {
+  ModalButton,
+  ModalCard,
+  OptionRow,
+  RingButton,
+  SoftButton,
+  belowBase,
+  capTop,
+  ls,
+  textGap,
+  useAuthPalette,
+} from "../../../components/Auth/AuthKit";
+import fonts from "../../../assets/fonts";
+import { put } from "../../../services/ApiRequest";
+import {
+  getCurrentLocation,
+  requestLocationPermission,
+} from "../../../utils/LocationUtils";
+
+const OPTIONS = [
   { key: "public", title: "Public", subtitle: "Everyone" },
   {
     key: "private",
     title: "Private",
     subtitle: "Privately explore and enjoy the app.",
   },
-  // { key: "premium", title: "Premium", subtitle: "First Monday of the month" },
-  // { key: "premiumPlus", title: "Premium Plus", subtitle: "First Monday of the month" },
 ];
 
-const ProfilePrivacy = () => {
-  const { colors, isDark } = useTheme();
-  const navigation = useNavigation();
-  const [selected, setSelected] = useState("public");
+/** Figma "Enable-Location" card. */
+const EnableLocationModal = ({ visible, onDone }) => {
+  const p = useAuthPalette();
   const [loading, setLoading] = useState(false);
 
-  const handleContinue = async () => {
+  const allow = async () => {
     setLoading(true);
-    const res = await put("user/profile", {
-      profilePrivacy: selected,
-    });
-    if (res?.data) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "MainStack" }],
-      });
-    }
+    try {
+      const granted = await requestLocationPermission();
+      // iOS shows its prompt on the first location request.
+      if (granted && Platform.OS === "ios") {
+        await getCurrentLocation().catch(() => null);
+      }
+    } catch (e) {}
     setLoading(false);
-  };
-
-  const renderOption = (opt) => {
-    const isSelected = selected === opt.key;
-    return (
-      <TouchableOpacity
-        key={opt.key}
-        activeOpacity={0.8}
-        onPress={() => setSelected(opt.key)}
-        style={[
-          styles.optionCard,
-          {
-            backgroundColor: isDark ? "#1B1B1B" : colors.surfaceAlt,
-            borderColor: isDark ? "#2A2A2A" : colors.border,
-            borderWidth: 1,
-          },
-        ]}
-      >
-        <View style={{ flex: 1 }}>
-          <CustomText
-            label={opt.title}
-            color={isDark ? COLORS.white : colors.text}
-            fontFamily={fonts.medium}
-            fontSize={16}
-            lineHeight={16 * 1.4}
-          />
-          <CustomText
-            label={opt.subtitle}
-            color={isDark ? COLORS.gray2 : colors.textSecondary}
-            fontSize={12}
-            lineHeight={12 * 1.4}
-          />
-        </View>
-        <View
-          style={[styles.radioOuter, isSelected && styles.radioOuterActive]}
-        >
-          <View
-            style={[styles.radioInner, isSelected && styles.radioInnerActive]}
-          />
-        </View>
-      </TouchableOpacity>
-    );
+    onDone();
   };
 
   return (
-    <ScreenWrapper
-      paddingHorizontal={24}
-      backgroundImage={isDark ? Images.authBg : undefined}
-      imageBottom={0}
-      footerUnScrollable={() => (
-        <View style={{ padding: 14, marginBottom: 20 }}>
-          <CustomButton
-            title="Continue"
-            isBoarder
-            secondBorderColor={isDark ? COLORS.gray2 : colors.border}
-            marginBottom={12}
-            onPress={handleContinue}
-            loading={loading}
+    <CustomModal isVisible={visible} onDisable={onDone}>
+      <ModalCard>
+        <View style={styles.center}>
+          <Icons
+            family="MaterialSymbolsRoundedFilled"
+            name="location_on"
+            size={80}
+            color={p.gold}
           />
-          {/* <CustomButton
+          <CustomText
+            label="Enable Location"
+            fontSize={20}
+            fontFamily={fonts.medium}
+            letterSpacing={ls(-2, 20)}
+            textAlign="center"
+            color={p.text}
+            marginTop={16 - capTop(20)}
+          />
+          <CustomText
+            label="To be able to use services, we require permission to access your location"
+            fontSize={14}
+            letterSpacing={ls(-2, 14)}
+            textAlign="center"
+            color={p.t64}
+            marginTop={textGap(12, 20, 14)}
+          />
+        </View>
+        <View style={[styles.modalActions, { marginTop: 24 - belowBase(14) }]}>
+          <ModalButton title="Continue" loading={loading} onPress={allow} />
+          <ModalButton title="Maybe Later" variant="soft" onPress={onDone} />
+        </View>
+      </ModalCard>
+    </CustomModal>
+  );
+};
+
+/** Figma "Allow-personalized-ads" (2317:3228): Profile Privacy. */
+const ProfilePrivacy = () => {
+  const navigation = useNavigation();
+  const p = useAuthPalette();
+  const [selected, setSelected] = useState("");
+  const [loading, setLoading] = useState(null);
+  const [locationOpen, setLocationOpen] = useState(false);
+
+  const save = async (privacy, key) => {
+    setLoading(key);
+    if (privacy) {
+      try {
+        await put("user/profile", { profilePrivacy: privacy });
+      } catch (e) {}
+    }
+    setLoading(null);
+    setLocationOpen(true);
+  };
+
+  const toWelcome = () => {
+    setLocationOpen(false);
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "WelcomeScreen", params: { fresh: true } }],
+    });
+  };
+
+  return (
+    <PromptLayout
+      variant="ads"
+      actions={
+        <>
+          <RingButton
+            title="Continue"
+            loading={loading === "yes"}
+            disabled={!!loading}
+            onPress={() => save(selected, "yes")}
+          />
+          <SoftButton
             title="Maybe Later"
-            backgroundColor="#FFFFFF29"
-            color={COLORS.white}
-          /> */}
-        </View>
-      )}
+            loading={loading === "no"}
+            disabled={!!loading}
+            onPress={() => save("", "no")}
+          />
+        </>
+      }
     >
-      <View style={{ justifyContent: "center", flex: 1 }}>
-        <CustomText
-          label="Profile Privacy"
-          color={isDark ? COLORS.white : colors.text}
-          fontFamily={fonts.semiBold}
-          fontSize={18}
-          lineHeight={18 * 1.4}
-        />
-        <CustomText
-          label="Choose who can see your profile."
-          color={isDark ? COLORS.gray2 : colors.textSecondary}
-          lineHeight={14 * 1.4}
-        />
-        <View style={{ marginTop: 16 }}>
-          {PRIVACY_OPTIONS.map(renderOption)}
-        </View>
+      <CustomText
+        label="Profile Privacy"
+        fontSize={18}
+        fontFamily={fonts.semiBold}
+        letterSpacing={ls(-2, 18)}
+        color={p.text}
+        marginTop={-capTop(18)}
+      />
+      <CustomText
+        label="Choose who can see your profile."
+        fontSize={14}
+        letterSpacing={ls(-2, 14)}
+        color={p.t64}
+        marginTop={textGap(12, 18, 14)}
+        marginBottom={16 - belowBase(14)}
+      />
+      <View style={styles.options}>
+        {OPTIONS.map((o) => (
+          <OptionRow
+            key={o.key}
+            title={o.title}
+            subtitle={o.subtitle}
+            selected={selected === o.key}
+            onPress={() => setSelected(o.key)}
+          />
+        ))}
       </View>
-    </ScreenWrapper>
+
+      <EnableLocationModal visible={locationOpen} onDone={toWelcome} />
+    </PromptLayout>
   );
 };
 
 export default ProfilePrivacy;
 
 const styles = StyleSheet.create({
-  optionCard: {
-    width: "100%",
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: "row",
+  center: {
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 8,
   },
-  radioOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: "#6D6D6D",
-    alignItems: "center",
-    justifyContent: "center",
+  options: {
+    gap: 8,
   },
-  radioOuterActive: {
-    borderColor: COLORS.buttonColor,
-  },
-  radioInner: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "transparent",
-  },
-  radioInnerActive: {
-    backgroundColor: COLORS.buttonColor,
+  modalActions: {
+    gap: 8,
   },
 });

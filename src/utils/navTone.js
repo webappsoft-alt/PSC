@@ -14,8 +14,8 @@ import { getSegmentsAverageColor } from "@somesoap/react-native-image-palette";
  *   dark icons) is animated, and the tab bar cross-fades its icons with it.
  */
 export const BANDS = 12;
-const LIGHT_ON = 0.62; // luminance above → light backdrop
-const LIGHT_OFF = 0.5; // hysteresis so the icons don't flicker at the edge
+const LIGHT_ON = 0.55; // lightness above → light backdrop (iOS flips around mid-tones)
+const LIGHT_OFF = 0.45; // hysteresis so the icons don't flicker at the edge
 
 export const navToneAnim = new Animated.Value(0);
 
@@ -98,37 +98,56 @@ export function unregisterNavMedia(key) {
 }
 
 /** Re-check what is under the tab bar (cheap; coalesced to one per frame). */
+let evalId = 0;
 export function evaluateNavTone() {
   if (!enabled || !navRect || pending) return;
   pending = true;
   requestAnimationFrame(() => {
     pending = false;
+    const id = ++evalId;
     const probeY = navRect.y + navRect.height / 2;
-    const entries = Array.from(media.values()).filter(
-      (m) => m.ref && m.bands && m.bands.length,
+    const entries = Array.from(media.entries()).filter(
+      ([, m]) => m.ref && m.bands && m.bands.length,
     );
     if (!entries.length) {
       setTone(0);
       return;
     }
-    let done = 0;
-    let found = null;
-    entries.forEach((m) => {
+    // Each measurement decides on its own: a hit applies immediately, and a
+    // miss only clears the tone once every view has answered — a view that
+    // never answers (unmounted / stale after a reload) is dropped instead of
+    // blocking all later evaluations.
+    let left = entries.length;
+    let hit = false;
+    const miss = () => {
+      left -= 1;
+      if (left === 0 && !hit && id === evalId) setTone(0);
+    };
+    entries.forEach(([key, m]) => {
+      let answered = false;
       m.ref.measureInWindow?.((x, y, w, h) => {
-        done += 1;
+        answered = true;
+        if (id !== evalId) return;
         if (h > 0 && probeY >= y && probeY <= y + h) {
           const idx = Math.min(
             m.bands.length - 1,
             Math.max(0, Math.floor(((probeY - y) / h) * m.bands.length)),
           );
-          found = m.bands[idx];
-        }
-        if (done === entries.length) {
-          if (found == null) setTone(0);
-          else if (tone === 1) setTone(found < LIGHT_OFF ? 0 : 1);
-          else setTone(found > LIGHT_ON ? 1 : 0);
+          const l = m.bands[idx];
+          hit = true;
+          if (tone === 1) setTone(l < LIGHT_OFF ? 0 : 1);
+          else setTone(l > LIGHT_ON ? 1 : 0);
+          left -= 1;
+        } else {
+          miss();
         }
       });
+      setTimeout(() => {
+        if (!answered) {
+          media.delete(key);
+          miss();
+        }
+      }, 100);
     });
   });
 }

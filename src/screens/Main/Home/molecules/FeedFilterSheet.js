@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import LottieView from "lottie-react-native";
 import fonts from "../../../../assets/fonts";
 import CustomSwitch from "../../../../components/CustomSwitch";
 import CustomText from "../../../../components/CustomText";
@@ -12,6 +11,7 @@ import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { COLORS } from "../../../../utils/COLORS";
 import { PSC_TOPICS } from "../../../../utils/feedTopics";
+import TopicLottie from "../../../../components/TopicLottie";
 
 /**
  * Figma "Filters-Sorting" (header tune button).
@@ -101,6 +101,7 @@ const FeedFilterSheet = ({
   const { colors } = useTheme();
   const [tab, setTab] = useState("sorting");
   const [draft, setDraft] = useState(filters || DEFAULT_FEED_FILTERS);
+  const lottieReady = true; // asset-URI Lotties load off the main thread
 
   useEffect(() => {
     if (visible) setDraft(filters || DEFAULT_FEED_FILTERS);
@@ -152,12 +153,7 @@ const FeedFilterSheet = ({
               key={t.name}
               style={[styles.topicRow, { borderBottomColor: colors.surfaceAlt }]}
             >
-              <LottieView
-                source={t.animation}
-                autoPlay
-                loop
-                style={{ width: 24, height: 24 }}
-              />
+              <TopicLottie name={t.name} ready={lottieReady} />
               <CustomText
                 label={t.name}
                 fontSize={16}

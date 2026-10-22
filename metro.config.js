@@ -17,7 +17,8 @@ const config = {
     ),
   },
   resolver: {
-    assetExts: assetExts.filter((ext) => ext !== "svg"),
+    // `.anim` = Lottie JSON shipped as an asset (topic icons), like Viral
+    assetExts: [...assetExts.filter((ext) => ext !== "svg"), "anim"],
     sourceExts: [...sourceExts, "svg"],
   },
 };

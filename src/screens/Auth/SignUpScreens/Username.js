@@ -1,347 +1,287 @@
-import { forwardRef, useImperativeHandle, useState, useEffect } from "react";
-import { StyleSheet, View, TouchableOpacity } from "react-native";
-
-import CustomInput from "../../../components/CustomInput";
-import CustomText from "../../../components/CustomText";
-import ErrorComponent from "../../../components/ErrorComponent";
-
-import fonts from "../../../assets/fonts";
-import { COLORS } from "../../../utils/COLORS";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
+import { useDispatch } from "react-redux";
+
+import CustomText from "../../../components/CustomText";
+import {
+  AuthHint,
+  AuthStepTitle,
+  AuthTextField,
+  HINT_ROW_EXTRA,
+  useAuthPalette,
+} from "../../../components/Auth/AuthKit";
+import fonts from "../../../assets/fonts";
 import { post } from "../../../services/ApiRequest";
-import { ToastMessage } from "../../../utils/ToastMessage";
-import Divider from "../../../components/Divider";
-import { useTheme } from "../../../contexts/ThemeContext";
+import { applySession } from "../../../utils/accountSession";
+import { flowOf } from "./flows";
 
-const StepTwo = forwardRef(
-  (
-    {
-      currentIndex,
-      setCurrentIndex,
-      state,
-      setState,
-      setLoadingState,
-      setBtnDisabled,
+const MAX_LENGTH = 37;
+const USERNAME = /^[a-z0-9._]{3,37}$/;
+const MAX_CHIPS = 7;
+
+const clean = (v) =>
+  String(v || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+/** Username ideas from the names entered earlier (Figma shows seven chips). */
+const candidatesOf = (s) => {
+  const company = s?.proType === "company";
+  const first = clean(company ? s?.entityName : s?.firstName);
+  const last = company ? "" : clean(s?.lastName);
+  if (!first && !last) return [];
+  const year = String(s?.dob || s?.foundingDate || "").slice(2, 4);
+  const list = [
+    `${first}${last}`,
+    last ? `${first}.${last}` : `${first}.official`,
+    last ? `${first}_${last}` : `the${first}`,
+    last ? `${first}${last.charAt(0)}` : `${first}hq`,
+    last ? `${first.charAt(0)}${last}` : `${first}app`,
+    year ? `${first}${last}${year}` : `${first}${last}1`,
+    `${first}${last}12`,
+    last ? `${last}${first}` : `${first}group`,
+    `${first}${last}.psc`,
+    `real${first}${last}`,
+  ];
+  return [...new Set(list.filter((u) => USERNAME.test(u)))];
+};
+
+const isAvailable = async (username) => {
+  try {
+    const res = await post("auth/check-username", { username });
+    return !!res?.data?.success;
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * "Pick a username?" — live availability, suggestion chips, and the account is
+ * created here (auth/register) before moving on to the PIN setup.
+ */
+const Username = forwardRef(({ state, setBtnDisabled, setLoading }, ref) => {
+  const p = useAuthPalette();
+  const navigation = useNavigation();
+  const dispatch = useDispatch();
+  const [username, setUsername] = useState(state?.username || "");
+  const [status, setStatus] = useState(null); // checking | available | taken | invalid
+  const [chips, setChips] = useState([]);
+  const [error, setError] = useState("");
+  const mounted = useRef(true);
+
+  useEffect(
+    () => () => {
+      mounted.current = false;
     },
-    ref,
-  ) => {
-    const { colors, isDark } = useTheme();
-    const [firstName, setFirstName] = useState(state?.first_name || "");
-    const [usernameStatus, setUsernameStatus] = useState(null);
-    const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
+    [],
+  );
 
-    const [suggestions, setSuggestions] = useState([]);
-    const [selectedSuggestion, setSelectedSuggestion] = useState(null);
-    const [isManualChange, setIsManualChange] = useState(true);
-
-    const navigation = useNavigation();
-
-    useEffect(() => {
-      setBtnDisabled?.(!firstName.trim() || usernameStatus === "taken");
-    }, [firstName, usernameStatus]);
-
-    // Live availability check (debounced) while the user types.
-    useEffect(() => {
-      const name = firstName.trim();
-      setUsernameStatus(null);
-      if (!name || errorCheck(name)) return;
-
-      const timer = setTimeout(async () => {
-        try {
-          const res = await post("auth/check-username", { username: name });
-          if (res?.data?.success && !res?.error) {
-            setUsernameStatus("available");
-            setError("");
-          } else {
-            setUsernameStatus("taken");
-            setError("Username is taken");
-          }
-        } catch (err) {
-          setUsernameStatus("taken");
-          setError("Username is taken");
-        }
-      }, 500);
-
-      return () => clearTimeout(timer);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [firstName]);
-
-    const randomSuffix = [
-      "official",
-      "real",
-      "x",
-      "hub",
-      "world",
-      "live",
-      "zone",
-      "gram",
-      "daily",
-      "pro",
-      "01",
-      "99",
-      "777",
-    ];
-
-    const generateSuggestions = (name) => {
-      if (!name) {
-        setSuggestions([]);
-        return;
+  // Suggestions: keep the ones that are still free.
+  useEffect(() => {
+    (async () => {
+      const ideas = candidatesOf(state);
+      const free = [];
+      for (const idea of ideas) {
+        if (free.length >= MAX_CHIPS) break;
+        // eslint-disable-next-line no-await-in-loop
+        if (await isAvailable(idea)) free.push(idea);
       }
+      if (!mounted.current) return;
+      setChips(free);
+      if (!username && free[0]) setUsername(free[0]);
+    })();
+  }, []);
 
-      const base = name.toLowerCase().replace(/\s/g, "");
+  // Live check of what is typed.
+  useEffect(() => {
+    const value = username.trim();
+    setError("");
+    if (!value) {
+      setStatus(null);
+      return undefined;
+    }
+    if (!USERNAME.test(value)) {
+      setStatus("invalid");
+      return undefined;
+    }
+    setStatus("checking");
+    const t = setTimeout(async () => {
+      const ok = await isAvailable(value);
+      if (mounted.current) setStatus(ok ? "available" : "taken");
+    }, 450);
+    return () => clearTimeout(t);
+  }, [username]);
 
-      const newSuggestions = new Set();
+  useEffect(() => {
+    setBtnDisabled?.(status !== "available");
+  }, [status]);
 
-      while (newSuggestions.size < 8) {
-        const random =
-          randomSuffix[Math.floor(Math.random() * randomSuffix.length)];
-        const number = Math.floor(Math.random() * 100);
-
-        const patterns = [
-          `${base}${number}`,
-          `${base}${random}`,
-          `${random}${base}`,
-          `${base}.${random}`,
-          `${base}${random}`,
-          `${base}_${number}`,
-        ];
-
-        const pick = patterns[Math.floor(Math.random() * patterns.length)];
-        newSuggestions.add(pick);
-      }
-
-      setSuggestions(Array.from(newSuggestions).slice(0, 8));
-    };
-
-    useEffect(() => {
-      if (isManualChange) {
-        generateSuggestions(firstName);
-      }
-    }, [firstName, isManualChange]);
-
-    const errorCheck = (val) => {
-      let newErrors = "";
-      const nameRegex = /^[A-Za-z\s'-_]{2,30}$/;
-
-      if (!val.trim()) {
-        newErrors = "Please enter your first name";
-      } else if (!nameRegex.test(val.trim())) {
-        newErrors =
-          "Please enter a valid first name (letters only, 2–30 characters)";
-      }
-
-      return newErrors;
-    };
-
-    const submit = async () => {
-      const err = errorCheck(firstName);
-
-      if (err) {
-        setError(err);
-        return;
-      }
-
-      setError("");
-
+  const register = async () => {
+    if (status !== "available") return;
+    const flow = flowOf(state);
+    const company = flow === "company";
+    setLoading?.(true);
+    try {
+      const fcmToken = await AsyncStorage.getItem("fcmToken");
       const body = {
-        username: firstName.trim(),
+        email: state?.email,
+        phone: state?.phone,
+        password: state?.password,
+        username: username.trim(),
+        firstName: company ? state?.entityName : state?.firstName,
+        lastName: company ? "" : state?.lastName || "",
+        ...(company
+          ? { foundingDate: state?.foundingDate }
+          : { dob: state?.dob }),
+        ...(!company && state?.gender ? { gender: state.gender } : {}),
+        ...(!company && state?.addressing
+          ? { addressing: state.addressing }
+          : {}),
+        enhancedTailoredAds: !!state?.enhancedTailoredAds,
+        role: flow,
+        fcmToken: fcmToken || "",
       };
-
-      try {
-        setLoading(true);
-        if (setLoadingState) setLoadingState(true);
-
-        const res = await post(`auth/check-username`, body);
-
-        if (res?.error?.data?.success === false) {
-          const message =
-            res?.error?.message ||
-            "Username already exists. Please choose another one.";
-
-          setError("Username is taken");
-          setUsernameStatus("taken");
-
-          ToastMessage(message, "error");
-
-          setLoading(false);
-          if (setLoadingState) setLoadingState(false);
-          return;
-        }
-
-        if (res?.data?.success && !res?.error) {
-          setState({ ...state, first_name: firstName.trim() });
-          setUsernameStatus("available");
-
-          setCurrentIndex(7);
-        } else {
-          setUsernameStatus("taken");
-        }
-
-        setLoading(false);
-        if (setLoadingState) setLoadingState(false);
-      } catch (error) {
-        setLoading(false);
-        setUsernameStatus("taken");
-
-        if (setLoadingState) setLoadingState(false);
-
-        const message = "Username already exists. Please choose another one.";
-
-        setError("Username is taken");
-        ToastMessage(message, "error");
+      const res = await post("auth/register", body);
+      const data = res?.data;
+      if (!data?.tokens?.accessToken) {
+        setError(data?.message || "Registration failed. Please try again.");
+        setLoading?.(false);
+        return;
       }
-    };
+      await applySession(dispatch, data?.user, data?.tokens);
+      setLoading?.(false);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "PinOnBoarding" }],
+      });
+    } catch (err) {
+      setLoading?.(false);
+      if (mounted.current) {
+        setError(err?.message || "Registration failed. Please try again.");
+      }
+    }
+  };
 
-    const back = () => {
-      setCurrentIndex(5);
-    };
+  useImperativeHandle(ref, () => ({ submit: register }));
 
-    const selectSuggestion = (username) => {
-      setFirstName(username);
-      setSelectedSuggestion(username);
-      setIsManualChange(false); // STOP new suggestions
-      setError("");
-    };
+  const statusHint =
+    status === "available"
+      ? { text: "Available", icon: "check_circle", iconColor: p.success }
+      : status === "taken"
+      ? { text: "Username is taken", icon: "error", color: p.error }
+      : status === "invalid"
+      ? {
+          text: "Use 3-37 lowercase letters, digits, dots or underscores.",
+          icon: "error",
+          color: p.error,
+        }
+      : status === "checking"
+      ? { text: "Checking availability…", icon: "info" }
+      : null;
 
-    useImperativeHandle(ref, () => ({ submit, back, isLoading: loading }));
+  return (
+    <View>
+      <AuthStepTitle label="Pick a username?" />
+      <AuthTextField
+        value={username}
+        onChangeText={(t) => setUsername(t.toLowerCase().replace(/\s/g, ""))}
+        placeholder="E.g. viktorsola"
+        maxLength={MAX_LENGTH}
+        autoCapitalize="none"
+        valueFamily={fonts.medium}
+        error={status === "taken" || status === "invalid" || !!error}
+      />
+      {error ? <AuthHint text={error} color={p.error} icon="error" iconFamily="MaterialSymbolsRoundedFilled" /> : null}
+      {statusHint ? (
+        <AuthHint
+          text={statusHint.text}
+          icon={statusHint.icon}
+          iconFamily="MaterialSymbolsRoundedFilled"
+          iconColor={statusHint.iconColor}
+          color={statusHint.color}
+          marginTop={error ? 8 - 2 * HINT_ROW_EXTRA : 8 - HINT_ROW_EXTRA}
+        />
+      ) : null}
+      <AuthHint
+        text="This will appear on your profile."
+        right={`${username.length}/${MAX_LENGTH}`}
+        marginTop={
+          statusHint || error ? 8 - 2 * HINT_ROW_EXTRA : 8 - HINT_ROW_EXTRA
+        }
+      />
+      <AuthHint
+        text="Inappropriate names are forbidden."
+        marginTop={8 - 2 * HINT_ROW_EXTRA}
+      />
 
-    return (
-      <View style={styles.container}>
-        <View>
-          <CustomText
-            label="Pick a username?"
-            fontFamily={fonts.semiBold}
-            fontSize={24}
-            marginTop={12}
-            letterSpacing={-1}
-            marginBottom={6}
-            color={isDark ? COLORS.white : colors.text}
-          />
-
-          <CustomInput
-            placeholder="E.g. James"
-            autoCapitalize={"none"}
-            maxLength={30}
-            value={firstName}
-            onChangeText={(text) => {
-              setFirstName(text);
-              setSelectedSuggestion(null);
-              setIsManualChange(true); // allow new suggestions
-
-              if (error) {
-                if (error.includes("already exists")) {
-                  setError("");
-                } else {
-                  const newError = errorCheck(text);
-                  if (!newError) {
-                    setError("");
-                  }
-                }
-              }
-            }}
-            error={error}
-          />
-
-          {usernameStatus == "available" && !error && (
-            <ErrorComponent
-              errorTitle="Username is available"
-              color={COLORS.green}
-              isValid
-              marginBottom={2}
-            />
-          )}
-
+      {chips.length ? (
+        <>
           <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <ErrorComponent
-              errorTitle="This will appear on your profile."
-              marginBottom={2}
-            />
-
-            <CustomText
-              label={`${firstName.length}/30`}
-              color={isDark ? COLORS.gray64 : colors.textSecondary}
-              fontSize={12}
-            />
+            style={[
+              styles.divider,
+              { backgroundColor: p.t04, marginTop: 16 - HINT_ROW_EXTRA },
+            ]}
+          />
+          <View style={styles.chips}>
+            {chips.map((c) => {
+              const on = c === username;
+              return (
+                <TouchableOpacity
+                  key={c}
+                  activeOpacity={0.8}
+                  onPress={() => setUsername(c)}
+                  style={[
+                    styles.chip,
+                    on
+                      ? { backgroundColor: p.text, borderColor: p.text }
+                      : { borderColor: p.t04 },
+                  ]}
+                >
+                  <CustomText
+                    label={c}
+                    fontSize={12}
+                    fontFamily={fonts.medium}
+                    color={on ? p.bg : p.t64}
+                  />
+                </TouchableOpacity>
+              );
+            })}
           </View>
+        </>
+      ) : null}
+    </View>
+  );
+});
 
-          <ErrorComponent errorTitle="Inappropriate names are forbidden." />
-        </View>
-
-        <Divider thickness={1} color={isDark ? COLORS.inputBg : colors.border} marginVertical={16} />
-
-        {/* USERNAME SUGGESTIONS */}
-        <View style={styles.suggestionContainer}>
-          <View style={styles.suggestionWrap}>
-            {suggestions
-              .filter((item) => item.length <= 30)
-              .map((item, index) => {
-                const isSelected = selectedSuggestion === item;
-
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.suggestionItem,
-                      { borderColor: isDark ? COLORS.inputBg : colors.border },
-                      isSelected && {
-                        backgroundColor: isDark ? COLORS.white : colors.text,
-                        borderColor: isDark ? COLORS.white : colors.text,
-                      },
-                    ]}
-                    onPress={() => selectSuggestion(item)}
-                    activeOpacity={0.8}
-                  >
-                    <CustomText
-                      label={`@${item}`}
-                      fontFamily={fonts.medium}
-                      fontSize={12}
-                      color={isSelected ? (isDark ? COLORS.black : colors.background) : (isDark ? COLORS.gray64 : colors.textSecondary)}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-          </View>
-        </View>
-      </View>
-    );
-  },
-);
-
-export default StepTwo;
+export default Username;
 
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: "space-between",
-    flex: 1,
+  divider: {
+    height: 1,
   },
-
-  suggestionContainer: {
-    marginTop: 4,
-  },
-
-  suggestionWrap: {
+  chips: {
+    marginTop: 16,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    columnGap: 4,
+    rowGap: 6,
   },
-
-  suggestionItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+  chip: {
+    height: 32,
+    borderRadius: 100,
     borderWidth: 1,
-    borderColor: COLORS.inputBg,
-  },
-
-  selectedSuggestion: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    paddingHorizontal: 11,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

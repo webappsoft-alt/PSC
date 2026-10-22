@@ -5,9 +5,8 @@ import SoundPlayer from "react-native-sound-player";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigation } from "@react-navigation/native";
 import fonts from "../../../../assets/fonts";
-import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
-import ImageFast from "../../../../components/ImageFast";
+import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { post } from "../../../../services/ApiRequest";
 import {
@@ -60,16 +59,20 @@ const RadioCard = ({ data = [] }) => {
     <View
       style={[styles.mainContainer, { backgroundColor: colors.background }]}
     >
-      {/* Header */}
+      {/* Figma "TOP RADIOS": Medium 14, "TOP" @48% */}
       <View style={[styles.row, styles.spaceBetween]}>
         <View style={styles.row}>
           <CustomText
             label="TOP"
-            color={colors.textSecondary}
+            fontSize={14}
+            letterSpacing={-0.07}
+            color={COLORS.gray48}
             fontFamily={fonts.medium}
           />
           <CustomText
             label="RADIOS"
+            fontSize={14}
+            letterSpacing={-0.07}
             color={colors.text}
             fontFamily={fonts.medium}
           />
@@ -86,7 +89,11 @@ const RadioCard = ({ data = [] }) => {
         )}
       </View>
 
-      {/* Horizontal Cards */}
+      {/* Figma "Radio" card: 351 × 64, r20, pad 4, fill white 16% + 1px
+          inside stroke #121212 16%, background blur; inner r16 #121212,
+          row pad 6 gap 8: 40 logo r8 · listeners (Medium 10 @48%) ·
+          name (Medium 14) + badge · 32px circles (volume + stop while
+          playing, waveform + play otherwise); green progress bar when live. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -96,106 +103,128 @@ const RadioCard = ({ data = [] }) => {
           const avatar = item?.userId?.profile?.avatar;
           const profileColor = item?.userId?.profile?.profileColor;
           const listeners = item?.play?.length || 0;
-          const timeAgo = moment(item?.createdAt).fromNow();
+          const isPlaying = playingRadioId === item?._id;
+          const endsAt = item?.endsAt || item?.expiresAt;
+          const timeLabel = endsAt
+            ? `${moment(endsAt).diff(moment(), "hours")}hrs left`
+            : moment(item?.createdAt).fromNow();
+          const isVerified =
+            item?.userId?.role === "individual" ||
+            item?.userId?.role === "company";
 
           return (
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => navigation.navigate("RadioDetail", { item })}
-              style={[styles.cardOutline, { backgroundColor: colors.surface }]}
+              style={styles.cardOutline}
               key={item?._id || index}
             >
-              {/* <Blur blurType="dark" /> */}
+              <Blur blurType={isDark ? "dark" : "light"} blurAmount={6} />
               <View
                 style={[
                   styles.cardInner,
                   { backgroundColor: colors.background },
                 ]}
               >
-                {/* User Avatar or Profile Color */}
-                {avatar ? (
-                  <Image source={{ uri: avatar }} style={styles.image} />
-                ) : (
-                  <View
-                    style={[
-                      styles.image,
-                      {
-                        backgroundColor: profileColor || COLORS.buttonColor,
-                        borderRadius: 8,
-                      },
-                    ]}
-                  />
-                )}
-
-                {/* Info */}
-                <View style={{ flex: 1 }}>
-                  <View style={styles.row}>
-                    <Image
-                      source={Images.friendGray}
-                      style={[
-                        styles.smallIcon,
-                        { tintColor: isDark ? colors.white : COLORS.black },
-                      ]}
-                    />
-                    <CustomText
-                      label={`${listeners} listener${
-                        listeners !== 1 ? "s" : ""
-                      }`}
-                      fontSize={10}
-                      fontFamily={fonts.medium}
-                      color={colors.textSecondary}
-                    />
+                <View style={styles.cardRow}>
+                  {avatar ? (
+                    <Image source={{ uri: avatar }} style={styles.image} />
+                  ) : (
                     <View
                       style={[
-                        styles.dot,
+                        styles.image,
+                        styles.logoFallback,
+                        { backgroundColor: profileColor || COLORS.green1 },
+                      ]}
+                    >
+                      <Icons
+                        family="MaterialSymbolsRoundedFilled"
+                        name="graphic_eq"
+                        size={20}
+                        color={COLORS.white}
+                      />
+                    </View>
+                  )}
+
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.row}>
+                      <Icons
+                        family="MaterialSymbolsRoundedFilled"
+                        name="group"
+                        size={12}
+                        color={COLORS.gray48}
+                      />
+                      <CustomText
+                        label={`${listeners.toLocaleString()} listener${
+                          listeners !== 1 ? "s" : ""
+                        }`}
+                        fontSize={10}
+                        letterSpacing={-0.05}
+                        fontFamily={fonts.medium}
+                        color={COLORS.gray48}
+                      />
+                      <View style={styles.dot} />
+                      <CustomText
+                        label={timeLabel}
+                        fontSize={10}
+                        letterSpacing={-0.05}
+                        fontFamily={fonts.medium}
+                        color={COLORS.gray48}
+                      />
+                    </View>
+                    <View style={styles.row}>
+                      <CustomText
+                        label={item?.title || "Untitled"}
+                        fontFamily={fonts.medium}
+                        fontSize={14}
+                        letterSpacing={-0.07}
+                        numberOfLines={1}
+                        color={colors.text}
+                        style={{ flexShrink: 1 }}
+                      />
+                      {isVerified ? (
+                        <Icons
+                          family="MaterialSymbolsRoundedFilled"
+                          name="verified"
+                          size={14}
+                          color="#007BFF"
+                        />
+                      ) : null}
+                    </View>
+                  </View>
+
+                  <View style={styles.actions}>
+                    <View
+                      style={[
+                        styles.circle,
                         { backgroundColor: colors.surfaceAlt },
                       ]}
-                    />
-                    <CustomText
-                      label={timeAgo}
-                      fontSize={10}
-                      fontFamily={fonts.medium}
-                      color={colors.textSecondary}
-                    />
-                  </View>
-
-                  <View style={styles.row}>
-                    <CustomText
-                      label={item?.title || "Untitled"}
-                      fontFamily={fonts.medium}
-                      numberOfLines={1}
-                      color={colors.text}
-                      style={{ flex: 1 }}
-                    />
+                    >
+                      <Icons
+                        family="MaterialSymbolsRoundedFilled"
+                        name={isPlaying ? "volume_up" : "graphic_eq"}
+                        size={18}
+                        color={colors.text}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={isPlaying ? handleStop : () => handlePlay(item)}
+                      style={[
+                        styles.circle,
+                        { backgroundColor: colors.surfaceAlt },
+                      ]}
+                    >
+                      <Icons
+                        family="MaterialSymbolsRoundedFilled"
+                        name={isPlaying ? "stop" : "play_arrow"}
+                        size={18}
+                        color={colors.text}
+                      />
+                    </TouchableOpacity>
                   </View>
                 </View>
-
-                {/* Actions */}
-                {/* <ImageFast source={Images.radio} style={styles.radioIcon} /> */}
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={
-                    playingRadioId === item?._id
-                      ? handleStop
-                      : () => handlePlay(item)
-                  }
-                  style={{ overflow: "hidden", borderRadius: 99 }}
-                >
-                  <Blur blurType={isDark ? "dark" : "light"} />
-                  <Image
-                    source={
-                      playingRadioId === item?._id
-                        ? Images.playerStop
-                        : Images.playBg
-                    }
-                    style={[
-                      styles.playIcon,
-                      {
-                        tintColor: isDark ? COLORS.white : COLORS.black,
-                      },
-                    ]}
-                  />
-                </TouchableOpacity>
+                {isPlaying ? <View style={styles.progress} /> : null}
               </View>
             </TouchableOpacity>
           );
@@ -208,75 +237,56 @@ const RadioCard = ({ data = [] }) => {
 export default RadioCard;
 
 const styles = StyleSheet.create({
-  mainContainer: {
-    padding: 12,
-  },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-
-  spaceBetween: {
-    justifyContent: "space-between",
-  },
-
-  listContent: {
-    paddingTop: 10,
-  },
-
+  // Figma section: pad H12 V12, list 10 below the title
+  mainContainer: { padding: 12 },
+  row: { flexDirection: "row", alignItems: "center", gap: 4 },
+  spaceBetween: { justifyContent: "space-between" },
+  listContent: { paddingTop: 10, gap: 8 },
   cardOutline: {
-    height: 60,
-    width: 303,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 16,
-    marginRight: 8,
+    width: 351,
+    height: 64,
+    borderRadius: 20,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: "rgba(18, 18, 18, 0.16)",
+    backgroundColor: "rgba(255, 255, 255, 0.16)",
     overflow: "hidden",
   },
-
   cardInner: {
-    height: 52,
-    width: 295,
-    borderRadius: 12,
+    flex: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+  cardRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 6,
+    paddingHorizontal: 6,
     gap: 8,
   },
-
-  image: {
-    height: 40,
-    width: 40,
-    borderRadius: 8,
-  },
-
-  smallIcon: {
-    height: 12,
-    width: 12,
-  },
-
-  verifiedIcon: {
-    height: 14,
-    width: 14,
-  },
-
-  radioIcon: {
-    height: 24,
-    width: 24,
-    marginLeft: "auto",
-  },
-
-  playIcon: {
-    height: 32,
+  image: { height: 40, width: 40, borderRadius: 8 },
+  logoFallback: { alignItems: "center", justifyContent: "center" },
+  actions: { flexDirection: "row", alignItems: "center", gap: 4 },
+  circle: {
     width: 32,
+    height: 32,
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
   },
-
   dot: {
-    height: 4,
-    width: 4,
+    height: 3,
+    width: 3,
     borderRadius: 99,
-    marginHorizontal: 4,
+    backgroundColor: COLORS.gray48,
+    marginHorizontal: 2,
+  },
+  progress: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: COLORS.green1,
   },
 });
