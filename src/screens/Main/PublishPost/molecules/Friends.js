@@ -57,7 +57,8 @@ const Friends = () => {
         endpoint = "relationships/following";
       } else if (selectedTab === 3) {
         // BFFS
-        endpoint = "relationships/bffs";
+        // BFFs = friends (mutual follows); the backend has no /bffs route
+        endpoint = "relationships/friends";
       }
 
       // Add searchQuery to URL if present

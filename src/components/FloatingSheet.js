@@ -4,7 +4,9 @@ import {
   Animated,
   Dimensions,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   TouchableOpacity,
   TouchableWithoutFeedback,
@@ -16,6 +18,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { COLORS } from "../utils/COLORS";
 import CustomText from "./CustomText";
 import Icons from "./Icons";
+import UserBadge from "./UserBadge";
 
 /**
  * Floating bottom sheet — port of Viral's ProfileFloatingBottomSheet:
@@ -42,6 +45,9 @@ const FloatingSheet = ({
   gap = 20,
   // Inner padding override (Figma repost: L12 T16 R12 B24)
   innerStyle,
+  // Optional node drawn over the backdrop, outside the card (e.g. the
+  // matching "Secured" pill at the top of the screen)
+  overlay,
 }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -85,8 +91,13 @@ const FloatingSheet = ({
           reducedTransparencyFallbackColor="rgba(0,0,0,0.6)"
         />
         <View style={styles.dim} pointerEvents="none" />
+        {overlay}
+        {/* sheets with inputs (e.g. Shows › New Show) rise above the keyboard */}
         <TouchableWithoutFeedback onPress={onDismiss}>
-          <View style={styles.overlay}>
+          <KeyboardAvoidingView
+            style={styles.overlay}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
               <Animated.View
                 style={[
@@ -153,7 +164,7 @@ const FloatingSheet = ({
                 </View>
               </Animated.View>
             </TouchableWithoutFeedback>
-          </View>
+          </KeyboardAvoidingView>
         </TouchableWithoutFeedback>
       </View>
     </Modal>
@@ -235,6 +246,7 @@ export const SheetUserHeader = ({
   displayName,
   username,
   role,
+  user,
   onPressUser,
   right,
 }) => {
@@ -267,22 +279,7 @@ export const SheetUserHeader = ({
               color={colors.text}
               numberOfLines={1}
             />
-            {role === "individual" ? (
-              <Icons
-                family="MaterialSymbolsRoundedFilled"
-                name="verified"
-                size={16}
-                color="#007BFF"
-              />
-            ) : null}
-            {role === "company" ? (
-              <Icons
-                family="MaterialSymbolsRounded"
-                name="star"
-                size={16}
-                color={COLORS.gray48}
-              />
-            ) : null}
+            <UserBadge user={user} size={16} mutedColor={COLORS.gray48} />
           </View>
           <CustomText
             label={username}

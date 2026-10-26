@@ -1,21 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Animated } from "react-native";
 import {
   Dimensions,
-  FlatList,
   Image,
   StyleSheet,
   TouchableOpacity,
   View,
-  ActivityIndicator,
   Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
+import { BottomSheetFlatList } from "@gorhom/bottom-sheet";
 import BottomSheetComponent from "../../../../components/BottomSheetComponent";
 import CustomButton from "../../../../components/CustomButton";
 import CustomText from "../../../../components/CustomText";
+import UserBadge from "../../../../components/UserBadge";
 import Header from "../../../../components/Header";
 import ImageFast from "../../../../components/ImageFast";
 import ScreenWrapper from "../../../../components/ScreenWrapper";
@@ -53,8 +54,13 @@ const PeopleSelection = ({
     }
   }, [isVisible, initialSelected]);
 
+  // Each tab / search shows a skeleton and never the previous tab's rows; a
+  // late response from an older request is ignored.
+  const requestId = useRef(0);
   const getUsers = async (selectedTab = tab, query = searchQuery) => {
+    const id = ++requestId.current;
     try {
+      setAllUsers([]);
       setLoading(true);
       let endpoint = "";
 
@@ -65,7 +71,8 @@ const PeopleSelection = ({
       } else if (selectedTab === 2) {
         endpoint = "relationships/following";
       } else if (selectedTab === 3) {
-        endpoint = "relationships/bffs";
+        // BFFs = friends (mutual follows); the backend has no /bffs route
+        endpoint = "relationships/friends";
       }
 
       if (query) {
@@ -73,12 +80,13 @@ const PeopleSelection = ({
       }
 
       const response = await get(endpoint);
+      if (id !== requestId.current) return;
       const fetchedUsers = response.data?.data?.users || [];
       setAllUsers(fetchedUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   };
 
@@ -110,6 +118,11 @@ const PeopleSelection = ({
           lastName: user.lastName,
           username: user.username,
           profilePicture: user.profilePicture,
+          // badges next to the picked names (verified shield, tier star)
+          profile: user.profile,
+          isVerified: user.isVerified,
+          role: user.role,
+          accountType: user.accountType, // Premium / Premium+ star
         },
       ]);
     }
@@ -165,7 +178,7 @@ const PeopleSelection = ({
                 fontFamily={fonts.medium}
                 marginRight={4}
               />
-              <Image source={Images.verified} style={styles.verifiedBadge} />
+              <UserBadge user={item} style={{ marginRight: 4 }} />
               <View style={styles.usernameBadge}>
                 <CustomText
                   label={item?.username}
@@ -242,6 +255,11 @@ const PeopleSelection = ({
           <BottomSheetComponent
             ref={sheetRef}
             snapPoints={["85%"]}
+            // fixed 85% — without this gorhom sizes the sheet to its content,
+            // so it jumped up / down between tabs (3 rows, 1 row, empty)
+            enableDynamicSizing={false}
+            // the list scrolls itself (no FlatList nested in a ScrollView)
+            enableScrollView={false}
             initialIndex={-1}
             enablePanDownToClose={false}
             handleIndicatorStyle={styles.indicator}
@@ -278,16 +296,16 @@ const PeopleSelection = ({
                 />
               </View>
 
-              {loading && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={COLORS.buttonColor} />
-                </View>
-              )}
-
-              <FlatList
-                data={users}
-                renderItem={renderUserItem}
-                keyExtractor={(item) => item?._id?.toString()}
+              <BottomSheetFlatList
+                data={loading ? SKELETON_ROWS : users}
+                renderItem={
+                  loading
+                    ? () => <UserRowSkeleton styles={styles} colors={colors} />
+                    : renderUserItem
+                }
+                keyExtractor={(item, index) =>
+                  loading ? `skeleton-${index}` : item?._id?.toString()
+                }
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.listContainer}
                 ListEmptyComponent={
@@ -315,6 +333,39 @@ const PeopleSelection = ({
         />
       </View>
     </Modal>
+  );
+};
+
+const SKELETON_ROWS = [0, 1, 2, 3, 4, 5, 6];
+
+/** Loading row in the same shape as a user row (44 avatar, name, meta, 40 action). */
+const UserRowSkeleton = ({ styles, colors }) => {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.9] });
+  const box = (style) => (
+    <Animated.View style={[{ backgroundColor: colors.surfaceAlt, opacity }, style]} />
+  );
+  return (
+    <View style={styles.userRow}>
+      <View style={styles.userInfoLeft}>
+        {box({ width: 44, height: 44, borderRadius: 22, marginRight: 12 })}
+        <View style={{ gap: 8 }}>
+          {box({ width: 150, height: 14, borderRadius: 4 })}
+          {box({ width: 100, height: 12, borderRadius: 4 })}
+        </View>
+      </View>
+      {box({ width: 40, height: 40, borderRadius: 20 })}
+    </View>
   );
 };
 
@@ -349,7 +400,9 @@ const createStyles = (colors, isDark) => StyleSheet.create({
     marginBottom: 12,
   },
   listContainer: {
-    paddingBottom: 40,
+    // clear the fixed Confirm button (48 + safe area) now the list scrolls
+    // on its own instead of inside the sheet's padded ScrollView
+    paddingBottom: 140,
   },
   userRow: {
     flexDirection: "row",

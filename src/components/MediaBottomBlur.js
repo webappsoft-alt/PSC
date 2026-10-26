@@ -26,6 +26,9 @@ for (let i = 0; i <= STEPS; i += 1) {
   MASK_COLORS.push(`rgba(0, 0, 0, ${easeInOutCubic(p).toFixed(3)})`);
   MASK_LOCATIONS.push(p);
 }
+// `edge="top"`: the same band mirrored (strongest at the top edge), e.g. the
+// Shows "Create An Episode" preview's top frame
+const MASK_COLORS_TOP = [...MASK_COLORS].reverse();
 
 export const MEDIA_BLUR_BAND = 56;
 
@@ -38,11 +41,17 @@ const MediaBottomBlur = ({
   blurRadius = 12,
   borderBottomLeftRadius = 8,
   borderBottomRightRadius = 8,
+  edge = "bottom",
+  // Figma "Linear" fill colour (#121212 on the Shows preview, black on posts)
+  tint = "0, 0, 0",
 }) => {
-  const radii = { borderBottomLeftRadius, borderBottomRightRadius };
+  const top = edge === "top";
+  const radii = top
+    ? { borderTopLeftRadius: borderBottomLeftRadius, borderTopRightRadius: borderBottomRightRadius }
+    : { borderBottomLeftRadius, borderBottomRightRadius };
   const mask = (
     <LinearGradient
-      colors={MASK_COLORS}
+      colors={top ? MASK_COLORS_TOP : MASK_COLORS}
       locations={MASK_LOCATIONS}
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
@@ -61,7 +70,7 @@ const MediaBottomBlur = ({
           style={{
             position: "absolute",
             left: 0,
-            top: -(mediaHeight - height),
+            top: top ? 0 : -(mediaHeight - height),
             width,
             height: mediaHeight,
           }}
@@ -83,12 +92,16 @@ const MediaBottomBlur = ({
   return (
     <View
       pointerEvents="none"
-      style={[styles.band, { height }, radii]}
+      style={[styles.band, top ? styles.bandTop : styles.bandBottom, { height }, radii]}
     >
       {blurred}
-      {/* Figma "Linear" fill @16%: clear at the top → dark at the bottom */}
+      {/* Figma "Linear" fill @16%: clear at the inner edge → dark at the outer */}
       <LinearGradient
-        colors={["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.16)"]}
+        colors={
+          top
+            ? [`rgba(${tint}, 0.16)`, `rgba(${tint}, 0)`]
+            : [`rgba(${tint}, 0)`, `rgba(${tint}, 0.16)`]
+        }
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -104,8 +117,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 0,
     overflow: "hidden",
     zIndex: 1,
+  },
+  bandBottom: {
+    bottom: 0,
+  },
+  bandTop: {
+    top: 0,
   },
 });

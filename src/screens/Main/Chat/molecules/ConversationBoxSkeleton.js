@@ -47,7 +47,7 @@ const ConversationBoxSkeleton = () => {
 
   return (
     <View style={styles.card}>
-      <SkeletonBox width={40} height={40} borderRadius={100} />
+      <SkeletonBox width={48} height={48} borderRadius={100} />
       <View style={styles.textBox}>
         <View style={styles.rowBetween}>
           <SkeletonBox width={120} height={16} borderRadius={4} />
@@ -68,15 +68,16 @@ const createStyles = (colors, isDark) => StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 12,
-    paddingBottom: 12,
+    // matches ConversationBox (Figma row 72 · padding 12/16 · gap 12)
+    minHeight: 72,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: isDark ? "#262626" : colors.border,
-    paddingHorizontal: 15,
+    borderBottomColor: isDark ? "rgba(255, 255, 255, 0.04)" : colors.border,
   },
   textBox: {
     flex: 1,
-    marginLeft: 12,
   },
   rowBetween: {
     flexDirection: "row",

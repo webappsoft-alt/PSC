@@ -10,6 +10,7 @@ import {ActivityIndicator,
 import CustomInput from "./CustomInput";
 import CustomModal from "./CustomModal";
 import CustomText from "./CustomText";
+import FlagImage from "./FlagImage";
 import Icons from "./Icons";
 import ImageFast from "./ImageFast";
 
@@ -18,7 +19,6 @@ import { Images } from "../assets/images";
 import { PNGIcons } from "../assets/images/icons";
 import { COLORS } from "../utils/COLORS";
 import { COUNTRIES as COUNTRIES_DATA } from "../utils/COUNTRIES";
-import Text from "./ScaledText";
 
 const COUNTRIES = COUNTRIES_DATA.map((country) => ({
   code: country.code,
@@ -226,7 +226,8 @@ const CustomPhoneInput = ({
         activeOpacity={0.6}
       >
         <View style={styles.countryContent}>
-          <Text style={styles.flagText}>{item.flag}</Text>
+          {/* flags are images, never emoji text (as Viral: 20 circle) */}
+          <FlagImage code={item.code} size={20} style={styles.flagImage} />
           <View style={styles.countryInfo}>
             <CustomText
               label={item.name}
@@ -312,7 +313,7 @@ const CustomPhoneInput = ({
             onPress={() => !isChange && handleModalOpen()}
             disabled={isChange}
           >
-            <CustomText label={selectedCountry.flag} fontSize={16} />
+            <FlagImage code={selectedCountry.code} size={18} />
             <CustomText
               label={selectedCountry.dialCode}
               fontSize={16}
@@ -580,10 +581,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
-  flagText: {
-    fontSize: 24,
+  flagImage: {
     marginRight: 15,
-    color: COLORS.white,
   },
   countryInfo: {
     flex: 1,

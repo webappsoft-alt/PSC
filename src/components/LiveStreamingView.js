@@ -40,6 +40,7 @@ import Blur from "./Blur";
 import PeopleSheet from "../screens/Main/LiveScreens/molecules/PeopleSheet";
 import ProgressiveBlur from "./ProgressiveBlur";
 import Text from "./ScaledText";
+import UserBadge from "./UserBadge";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const LIVE_STREAM_MAX_DURATION_SECONDS = 45 * 60;
@@ -168,6 +169,8 @@ const getQuestionUserMeta = (question) => {
     user?.image ||
     null;
   const isPro = Boolean(user?.profile?.isPro || user?.isPro);
+  const isVerified = !!(user?.profile?.isVerified ?? user?.isVerified);
+  const accountType = user?.accountType || "";
 
   return {
     displayName,
@@ -176,6 +179,8 @@ const getQuestionUserMeta = (question) => {
       : `@${usernameRaw || "username"}`,
     avatar,
     isPro,
+    isVerified,
+    accountType,
   };
 };
 
@@ -198,6 +203,8 @@ const parseLiveQuestion = (first) => {
     username: userMeta.username,
     avatar: userMeta.avatar,
     isPro: userMeta.isPro,
+    isVerified: userMeta.isVerified,
+    accountType: userMeta.accountType,
     createdAt:
       String(first?.createdAt ?? first?.created_at ?? "") ||
       new Date().toISOString(),
@@ -1693,12 +1700,12 @@ const MeetingView = ({
                       <Text style={[styles.liveQuestionName, { color: isDark ? COLORS.white : colors.text }]} numberOfLines={1}>
                         {liveQuestion.displayName}
                       </Text>
-                      {liveQuestion.isPro ? (
-                        <Image
-                          source={Images.verified}
-                          style={styles.questionVerified}
-                        />
-                      ) : null}
+                      <UserBadge
+                        verified={liveQuestion.isVerified}
+                        accountType={liveQuestion.accountType}
+                        mutedColor={isDark ? "rgba(255, 255, 255, 0.64)" : colors.textSecondary}
+                        style={{ marginLeft: 4 }}
+                      />
                       <Text style={[styles.metaDot, { color: isDark ? COLORS.gray48 : colors.textSecondary }]}>•</Text>
                       <View style={[styles.usernamePill, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(18, 18, 18, 0.06)" }]}>
                         <Text style={[styles.usernamePillText, { color: isDark ? COLORS.gray64 : colors.textSecondary }]} numberOfLines={1}>

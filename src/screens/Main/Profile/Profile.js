@@ -27,15 +27,17 @@ import { useTabBarVisibility } from "../../../navigation/TabStack";
 import { del, get } from "../../../services/ApiRequest";
 import { COLORS } from "../../../utils/COLORS";
 import { ToastMessage } from "../../../utils/ToastMessage";
-import PostCard from "../Home/molecules/PostCard";
+import FeedPostItem from "../Home/molecules/FeedPostItem";
 import PostCardSkeleton from "../Home/molecules/PostCardSkeleton";
 import BannerModal from "./molecules/BannerModal";
 import DelImagesModal from "./molecules/DelImagesModal";
 import FinalizeProfile from "./molecules/FinalizeProfile";
 import MediaGrid from "./molecules/MediaGrid";
-import ProfileCard from "./molecules/ProfileCard";
+import ProfileCard, { getProfileCardLayout } from "./molecules/ProfileCard";
 import ProfileHeader from "./molecules/ProfileHeader";
 import { getProfile } from "../../../utils/constants";
+import { accentA, getProfileTier } from "../../../utils/profileTier";
+import { post } from "../../../services/ApiRequest";
 
 const Profile = () => {
   const isFocus = useIsFocused();
@@ -299,91 +301,56 @@ const Profile = () => {
     }
   };
 
-  const renderItem = useCallback(
-    ({ item, index }) => {
-      const author = item?.author || {};
-      const displayName =
-        `${author.firstName || ""} ${author.lastName || ""}`.trim() ||
-        "Display Name";
-      const username = author.username || "username";
-      const description = item?.description || "";
-      const images = item?.images || [];
-      const hashtags = item?.hashtags || [];
-      const topic = item?.topic || "Crypto";
-      const likesCount = item?.stats?.upvotes || 0;
-      const commentsCount = item?.stats?.comments || 0;
-      const repostsCount = item?.stats?.reposts || 0;
-      const savedCount = item?.stats?.saved || 0;
-      const stats = item?.stats || {};
-      const createdAt = item?.createdAt || "";
-      const timeAgo = getTimeAgo(createdAt);
-
-      return (
-        <View>
-          <PostCard
-            displayName={displayName}
-            username={username}
-            description={description}
-            images={images}
-            hashtags={hashtags}
-            topic={topic}
-            likesCount={likesCount}
-            commentsCount={commentsCount}
-            repostsCount={repostsCount}
-            savedCount={savedCount}
-            stats={stats}
-            timeAgo={timeAgo}
-            formatCount={formatCount}
-            upvotes={item?.upvotes || []}
-            downvotes={item?.downvotes || []}
-            showFollowButton={false}
-            // onClickRepostedFrom={() =>
-            //   navigation.navigate("UserProfile", {
-            //     item: author,
-            //   })
-            // }
-            onCommentPress={() =>
-              navigation.navigate("CommentScreen", {
-                item: item,
-                postData: {
-                  displayName,
-                  username,
-                  description,
-                  likesCount,
-                  commentsCount,
-                  repostsCount,
-                  timeAgo,
-                  images,
-                },
-              })
-            }
-            onDeletePress={() => deletePost(item._id)}
-            onEditPress={() => handleEditPost(item)}
-            item={item}
-            shouldPlay={item?._id === viewablePostId && isFocus}
-            onSwipeRight={() =>
-              navigation.navigate("CommentScreen", {
-                item: item,
-                postData: {
-                  displayName,
-                  username,
-                  description,
-                  likesCount,
-                  commentsCount,
-                  repostsCount,
-                  timeAgo,
-                  images,
-                },
-              })
-            }
-            // onSwipeLeft={() => navigation.navigate("InboxScreen")}
-          />
-          <Divider marginBottom={12} marginTop={8} thickness={4} />
-        </View>
-      );
-    },
-    [navigation, getTimeAgo, formatCount],
+  const openComments = useCallback(
+    (item, postData) =>
+      navigation.navigate("CommentScreen", { item, postData }),
+    [navigation],
   );
+
+  const hidePost = useCallback(async (postId) => {
+    try {
+      const response = await post("hide/post", { postId });
+      if (response?.data?.success) {
+        ToastMessage("Post hidden successfully", "success");
+        setPosts((prev) => prev.filter((p) => p._id !== postId));
+      }
+    } catch (e) {
+      console.log("hidePost error", e);
+    }
+  }, []);
+
+  const hideUserPosts = useCallback(async (authorId) => {
+    try {
+      const response = await post("hide/post", { authorId });
+      if (response?.data?.success) {
+        ToastMessage("User posts hidden successfully", "success");
+        setPosts((prev) => prev.filter((p) => p.author?._id !== authorId));
+      }
+    } catch (e) {
+      console.log("hideUserPosts error", e);
+    }
+  }, []);
+
+  // Same post rendering as the Home feed (FeedPostItem)
+  const renderItem = useCallback(
+    ({ item }) => (
+      <FeedPostItem
+        post={item}
+        shouldPlay={item?._id === viewablePostId && isFocus}
+        formatCount={formatCount}
+        onOpenComments={openComments}
+        onDeletePress={deletePost}
+        onEditPress={handleEditPost}
+        onHidePost={hidePost}
+        onHideUserPosts={hideUserPosts}
+      />
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewablePostId, isFocus, formatCount, openComments, hidePost, hideUserPosts],
+  );
+
+  const tier = getProfileTier(userData);
+  const cardLayout = getProfileCardLayout(userData, false);
 
   return (
     <View style={{ flex: 1 }}>
@@ -402,18 +369,21 @@ const Profile = () => {
           />
         }
         headerUnScrollable={() => (
-          <ProfileHeader
-            isImage
-            isUser
-            type={"premium"}
-            name={`${userData?.firstName} ${userData?.lastName}`}
-            onBannerPress={() => setBannerModal(true)}
-            coverImage={
-              userData?.profile?.hideCover === false
-                ? null
-                : userData?.profile?.cover
-            }
-          />
+          <>
+            <ProfileHeader
+              isUser
+              user={userData}
+              name={`${userData?.firstName || ""} ${userData?.lastName || ""}`}
+              onBannerPress={() => setBannerModal(true)}
+              coverImage={
+                userData?.profile?.hideCover === false
+                  ? null
+                  : userData?.profile?.cover
+              }
+            />
+            {/* Figma: sections sit 2pt apart on #262626 */}
+            <View style={styles.sectionGap} />
+          </>
         )}
       >
         <ProfileCard
@@ -432,10 +402,13 @@ const Profile = () => {
           showTopTab={false}
         />
 
+        {/* Figma "Profile": tabs close the info block — 20 above, 16 below,
+            32pt chips, padding 14, Medium 16 / −0.5, accent text */}
         <View
           style={{
             backgroundColor: colors.background,
-            paddingBottom: 8,
+            paddingTop: cardLayout.outerGap,
+            paddingBottom: cardLayout.padTop,
             paddingHorizontal: 12,
           }}
         >
@@ -454,15 +427,19 @@ const Profile = () => {
               "Saved",
             ]}
             paddingHorizontal={14}
+            height={32}
             borderWidth={1}
-            borderColor={colors.surfaceAlt}
-            activeColor={"rgba(161, 147, 117, 0.08)"}
-            ovalBg={"rgba(161, 147, 117, 0)"}
-            marginTop={6}
+            borderColor={accentA(tier, 0.04)}
+            activeBorderColor={"transparent"}
+            activeColor={accentA(tier, 0.08)}
+            ovalBg={accentA(tier, 0)}
+            textColor={accentA(tier, 1)}
+            textFontSize={16}
+            textLetterSpacing={-0.5}
           />
         </View>
 
-        <Divider marginBottom={0.1} marginTop={0} thickness={2} />
+        <View style={styles.sectionGap} />
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => navigation.navigate("RequestsScreen")}
@@ -486,7 +463,7 @@ const Profile = () => {
             style={[styles.forwardIcon, { tintColor: colors.iconMuted }]}
           />
         </TouchableOpacity>
-        <Divider marginBottom={0.1} marginTop={0} thickness={2} />
+        <View style={styles.sectionGap} />
 
         <FinalizeProfile />
 
@@ -595,4 +572,5 @@ const styles = StyleSheet.create({
     tintColor: COLORS.red1 || "#FF3B30",
   },
   forwardIcon: { width: 20, height: 20 },
+  sectionGap: { height: 2, backgroundColor: COLORS.authHeader },
 });

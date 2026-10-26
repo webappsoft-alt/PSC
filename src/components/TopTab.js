@@ -6,6 +6,8 @@ import {
   View,
 } from "react-native";
 
+import { useEffect, useRef } from "react";
+
 import CustomText from "./CustomText";
 
 import fonts from "../assets/fonts";
@@ -39,7 +41,42 @@ const TopTab = ({
   activeTintColor,
   inactiveTintColor,
   isBlur,
+  // Optional overrides (Profile tabs): label color / size / tracking and the
+  // active chip's border (Figma: active chip has no stroke).
+  textColor,
+  textFontSize,
+  textLetterSpacing,
+  activeBorderColor,
+  // Scroll the rounded row so the active chip is fully visible (e.g. a screen
+  // opened straight on its 4th tab).
+  scrollToActive,
 }) => {
+  const scrollRef = useRef(null);
+  const itemLayouts = useRef({});
+  const viewWidth = useRef(0);
+  const scrollX = useRef(0);
+
+  const revealActive = (index = tab, animated = true) => {
+    const item = itemLayouts.current[index];
+    if (!scrollToActive || !item || !scrollRef.current || !viewWidth.current)
+      return;
+    const left = item.x;
+    const right = item.x + item.width;
+    if (left < scrollX.current) {
+      scrollRef.current.scrollTo({ x: Math.max(left - 12, 0), animated });
+    } else if (right > scrollX.current + viewWidth.current) {
+      scrollRef.current.scrollTo({
+        x: right - viewWidth.current + 12,
+        animated,
+      });
+    }
+  };
+
+  useEffect(() => {
+    revealActive(tab, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   const { colors, isDark } = useTheme();
   const finalActiveColor = activeColor || (isDark ? "white" : colors.text);
   const finalActiveTintColor = activeTintColor || (isDark ? COLORS.black : COLORS.white);
@@ -60,8 +97,17 @@ const TopTab = ({
     <>
       {rounded ? (
         <ScrollView
+          ref={scrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onLayout={(e) => {
+            viewWidth.current = e.nativeEvent.layout.width;
+            revealActive(tab, false);
+          }}
+          onScroll={(e) => {
+            scrollX.current = e.nativeEvent.contentOffset.x;
+          }}
           contentContainerStyle={{
             marginBottom,
             marginTop,
@@ -73,11 +119,19 @@ const TopTab = ({
             <TouchableOpacity
               key={index}
               onPress={() => setTab(index)}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                itemLayouts.current[index] = { x, width };
+                if (index === tab) revealActive(index, false);
+              }}
               style={[
                 styles.roundedContainer,
                 {
                   borderWidth,
-                  borderColor,
+                  borderColor:
+                    tab == index && activeBorderColor
+                      ? activeBorderColor
+                      : borderColor,
                   borderRadius: borderRadius || 99,
                   backgroundColor:
                     tab == index
@@ -124,11 +178,15 @@ const TopTab = ({
               {tabName?.length > 0 ? (
                 <CustomText
                   label={tabName}
-                  lineHeight={14 * 1.4}
+                  lineHeight={textFontSize ? undefined : 14 * 1.4}
+                  fontSize={textFontSize}
+                  letterSpacing={textLetterSpacing}
                   fontFamily={fontFamily}
                   textTransform="capitalize"
                   color={
-                    oval
+                    textColor
+                      ? textColor
+                      : oval
                       ? COLORS.buttonColor
                       : rounded && tab == index
                       ? getActiveTextColor()

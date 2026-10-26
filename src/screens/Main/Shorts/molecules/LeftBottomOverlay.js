@@ -13,6 +13,7 @@ import { COLORS } from "../../../../utils/COLORS";
 import { ToastMessage } from "../../../../utils/ToastMessage";
 import { Tags } from "../../../../assets/svgs";
 import Blur from "../../../../components/Blur";
+import UserBadge from "../../../../components/UserBadge";
 
 const LeftBottomOverlay = ({ item }) => {
   const navigation = useNavigation();
@@ -116,7 +117,7 @@ const LeftBottomOverlay = ({ item }) => {
           fontSize={16}
           color={COLORS.white}
         />
-        <Image source={Images.verified} style={styles.verifiedIcon} />
+        <UserBadge user={item?.author} style={{ marginLeft: 4 }} />
         {!isOwner && (
           <CustomButton
             title={isFollowing ? "Following" : "Follow"}

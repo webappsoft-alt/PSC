@@ -7,6 +7,7 @@ import CustomText from "../../../../components/CustomText";
 import ImageFast from "../../../../components/ImageFast";
 import { COLORS } from "../../../../utils/COLORS";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import UserBadge from "../../../../components/UserBadge";
 
 const CommentOption = ({
   isVisible,
@@ -16,7 +17,8 @@ const CommentOption = ({
   userImage = null,
   profileColor,
   commentText = "Comments goes here.",
-  isVerified = true,
+  isVerified = false,
+  accountType,
   userData,
   commentUserId,
   onPinComment,
@@ -169,12 +171,11 @@ const CommentOption = ({
                     fontSize={16}
                     color={colors.text}
                   />
-                  {isVerified && (
-                    <Image
-                      source={Images.verified}
-                      style={styles.verifiedBadge}
-                    />
-                  )}
+                  <UserBadge
+                    verified={isVerified}
+                    accountType={accountType}
+                    size={16}
+                  />
                 </View>
                 <CustomText
                   label={`${username}`}

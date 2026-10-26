@@ -34,6 +34,7 @@ import { del, post } from "../../../../services/ApiRequest";
 import { setUserData } from "../../../../store/reducer/usersSlice";
 import { COLORS } from "../../../../utils/COLORS";
 import { ToastMessage } from "../../../../utils/ToastMessage";
+import UserBadge from "../../../../components/UserBadge";
 
 const { width, height } = Dimensions.get("window");
 
@@ -874,20 +875,7 @@ const StoryViewer = ({
                       numberOfLines={1}
                       width={150}
                     />
-                    {(liveAuthor?.role == "individual" ||
-                      liveProfile?.isVerified ||
-                      liveProfile?.isPro) && (
-                      <ImageFast
-                        source={Images.verified}
-                        style={styles.verifiedIcon}
-                      />
-                    )}
-                    {liveAuthor?.role == "company" && (
-                      <ImageFast
-                        source={Images.grayStar}
-                        style={styles.verifiedIcon}
-                      />
-                    )}
+                    <UserBadge user={liveAuthor} size={12} mutedColor="rgba(18, 18, 18, 0.64)" />
                   </View>
                   <CustomText
                     label={liveUsername}
@@ -1014,18 +1002,7 @@ const StoryViewer = ({
                       color={COLORS.black}
                       fontSize={12}
                     />
-                    {item?.postId?.userId?.role == "individual" && (
-                      <ImageFast
-                        source={Images.verified}
-                        style={styles.verifiedIcon}
-                      />
-                    )}
-                    {item?.postId?.userId?.role == "company" && (
-                      <ImageFast
-                        source={Images.grayStar}
-                        style={styles.verifiedIcon}
-                      />
-                    )}
+                    <UserBadge user={item?.postId?.userId} size={12} mutedColor="rgba(18, 18, 18, 0.64)" />
                   </View>
                   <CustomText
                     label={`@${item?.postId?.userId?.username}`}
@@ -1352,10 +1329,7 @@ const StoryViewer = ({
                       fontFamily={fonts.semiBold}
                       fontSize={14}
                     />
-                    <Image
-                      source={Images.verified}
-                      style={styles.verifiedIcon}
-                    />
+                    <UserBadge user={userInfo.user[0]} />
                   </View>
                   <CustomText
                     label={`@${userInfo.username?.toLowerCase() || "username"}`}

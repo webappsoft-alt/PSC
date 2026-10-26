@@ -18,6 +18,7 @@ import ImageFast from "../../../../components/ImageFast";
 import { get } from "../../../../services/ApiRequest";
 import { COLORS } from "../../../../utils/COLORS";
 import { BlurView } from "@react-native-community/blur";
+import UserBadge from "../../../../components/UserBadge";
 
 const ViewerModal = ({ isVisible, onDisable, viewersCount, postId }) => {
   const insets = useSafeAreaInsets();
@@ -84,10 +85,7 @@ const ViewerModal = ({ isVisible, onDisable, viewersCount, postId }) => {
                 fontFamily={fonts.medium}
                 fontSize={14}
               />
-              {/* Assuming verification status might come from item.isVerified or similar if added later */}
-              {item.isVerified && (
-                <Image source={Images.verified} style={styles.verifiedBadge} />
-              )}
+              <UserBadge user={item} style={{ marginLeft: 4 }} />
               <View style={styles.usernameBadge}>
                 <CustomText
                   label={`@${item.username}`}

@@ -1,17 +1,30 @@
-import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, Animated, Dimensions, Platform } from "react-native";
-import { COLORS } from "../../../../utils/COLORS";
-import { useTheme } from "../../../../contexts/ThemeContext";
+import { useEffect, useRef } from "react";
+import { Animated, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+import { useTheme } from "../../../../contexts/ThemeContext";
+import { getNavBarClearance } from "../../../../navigation/TabStack";
+import {
+  ACTIONS_ABOVE_NAV,
+  ACTIONS_HEIGHT,
+  BARS_HEIGHT,
+  BARS_TOP_FROM_INSET,
+  CARD_PAD_H,
+  INFO_ABOVE_ACTIONS,
+  TITLES_GAP,
+  TITLES_HEIGHT,
+} from "./matchLayout";
+
+// Mirrors the New-Home card (MatchCard) so nothing jumps when it loads
+const ACTION_SIZES = [48, 56, 64, 56, 48];
 
 const MatchCardSkeleton = () => {
-  const { colors, isDark } = useTheme();
-  const styles = createStyles(colors, isDark);
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(animatedValue, {
           toValue: 1,
@@ -24,28 +37,24 @@ const MatchCardSkeleton = () => {
           useNativeDriver: true,
         }),
       ]),
-    ).start();
-  }, []);
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animatedValue]);
 
   const opacity = animatedValue.interpolate({
     inputRange: [0, 1],
     outputRange: [0.3, 0.7],
   });
 
-  const SkeletonBox = ({
-    width,
-    height,
-    borderRadius = 8,
-    style,
-    backgroundColor = colors.surfaceAlt,
-  }) => (
+  const Box = ({ width, height, radius = 100, style }) => (
     <Animated.View
       style={[
         {
           width,
           height,
-          borderRadius,
-          backgroundColor,
+          borderRadius: radius,
+          backgroundColor: colors.surfaceAlt,
           opacity,
         },
         style,
@@ -53,173 +62,109 @@ const MatchCardSkeleton = () => {
     />
   );
 
+  const navClearance = getNavBarClearance(insets.bottom);
+  const actionsBottom = navClearance + ACTIONS_ABOVE_NAV;
+  const barsTop = insets.top + BARS_TOP_FROM_INSET;
+
   return (
-    <View style={styles.container}>
-      {/* Card Skeleton */}
-      <View style={styles.cardWrapper}>
-        <View style={styles.imagePlaceholder}>
-          <View style={styles.innerContainer}>
-            {/* Header Row */}
-            <View style={styles.headerRow}>
-              <View style={styles.row}>
-                <SkeletonBox width={22} height={22} borderRadius={11} />
-                <SkeletonBox
-                  width={120}
-                  height={14}
-                  borderRadius={4}
-                  style={{ marginLeft: 8 }}
-                />
-              </View>
-              <SkeletonBox width={32} height={32} borderRadius={16} />
-            </View>
+    <View
+      pointerEvents="none"
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      {/* story bars */}
+      <View style={[styles.barsRow, { top: barsTop }]}>
+        {[0, 1, 2].map((i) => (
+          <Box key={i} height={BARS_HEIGHT} style={styles.flex} />
+        ))}
+      </View>
 
-            {/* Footer */}
-            <View>
-              {/* Name and Age */}
-              <SkeletonBox
-                width={180}
-                height={44}
-                borderRadius={8}
-                style={{ marginBottom: 10 }}
-              />
+      {/* VERIFIED INDIVIDUAL · score */}
+      <View
+        style={[
+          styles.titlesRow,
+          { top: barsTop + BARS_HEIGHT + TITLES_GAP },
+        ]}
+      >
+        <View style={styles.row}>
+          <Box width={18} height={18} />
+          <Box width={130} height={10} radius={4} style={{ marginLeft: 4 }} />
+        </View>
+        <Box width={50} height={TITLES_HEIGHT} />
+      </View>
 
-              {/* Location Row */}
-              <View style={styles.locationRow}>
-                <SkeletonBox width={12} height={12} borderRadius={6} />
-                <SkeletonBox
-                  width={60}
-                  height={12}
-                  borderRadius={4}
-                  style={{ marginLeft: 4 }}
-                />
-                <SkeletonBox
-                  width={40}
-                  height={12}
-                  borderRadius={4}
-                  style={{ marginLeft: 4 }}
-                />
-              </View>
-
-              {/* Monthly Views */}
-              <SkeletonBox
-                width={140}
-                height={11}
-                borderRadius={4}
-                style={{ marginTop: 8 }}
-              />
-
-              {/* Genre/Interest pills */}
-              <View style={styles.genreRow}>
-                <SkeletonBox width={80} height={24} borderRadius={99} />
-                <SkeletonBox width={80} height={24} borderRadius={99} />
-                <SkeletonBox width={80} height={24} borderRadius={99} />
-              </View>
-
-              {/* Description box */}
-              <View style={styles.footerRow}>
-                <SkeletonBox width="85%" height={32} borderRadius={4} />
-                <SkeletonBox width={28} height={28} borderRadius={14} />
-              </View>
-
-              {/* Slider bars */}
-              <View style={styles.sliderContainer}>
-                <View style={styles.sliderTrack}>
-                  <SkeletonBox width="30%" height={6} borderRadius={3} />
-                  <SkeletonBox width="30%" height={6} borderRadius={3} />
-                  <SkeletonBox width="30%" height={6} borderRadius={3} />
-                </View>
-              </View>
-            </View>
-          </View>
+      {/* info column (Figma 454…630 on an 812 frame) */}
+      <View
+        style={[
+          styles.info,
+          { bottom: actionsBottom + ACTIONS_HEIGHT + INFO_ABOVE_ACTIONS },
+        ]}
+      >
+        <Box width={200} height={31} radius={8} />
+        <Box width={130} height={12} radius={4} style={{ marginTop: 12 }} />
+        <Box width={190} height={12} radius={4} style={{ marginTop: 12 }} />
+        <Box width={142} height={8} radius={4} style={{ marginTop: 12 }} />
+        <Box width={300} height={8} radius={4} style={{ marginTop: 12 }} />
+        <Box width={180} height={8} radius={4} style={{ marginTop: 9 }} />
+        <View style={[styles.row, { marginTop: 12, gap: 4 }]}>
+          <Box width={95} height={28} radius={16} />
+          <Box width={72} height={28} radius={16} />
+          <Box width={60} height={28} radius={16} />
         </View>
       </View>
 
-      {/* Bottom Buttons */}
-      <View style={styles.bottomContainer}>
-        <SkeletonBox width={48} height={48} borderRadius={24} />
-        <SkeletonBox width={56} height={56} borderRadius={28} />
-        <SkeletonBox width={56} height={56} borderRadius={28} />
-        <SkeletonBox width={56} height={56} borderRadius={28} />
-        <SkeletonBox width={48} height={48} borderRadius={24} />
+      {/* action row */}
+      <View style={[styles.actionsRow, { bottom: actionsBottom }]}>
+        {ACTION_SIZES.map((size, i) => (
+          <Box key={i} width={size} height={size} />
+        ))}
       </View>
     </View>
   );
 };
 
-const createStyles = (colors, isDark) => StyleSheet.create({
+export default MatchCardSkeleton;
+
+const styles = StyleSheet.create({
   container: {
-    marginTop: 16,
-    alignItems: "center",
-    width: "100%",
-    paddingHorizontal: 6,
+    ...StyleSheet.absoluteFillObject,
   },
-  cardWrapper: {
-    width: "100%",
-    padding: 4,
-    backgroundColor: "#ffffff03",
-    borderColor: colors.border,
-    borderRadius: 34,
-    borderWidth: 1,
-  },
-  imagePlaceholder: {
-    height: Platform.OS == "ios" ? screenHeight * 0.56 : screenHeight * 0.55,
-    width: "100%",
-    borderRadius: 32,
-    backgroundColor: colors.surfaceAlt,
-    padding: 14,
-  },
-  innerContainer: {
-    justifyContent: "space-between",
+  flex: {
     flex: 1,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
   },
-  headerRow: {
+  barsRow: {
+    position: "absolute",
+    left: CARD_PAD_H,
+    right: CARD_PAD_H,
+    flexDirection: "row",
+    gap: 6,
+  },
+  titlesRow: {
+    position: "absolute",
+    left: CARD_PAD_H,
+    right: CARD_PAD_H,
+    height: TITLES_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  locationRow: {
-    flexDirection: "row",
+  info: {
+    position: "absolute",
+    left: 0,
+    right: 0,
     alignItems: "center",
   },
-  genreRow: {
+  actionsRow: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: ACTIONS_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginVertical: 12,
-  },
-  footerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  sliderContainer: {
-    width: "100%",
-    alignItems: "center",
-    marginTop: 12,
-    marginBottom: 20,
-  },
-  sliderTrack: {
-    width: "100%",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderRadius: 100,
-    overflow: "hidden",
-    gap: 8,
-  },
-  bottomContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    marginTop: 30,
-    padding: 6,
+    justifyContent: "center",
     gap: 16,
   },
 });
-
-export default MatchCardSkeleton;

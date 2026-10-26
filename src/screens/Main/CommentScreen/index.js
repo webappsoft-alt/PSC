@@ -36,6 +36,7 @@ import CommentModal from "./molecules/CommentModal";
 import LinearGradient from "react-native-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { useTheme } from "../../../contexts/ThemeContext";
+import UserBadge from "../../../components/UserBadge";
 
 const CommentScreen = ({ route }) => {
   const navigation = useNavigation();
@@ -643,7 +644,7 @@ const CommentScreen = ({ route }) => {
               <View style={styles.userInfo}>
                 <View style={styles.nameRow}>
                   <CustomText label={displayName} color={colors.text} />
-                  <Image source={Images.verified} style={styles.verifiedIcon} />
+                  <UserBadge user={author} style={{ marginLeft: 4 }} />
                 </View>
                 <CustomText label={username} color={colors.textSecondary} />
               </View>

@@ -8,10 +8,18 @@ import CustomModal from "../../../../components/CustomModal";
 import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
+import Blur from "../../../../components/Blur";
 import { COLORS } from "../../../../utils/COLORS";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
-const ChatHeader = ({ title, location, type, showIcons = false, user }) => {
+const ChatHeader = ({
+  title,
+  location,
+  type,
+  showIcons = false,
+  user,
+  onSettingsPress,
+}) => {
   const navigation = useNavigation();
   const [isViewModal, setIsViewModal] = useState(false);
   const { colors, isDark } = useTheme();
@@ -73,6 +81,22 @@ const ChatHeader = ({ title, location, type, showIcons = false, user }) => {
           )}
         </View>
       </View>
+      {/* Figma Inbox_General-Default: 40 circle, white 8% + blur, tune 20 */}
+      {onSettingsPress && (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={onSettingsPress}
+          style={styles.settingsBtn}
+        >
+          <Blur blurType={isDark ? "dark" : "xlight"} borderRadius={100} />
+          <Icons
+            family="MaterialSymbolsRounded"
+            name="tune"
+            size={20}
+            color={colors.text}
+          />
+        </TouchableOpacity>
+      )}
       {showIcons && (
         <>
           <TouchableOpacity activeOpacity={0.6} style={[styles.backIcon]}>
@@ -147,6 +171,16 @@ const createStyles = (colors, isDark) => StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
+  },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 100,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 12,
+    backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(18, 18, 18, 0.08)",
   },
   userImage: {
     width: 24,

@@ -14,6 +14,7 @@ import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import { COLORS } from "../../../../utils/COLORS";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import { CURRENCIES } from "../../../../utils/currencies";
 
 const ageRatings = [
   { id: "Kids", title: "Under 10 years old" },
@@ -52,44 +53,8 @@ const visibleToOptions = [
   { id: "Private" },
 ];
 
-const currencyOptions = [
-  { id: "USD", title: "US Dollar" },
-  { id: "EUR", title: "Euro" },
-  { id: "GBP", title: "British Pound" },
-
-  { id: "AED", title: "UAE Dirham" },
-  { id: "SAR", title: "Saudi Riyal" },
-  { id: "QAR", title: "Qatari Riyal" },
-  { id: "KWD", title: "Kuwaiti Dinar" },
-
-  { id: "INR", title: "Indian Rupee" },
-  { id: "PKR", title: "Pakistani Rupee" },
-  { id: "BDT", title: "Bangladeshi Taka" },
-  { id: "LKR", title: "Sri Lankan Rupee" },
-  { id: "NPR", title: "Nepalese Rupee" },
-
-  { id: "CAD", title: "Canadian Dollar" },
-  { id: "AUD", title: "Australian Dollar" },
-  { id: "NZD", title: "New Zealand Dollar" },
-
-  { id: "CNY", title: "Chinese Yuan" },
-  { id: "JPY", title: "Japanese Yen" },
-  { id: "KRW", title: "South Korean Won" },
-
-  { id: "ZAR", title: "South African Rand" },
-  { id: "NGN", title: "Nigerian Naira" },
-  { id: "EGP", title: "Egyptian Pound" },
-
-  { id: "BRL", title: "Brazilian Real" },
-  { id: "ARS", title: "Argentine Peso" },
-  { id: "MXN", title: "Mexican Peso" },
-
-  { id: "TRY", title: "Turkish Lira" },
-  { id: "CHF", title: "Swiss Franc" },
-  { id: "SEK", title: "Swedish Krona" },
-  { id: "NOK", title: "Norwegian Krone" },
-  { id: "DKK", title: "Danish Krone" },
-];
+// shared list (also used by Shows › Create An Episode)
+const currencyOptions = CURRENCIES.map(({ id, title }) => ({ id, title }));
 
 const unitOptions = [
   { id: "g" },

@@ -28,6 +28,7 @@ import { useDispatch } from "react-redux";
 import fonts from "../../../assets/fonts";
 import { Images } from "../../../assets/images";
 import Blur from "../../../components/Blur";
+import Header from "../../../components/Header";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
 import Icons from "../../../components/Icons";
@@ -629,19 +630,9 @@ const CameraScreen = ({ isCameraActive = true }) => {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#000000" />
-        <View style={[styles.row, { gap: 12 }]}>
-          <TouchableOpacity
-            style={[styles.controlButton, { overflow: "hidden" }]}
-            onPress={handleClose}
-          >
-            <Blur />
-            <Image source={Images.back} style={{ height: 20, width: 20 }} />
-          </TouchableOpacity>
-          <CustomText
-            label={"Back"}
-            fontFamily={fonts.semiBold}
-            fontSize={20}
-          />
+        {/* below the notch / status bar, same back button as every other header */}
+        <View style={{ alignSelf: "stretch", paddingTop: insets.top }}>
+          <Header title="Back" onBackPress={handleClose} />
         </View>
         <View style={styles.permissionContainer}>
           <Icon name="camera-outline" size={80} color={COLORS.subtitle} />

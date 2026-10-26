@@ -1,6 +1,16 @@
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { useEffect, useRef, useState } from "react";
-import { FlatList, Keyboard, Platform, StyleSheet, View } from "react-native";
+import {
+  FlatList,
+  Keyboard,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import fonts from "../../../assets/fonts";
+import CustomText from "../../../components/CustomText";
+import Icons from "../../../components/Icons";
 import { useSelector } from "react-redux";
 import { Images } from "../../../assets/images";
 import ScreenWrapper from "../../../components/ScreenWrapper";
@@ -17,6 +27,7 @@ import AnimatedListItem from "../../../utils/AnimatedListItem";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 const InboxScreen = ({ route }) => {
+  const navigation = useNavigation();
   const { socket } = useSocket();
   const flatListRef = useRef(null);
   const { userData } = useSelector((state) => state.users);
@@ -452,6 +463,12 @@ const InboxScreen = ({ route }) => {
           }
           type={otherUser?.occupation?.jobTitle}
           status={otherUserTyping ? "Typing..." : ""} // Basic status
+          onSettingsPress={() =>
+            navigation.navigate("ConversationSettings", {
+              recipientId,
+              otherUser,
+            })
+          }
         />
       )}
       footerUnScrollable={() => (
@@ -487,11 +504,68 @@ const InboxScreen = ({ route }) => {
           ref={flatListRef}
           data={messages}
           showsVerticalScrollIndicator={false}
+          keyExtractor={(item, i) => item._id || i.toString()}
           contentContainerStyle={[
             styles.contentContainer,
             { paddingBottom: keyboardHeight + 10 },
+            messages.length === 0 && { flexGrow: 1 },
           ]}
-          keyExtractor={(item, i) => item._id || i.toString()}
+          ListEmptyComponent={
+            // inverted list flips its children — flip back so it reads normally
+            <View style={styles.empty}>
+              <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
+                <Icons
+                  family="MaterialSymbolsRoundedFilled"
+                  name="waving_hand"
+                  size={32}
+                  color={COLORS.gray64}
+                />
+              </View>
+              <CustomText
+                label="No messages yet"
+                fontSize={20}
+                fontFamily={fonts.semiBold}
+                letterSpacing={-0.5}
+                color={colors.text}
+                textAlign="center"
+                marginTop={16}
+              />
+              <CustomText
+                label={`Say hi to ${recipientName} and start the conversation.`}
+                fontSize={14}
+                color={COLORS.gray64}
+                textAlign="center"
+                marginTop={4}
+              />
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (!socket) return;
+                  socket.emit(
+                    "send:message",
+                    { participant_id: recipientId, content: "Hi 👋", type: "text" },
+                    (response) => {
+                      if (response?.success && response?.data) {
+                        setMessages((prev) =>
+                          prev.some((m) => m._id === response.data._id)
+                            ? prev
+                            : [response.data, ...prev],
+                        );
+                      }
+                    },
+                  );
+                }}
+                style={[styles.sayHi, { backgroundColor: colors.surfaceAlt }]}
+              >
+                <CustomText
+                  label="Say hi 👋"
+                  fontSize={14}
+                  fontFamily={fonts.medium}
+                  color={colors.text}
+                />
+              </TouchableOpacity>
+            </View>
+          }
           renderItem={({ item, index }) => {
             const getSenderName = (msg) => {
               if (!msg) return "";
@@ -556,6 +630,28 @@ const createStyles = (colors, isDark) => StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 10,
+  },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    transform: [{ scaleY: -1 }],
+  },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sayHi: {
+    marginTop: 24,
+    height: 40,
+    paddingHorizontal: 20,
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
   },
   timeBox: {
     backgroundColor: isDark ? COLORS.primaryColor : colors.surfaceAlt,

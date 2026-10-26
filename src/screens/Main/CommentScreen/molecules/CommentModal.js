@@ -639,7 +639,11 @@ const CommentModal = ({
         userImage={selectedComment?.user?.profile?.avatar || null}
         profileColor={selectedComment?.user?.profile?.profileColor}
         commentText={selectedComment?.comment || ""}
-        isVerified={selectedComment?.user?.isVerified}
+        isVerified={
+          selectedComment?.user?.profile?.isVerified ??
+          selectedComment?.user?.isVerified
+        }
+        accountType={selectedComment?.user?.accountType}
         userData={userData}
         commentUserId={selectedComment?.user?._id}
         isPinned={selectedComment?.isPinned}

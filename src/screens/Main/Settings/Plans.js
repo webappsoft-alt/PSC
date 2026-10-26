@@ -1,4 +1,4 @@
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useRoute } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useIAP } from "react-native-iap";
@@ -89,7 +89,12 @@ const Plans = () => {
   const { colors } = useTheme();
   const dispatch = useDispatch();
   const { userData } = useSelector((state) => state.users);
-  const [selectedTab, setSelectedTab] = useState(0);
+  // optional route param from the matching "Not enough extras" sheets
+  const route = useRoute();
+  const [selectedTab, setSelectedTab] = useState(() => {
+    const index = tabs.indexOf(route?.params?.tab);
+    return index >= 0 ? index : 0;
+  });
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
 

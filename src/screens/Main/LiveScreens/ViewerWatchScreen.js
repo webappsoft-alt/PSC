@@ -40,6 +40,7 @@ import fonts from "../../../assets/fonts";
 import { Images } from "../../../assets/images";
 import { Movie } from "../../../assets/svgs";
 import Text from "../../../components/ScaledText";
+import UserBadge from "../../../components/UserBadge";
 
 const _originalConsoleError = console.error;
 console.error = (...args) => {
@@ -101,12 +102,9 @@ const getAuthorMeta = (item, fallbackName) => {
     author?.profileImage ||
     author?.image ||
     null;
-  const isVerified =
-    author?.profile?.isVerified ||
-    author?.profile?.isPro ||
-    author?.role === "company" ||
-    author?.role === "individual";
-  return { displayName, username, avatar, isVerified };
+  const isVerified = !!(author?.profile?.isVerified ?? author?.isVerified);
+  const accountType = author?.accountType || "";
+  return { displayName, username, avatar, isVerified, accountType };
 };
 
 const reactionCountsFromItem = (item) => ({
@@ -1027,12 +1025,12 @@ const MeetingView = ({
                   <Text style={styles.displayName} numberOfLines={1}>
                     {authorMeta.displayName}
                   </Text>
-                  {authorMeta.isVerified ? (
-                    <Image
-                      source={Images.verified}
-                      style={styles.verifiedIcon}
-                    />
-                  ) : null}
+                  <UserBadge
+                    verified={authorMeta.isVerified}
+                    accountType={authorMeta.accountType}
+                    size={16}
+                    style={{ marginLeft: 6 }}
+                  />
                 </View>
                 <Text style={styles.username} numberOfLines={1}>
                   {authorMeta.username}

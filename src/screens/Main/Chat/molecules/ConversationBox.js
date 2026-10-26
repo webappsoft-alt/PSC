@@ -1,274 +1,241 @@
 import { useNavigation } from "@react-navigation/native";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { useSelector } from "react-redux";
 import fonts from "../../../../assets/fonts";
-import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
 import { COLORS } from "../../../../utils/COLORS";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
-const ConversationBox = ({ item }) => {
+/**
+ * Inbox row — Figma `Main-Chat` (7815:3751):
+ * 375×72 · padding 12/16 · gap 12 · centred.
+ * Avatar 48: ring 3 (#1ED760 online, white 16% offline) around a 42 photo;
+ * group = 2×2 grid of 24 tiles, outer corners 12.
+ * Name row: [briefcase 12 #A19375 + gap 2 when business] Medium 16 −0.5.
+ * Preview Medium 14 −0.5 @48%. Unread badge 24 #EE1045, SemiBold 12.
+ */
+const GOLD = "#A19375";
+const ONLINE = "#1ED760";
+
+const ConversationBox = ({ item, onLongPress }) => {
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
   const styles = createStyles(colors, isDark);
 
+  const { userData } = useSelector((state) => state.users);
   const otherUser = item?.otherUser;
+  // Figma: name 100%, preview 48%, on #121212 (mirrored for light mode)
+  const tint = (o) =>
+    isDark ? `rgba(255, 255, 255, ${o})` : `rgba(18, 18, 18, ${o})`;
+
+  // Group conversation (backend flags participants > 2): 2×2 avatar grid
+  const groupMembers = item?.isGroup
+    ? (item?.participants || []).filter(
+        (p) => p?._id && p._id !== userData?._id,
+      )
+    : [];
+  const isGroup = groupMembers.length > 1;
+  const title = isGroup
+    ? groupMembers
+        .map((p) => p?.firstName)
+        .filter(Boolean)
+        .join(", ")
+    : `${otherUser?.firstName || ""} ${otherUser?.lastName || ""}`.trim();
+  const unread = Number(item?.unreadCount) || 0;
+
+  // PSC users keep their photo in profile.avatar (backend sets a default)
+  const avatarUri = (user) => user?.profile?.avatar || user?.profilePicture;
+  const initials = (user) =>
+    `${user?.firstName?.[0] || ""}${user?.lastName?.[0] || ""}`.toUpperCase() ||
+    "?";
+  // photo, or the user's initials on their profile colour — never a stock face
+  const renderAvatar = (user, style, fontSize, key) =>
+    avatarUri(user) ? (
+      <ImageFast key={key} source={{ uri: avatarUri(user) }} style={style} />
+    ) : (
+      <View
+        key={key}
+        style={[
+          style,
+          styles.initials,
+          { backgroundColor: user?.profile?.profileColor || tint(0.08) },
+        ]}
+      >
+        <CustomText
+          label={initials(user)}
+          fontSize={fontSize}
+          fontFamily={fonts.semiBold}
+          color={COLORS.primaryColor}
+        />
+      </View>
+    );
+
+  const preview =
+    item?.lastMessage?.type == "voice"
+      ? "🎤 Voice Message"
+      : item?.lastMessage?.type == "image"
+      ? "📷 Image"
+      : item?.lastMessage?.type == "file"
+      ? "📹 Video"
+      : item?.lastMessage?.content || "No messages yet · Say hi 👋";
 
   return (
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.7}
+      delayLongPress={350}
+      onLongPress={
+        // a matched person without a chat yet has nothing to pin / mark
+        item?.noConversation || !onLongPress ? undefined : () => onLongPress(item)
+      }
       onPress={() =>
         navigation.navigate("InboxScreen", {
           recipientId: otherUser?._id,
-          recipientName: `${otherUser?.firstName} ${otherUser?.lastName}`,
+          recipientName: title,
           otherUser,
         })
       }
     >
-      <ImageFast
-        source={
-          otherUser?.profilePicture
-            ? { uri: otherUser?.profilePicture }
-            : Images.ChatUserProfile
-        }
-        style={item?.isRequest ? styles.avatarRequest : styles.avatar}
-      />
-      <View style={styles.textBox}>
-        <View>
-          {item?.isRequest && item?._id === 1 && (
-            <>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <View style={styles.requestbadge}>
-                  <CustomText
-                    fontSize={12}
-                    label="Looking for Jam Session"
-                    fontFamily={fonts.medium}
-                    numberOfLines={1}
-                    color={colors.textSecondary}
-                  />
-                </View>
-                <View style={styles.turn}>
-                  <CustomText
-                    label={"Your Turn"}
-                    fontSize={10}
-                    alignSelf={"flex-end"}
-                    numberOfLines={1}
-                    color={colors.text}
-                    fontFamily={fonts.semiBold}
-                  />
-                </View>
-              </View>
-            </>
-          )}
-          <View
-            style={{ flexDirection: "row", justifyContent: "space-between" }}
-          >
-            <View>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
-              >
-                <CustomText
-                  fontSize={16}
-                  label={otherUser?.firstName + " " + otherUser?.lastName}
-                  fontFamily={fonts.medium}
-                />
-                {item?.isRequest && item?._id === 1 && (
-                  <>
-                    <ImageFast
-                      source={Images.GreyVerified}
-                      resizeMode={"contain"}
-                      style={styles.verified}
-                    />
-                    <ImageFast
-                      source={Images.PscStart}
-                      resizeMode={"contain"}
-                      style={styles.verified}
-                    />
-                  </>
-                )}
-              </View>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
-              >
-                {item?.isRequest && item?._id === 1 && (
-                  <View style={styles.Newdot} />
-                )}
-                <CustomText
-                  color={colors.textSecondary}
-                  fontFamily={fonts.medium}
-                  label={
-                    item?.lastMessage?.type == "voice"
-                      ? "🎤 Voice Message"
-                      : item?.lastMessage?.type == "image"
-                      ? "📷 Image"
-                      : item?.lastMessage?.type == "file"
-                      ? "📹 Video"
-                      : item?.lastMessage?.content
-                  }
-                />
-                {item?.isRequest && item?._id === 1 && (
-                  <>
-                    <View style={styles.separatDot} />
-                    <Icons
-                      name={"checkmark-done"}
-                      family={"Ionicons"}
-                      size={11}
-                      color={colors.text}
-                    />
-                  </>
-                )}
-              </View>
+      {isGroup ? (
+        <View style={styles.groupGrid}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={[styles.groupCell, styles[`groupCell${i}`]]}>
+              {renderAvatar(
+                groupMembers[i % groupMembers.length],
+                styles.groupImage,
+                10,
+              )}
             </View>
-            {item?.isRequest && item?._id === 1 && (
-              <View>
-                <CustomText
-                  label={"10:55 PM"}
-                  fontSize={12}
-                  alignSelf={"flex-end"}
-                  numberOfLines={1}
-                  color={colors.textSecondary}
-                  fontFamily={fonts.medium}
-                />
-                <View style={styles.count}>
-                  <CustomText
-                    label={"12"}
-                    fontSize={10}
-                    alignSelf={"flex-end"}
-                    numberOfLines={1}
-                    color={colors.text}
-                    fontFamily={fonts.medium}
-                  />
-                </View>
-              </View>
-            )}
-          </View>
+          ))}
         </View>
-      </View>
+      ) : (
+        <View
+          style={[
+            styles.ring,
+            { backgroundColor: item?.isOnline ? ONLINE : tint(0.16) },
+          ]}
+        >
+          {renderAvatar(otherUser, styles.avatar, 15)}
+        </View>
+      )}
 
-      <View style={styles.row}>
-        {item?.unreadCount != 0 && (
-          <View style={styles.badge}>
-            <CustomText
-              label={item?.unreadCount}
-              fontSize={10}
-              numberOfLines={1}
-              color={COLORS.primaryColor}
-              fontFamily={fonts.medium}
-            />
-          </View>
-        )}
-
-        {!item?.isRequest && (
-          <TouchableOpacity>
+      <View style={styles.textBox}>
+        <View style={styles.nameRow}>
+          {item?.isBusiness && (
             <Icons
-              size={20}
-              family={"Entypo"}
-              name={"chevron-right"}
-              color={colors.textSecondary}
+              family="MaterialSymbolsRoundedFilled"
+              name="work"
+              size={12}
+              color={GOLD}
             />
-          </TouchableOpacity>
-        )}
+          )}
+          <CustomText
+            fontSize={16}
+            label={title}
+            fontFamily={fonts.medium}
+            letterSpacing={-0.5}
+            color={colors.text}
+            numberOfLines={1}
+            containerStyle={styles.shrink}
+          />
+        </View>
+        <CustomText
+          fontSize={14}
+          color={tint(0.48)}
+          fontFamily={fonts.medium}
+          letterSpacing={-0.5}
+          numberOfLines={1}
+          marginTop={1.4}
+          label={preview}
+        />
       </View>
+
+      {unread > 0 && (
+        <View style={styles.badge}>
+          <CustomText
+            label={unread > 99 ? "99+" : String(unread)}
+            fontSize={12}
+            letterSpacing={-0.5}
+            numberOfLines={1}
+            color={COLORS.white}
+            fontFamily={fonts.semiBold}
+          />
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
 
 export default ConversationBox;
 
-const createStyles = (colors, isDark) => StyleSheet.create({
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: isDark ? "#262626" : colors.border,
-    paddingHorizontal: 15,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-  },
-  avatarRequest: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    borderWidth: 2,
-    borderColor: "#1ED760",
-  },
-
-  textBox: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    columnGap: 10,
-  },
-  badge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#EE1045",
-  },
-
-  requestbadge: {
-    backgroundColor: isDark ? "#262626" : colors.white04,
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    alignSelf: "flex-start",
-  },
-
-  verified: {
-    height: 12,
-    width: 12,
-  },
-
-  Newdot: {
-    width: 8,
-    height: 8,
-    borderRadius: 3,
-    backgroundColor: "#A19375",
-  },
-  separatDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 3,
-    backgroundColor: isDark ? "#FFFFFF7A" : "rgba(18, 18, 18, 0.32)",
-  },
-
-  yourTurn: {
-    backgroundColor: isDark ? "#262626" : colors.white04,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 100,
-    alignSelf: "flex-end",
-  },
-
-  count: {
-    backgroundColor: isDark ? "#FFFFFF29" : "rgba(18, 18, 18, 0.08)",
-    padding: 2,
-    borderRadius: 2,
-    alignSelf: "flex-end",
-    marginTop: 5,
-  },
-
-  turn: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 100,
-    alignSelf: "flex-end",
-    backgroundColor: isDark ? "#262626" : colors.white04,
-  },
-});
+const createStyles = (colors, isDark) =>
+  StyleSheet.create({
+    card: {
+      flexDirection: "row",
+      alignItems: "center",
+      minHeight: 72,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      gap: 12,
+    },
+    // Figma "Frame 1329": 48 circle, padding 3, photo 42
+    ring: {
+      width: 48,
+      height: 48,
+      borderRadius: 100,
+      padding: 3,
+    },
+    avatar: {
+      width: 42,
+      height: 42,
+      borderRadius: 100,
+    },
+    initials: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    // Group: 48×48 grid of four 24×24 tiles, outer corners rounded 12
+    groupGrid: {
+      width: 48,
+      height: 48,
+      flexDirection: "row",
+      flexWrap: "wrap",
+    },
+    groupCell: {
+      width: 24,
+      height: 24,
+      overflow: "hidden",
+    },
+    groupImage: {
+      width: 24,
+      height: 24,
+    },
+    groupCell0: { borderTopLeftRadius: 12 },
+    groupCell1: { borderTopRightRadius: 12 },
+    groupCell2: { borderBottomLeftRadius: 12 },
+    groupCell3: { borderBottomRightRadius: 12 },
+    textBox: {
+      flex: 1,
+    },
+    // Figma "Frame 2085664190": briefcase 12 · gap 2 · name
+    nameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 2,
+    },
+    shrink: {
+      flexShrink: 1,
+    },
+    // Figma: 24 circle #EE1045, SemiBold 12 white
+    badge: {
+      minWidth: 24,
+      height: 24,
+      borderRadius: 100,
+      paddingHorizontal: 4,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: COLORS.red1,
+    },
+  });

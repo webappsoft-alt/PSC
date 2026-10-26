@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useDispatch } from "react-redux";
 
 import ScreenWrapper from "../../../components/ScreenWrapper";
@@ -30,10 +30,14 @@ const MAX_LENGTH = 37;
  */
 const Login = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const dispatch = useDispatch();
   const p = useAuthPalette();
 
-  const [identifier, setIdentifier] = useState("");
+  // Prefilled when a saved account's session expired (profile selector).
+  const [identifier, setIdentifier] = useState(
+    String(route?.params?.identifier || ""),
+  );
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);

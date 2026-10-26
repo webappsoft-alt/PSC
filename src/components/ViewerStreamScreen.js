@@ -56,6 +56,7 @@ import QuestionModal from "./QuestionModal";
 import { useSocket } from "./SocketProvider";
 import UploadImageCustom from "./UploadImageCustom";
 import Text from "./ScaledText";
+import UserBadge from "./UserBadge";
 
 const QUESTION_PAYMENT_USD = 5;
 const PAYMENT_INTENT_ENDPOINTS = [
@@ -212,12 +213,9 @@ const getAuthorMeta = (item, fallbackName) => {
     author?.profileImage ||
     author?.image ||
     null;
-  const isVerified =
-    author?.profile?.isVerified ||
-    author?.profile?.isPro ||
-    author?.role === "company" ||
-    author?.role === "individual";
-  return { displayName, username, avatar, isVerified };
+  const isVerified = !!(author?.profile?.isVerified ?? author?.isVerified);
+  const accountType = author?.accountType || "";
+  return { displayName, username, avatar, isVerified, accountType };
 };
 
 const getQuestionUser = (question) => {
@@ -283,6 +281,8 @@ const getQuestionUserMeta = (question) => {
     user?.image ||
     null;
   const isPro = Boolean(user?.profile?.isPro || user?.isPro);
+  const isVerified = !!(user?.profile?.isVerified ?? user?.isVerified);
+  const accountType = user?.accountType || "";
 
   return {
     displayName,
@@ -291,6 +291,8 @@ const getQuestionUserMeta = (question) => {
       : `@${usernameRaw || "username"}`,
     avatar,
     isPro,
+    isVerified,
+    accountType,
   };
 };
 
@@ -322,6 +324,8 @@ const parseLiveQuestion = (first) => {
     username: userMeta.username,
     avatar: userMeta.avatar,
     isPro: userMeta.isPro,
+    isVerified: userMeta.isVerified,
+    accountType: userMeta.accountType,
     createdAt:
       String(first?.createdAt ?? first?.created_at ?? "") ||
       new Date().toISOString(),
@@ -2354,12 +2358,12 @@ const MeetingView = ({
                   <Text style={styles.displayName} numberOfLines={1}>
                     {authorMeta.displayName}
                   </Text>
-                  {authorMeta.isVerified ? (
-                    <Image
-                      source={Images.verified}
-                      style={styles.verifiedIcon}
-                    />
-                  ) : null}
+                  <UserBadge
+                    verified={authorMeta.isVerified}
+                    accountType={authorMeta.accountType}
+                    size={16}
+                    style={{ marginLeft: 6 }}
+                  />
                 </View>
                 <Text style={styles.username} numberOfLines={1}>
                   {authorMeta.username}
@@ -2514,12 +2518,11 @@ const MeetingView = ({
                       <Text style={styles.liveQuestionName} numberOfLines={1}>
                         {liveQuestion.displayName}
                       </Text>
-                      {liveQuestion.isPro ? (
-                        <Image
-                          source={Images.verified}
-                          style={styles.questionVerified}
-                        />
-                      ) : null}
+                      <UserBadge
+                        verified={liveQuestion.isVerified}
+                        accountType={liveQuestion.accountType}
+                        style={{ marginLeft: 4 }}
+                      />
                       <Text style={styles.metaDot}>•</Text>
                       <View style={styles.usernamePill}>
                         <Text style={styles.usernamePillText} numberOfLines={1}>
@@ -3086,6 +3089,7 @@ const MeetingView = ({
         creatorDisplayName={authorMeta.displayName}
         creatorAvatar={authorMeta.avatar}
         creatorIsVerified={authorMeta.isVerified}
+        creatorAccountType={authorMeta.accountType}
         onDonationResponse={handleGiftDonationResponse}
         onGiftSent={handleGiftSent}
       />

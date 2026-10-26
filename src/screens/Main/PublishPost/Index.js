@@ -303,7 +303,9 @@ const CreatePost = ({ route }) => {
   );
   const [location, setLocation] = useState(transformedPost?.location || null);
   const [collaborators, setCollaborators] = useState(
-    transformedPost?.collaborators || [],
+    // Profile "Mention" button pre-tags that user
+    transformedPost?.collaborators ||
+      (route?.params?.mentionUser?._id ? [route.params.mentionUser] : []),
   );
   const [sponsors, setSponsors] = useState(transformedPost?.sponsors || []);
   const [startDate, setStartDate] = useState(

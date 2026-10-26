@@ -16,6 +16,7 @@ import CustomText from "../../../../components/CustomText";
 import ImageFast from "../../../../components/ImageFast";
 import { get } from "../../../../services/ApiRequest";
 import { COLORS } from "../../../../utils/COLORS";
+import UserBadge from "../../../../components/UserBadge";
 
 const CollaborationModal = ({
   isVisible,
@@ -119,7 +120,7 @@ const CollaborationModal = ({
                 fontFamily={fonts.medium}
                 marginRight={4}
               />
-              <Image source={Images.verified} style={styles.verifiedBadge} />
+              <UserBadge user={item} style={{ marginRight: 2 }} />
               <View
                 style={{
                   padding: 5,

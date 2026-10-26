@@ -221,7 +221,10 @@ const AccountInfo = () => {
         phone: values.phoneNumber,
         dob: moment(values.birthDate).format("YYYY-MM-DD"),
         gender: values.gender.toLowerCase(),
-        accountType: values.accountType.toLowerCase(),
+        // Backend enum is camelCase ("premiumPlus"): only lower the first letter
+        accountType:
+          values.accountType.charAt(0).toLowerCase() +
+          values.accountType.slice(1),
         industry: userData?.industry || "Technology",
         occupation: {
           jobTitle: values.jobTitle,

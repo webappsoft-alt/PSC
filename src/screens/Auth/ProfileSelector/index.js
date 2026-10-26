@@ -32,6 +32,7 @@ import {
 } from "../../../store/reducer/usersSlice";
 import { accountId, buildSavedAccount } from "../../../utils/accountSession";
 import { hasProfilePin } from "../../../utils/profileLock";
+import UserBadge from "../../../components/UserBadge";
 
 const GAP = 8;
 const CARD_RADIUS = 48;
@@ -75,14 +76,12 @@ const AccountCard = ({ account, size, onPress }) => {
           color={p.text}
           numberOfLines={1}
         />
-        {account?.isPro || account?.isVerified ? (
-          <Icons
-            family="MaterialSymbolsRoundedFilled"
-            name="verified"
-            size={12}
-            color={p.blue}
-          />
-        ) : null}
+        <UserBadge
+          verified={account?.isVerified}
+          accountType={account?.accountType}
+          size={12}
+          mutedColor={p.t64}
+        />
       </View>
       <CustomText
         label={account?.isPro ? "Pro User" : "Regular User"}

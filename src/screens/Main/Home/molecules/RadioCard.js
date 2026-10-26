@@ -20,6 +20,7 @@ import {
 import { COLORS } from "../../../../utils/COLORS";
 import moment from "moment";
 import Blur from "../../../../components/Blur";
+import UserBadge from "../../../../components/UserBadge";
 
 const RadioCard = ({ data = [] }) => {
   const dispatch = useDispatch();
@@ -182,14 +183,7 @@ const RadioCard = ({ data = [] }) => {
                         color={colors.text}
                         style={{ flexShrink: 1 }}
                       />
-                      {isVerified ? (
-                        <Icons
-                          family="MaterialSymbolsRoundedFilled"
-                          name="verified"
-                          size={14}
-                          color="#007BFF"
-                        />
-                      ) : null}
+                      <UserBadge user={item?.userId} />
                     </View>
                   </View>
 

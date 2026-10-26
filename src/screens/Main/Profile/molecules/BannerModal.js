@@ -20,6 +20,7 @@ import { setUserData } from "../../../../store/reducer/usersSlice";
 import { COLORS } from "../../../../utils/COLORS";
 import { uploadAndGetUrl } from "../../../../utils/constants";
 import { ToastMessage } from "../../../../utils/ToastMessage";
+import UserBadge from "../../../../components/UserBadge";
 
 const BannerModal = ({ isVisible, onClose, user, onHidePress }) => {
   const dispatch = useDispatch();
@@ -177,18 +178,7 @@ const BannerModal = ({ isVisible, onClose, user, onHidePress }) => {
                     fontFamily={fonts.medium}
                     fontSize={16}
                   />
-                  {user?.role === "individual" && (
-                    <ImageFast
-                      source={Images.verified}
-                      style={styles.verifiedBadge}
-                    />
-                  )}
-                  {user?.role === "company" && (
-                    <ImageFast
-                      source={Images.grayStar}
-                      style={styles.verifiedBadge}
-                    />
-                  )}
+                  <UserBadge user={user} size={16} />
                 </View>
                 <CustomText
                   label={`${username}`}

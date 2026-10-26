@@ -35,6 +35,7 @@ import { Images } from "../assets/images";
 import ImageFast from "./ImageFast";
 import { useTheme } from "../contexts/ThemeContext";
 import Text from "./ScaledText";
+import UserBadge from "./UserBadge";
 
 const colors = {
   black: COLORS.black,
@@ -181,6 +182,7 @@ export default function GiftModal({
   creatorDisplayName,
   creatorAvatar,
   creatorIsVerified,
+  creatorAccountType,
   coinBalance = 5000,
   onGiftSent,
   onDonationResponse,
@@ -518,14 +520,10 @@ export default function GiftModal({
             <Text style={[styles.displayName, { color: themeColors.text }]} numberOfLines={1}>
               {displayName}
             </Text>
-            {creatorIsVerified ? (
-              <Icons
-                family="MaterialIcons"
-                name="verified"
-                size={14}
-                color="#007BFF"
-              />
-            ) : null}
+            <UserBadge
+              verified={creatorIsVerified}
+              accountType={creatorAccountType}
+            />
           </View>
           <Text style={[styles.username, { color: themeColors.textSecondary }]} numberOfLines={1}>
             {handleLine}

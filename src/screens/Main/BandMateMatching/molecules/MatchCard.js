@@ -8,30 +8,22 @@ import {
   useState,
 } from "react";
 import {
-  Alert,
   Animated,
   Dimensions,
-  Image,
   PanResponder,
-  Platform,
   Pressable,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTabBarVisibility } from "../../../../navigation/TabStack";
+import { getNavBarClearance, useTabBarVisibility } from "../../../../navigation/TabStack";
+import FastImage from "react-native-fast-image";
 import LinearGradient from "react-native-linear-gradient";
-import {
-  gyroscope,
-  SensorTypes,
-  setUpdateIntervalForType,
-} from "react-native-sensors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 import fonts from "../../../../assets/fonts";
-import { Images } from "../../../../assets/images";
-import { PNGIcons } from "../../../../assets/images/icons";
-import Blur from "../../../../components/Blur";
 import CustomText from "../../../../components/CustomText";
+import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
 import { post } from "../../../../services/ApiRequest";
 import {
@@ -40,19 +32,44 @@ import {
 } from "../../../../store/reducer/MatchingSlice";
 import { setUserData } from "../../../../store/reducer/usersSlice";
 import { COLORS } from "../../../../utils/COLORS";
+import { COUNTRIES } from "../../../../utils/COUNTRIES";
 import { ToastMessage } from "../../../../utils/ToastMessage";
+import {
+  ACTIONS_ABOVE_NAV,
+  ACTIONS_HEIGHT,
+  BARS_HEIGHT,
+  BARS_TOP_FROM_INSET,
+  CARD_PAD_H,
+  GlassFill,
+  INFO_ABOVE_ACTIONS,
+  INFO_PAD_H,
+  TITLES_GAP,
+  TITLES_HEIGHT,
+  capGap,
+} from "./matchLayout";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-const MatchCard = ({ isCross, data }) => {
+const MatchCard = ({ data, onExtrasNeeded, onMatch }) => {
+  const insets = useSafeAreaInsets();
+  const navClearance = getNavBarClearance(insets.bottom);
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const { userData } = useSelector((state) => state.users);
+  // The PanResponder (created once) calls into these handlers, so they read
+  // the latest user (super like / boost counts) through a ref, not a stale
+  // first-render copy
+  const userDataRef = useRef(userData);
+  userDataRef.current = userData;
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   // Redux is the single source of truth for the stack, a local copy of it can
   // fall out of sync and bring an already swiped profile back on screen
   const cards = useMemo(() => (Array.isArray(data) ? data : []), [data]);
   const [history, setHistory] = useState([]);
+  // Figma "NOT ENOUGH EXTRAS" sheet / It's-a-match live on the screen
+  // (index.js) so they survive this stack unmounting after the last card
+  const setExtrasSheet = (type) => onExtrasNeeded?.(type);
+  const setMatch = (payload) => onMatch?.(payload);
   // Set while the final card leaves, so the wrapper is hidden with a plain
   // (non-animated) style before the whole component unmounts
   const [isLastCardLeaving, setIsLastCardLeaving] = useState(false);
@@ -63,7 +80,6 @@ const MatchCard = ({ isCross, data }) => {
   const pagerScrollRef = useRef();
   pagerScrollRef.current = setPagerScrollEnabled;
 
-  const nextCardLift = useRef(new Animated.Value(10)).current;
   const sliderAnimation = useRef(new Animated.Value(0)).current;
 
   const currentCardRef = useRef(null);
@@ -87,9 +103,6 @@ const MatchCard = ({ isCross, data }) => {
   const gradientOpacity = useRef(new Animated.Value(0)).current;
   const gradientTranslateY = useRef(new Animated.Value(200)).current;
 
-  // Next card animations
-  const nextCardScale = useRef(new Animated.Value(0.9)).current;
-  const nextCardTranslateY = useRef(new Animated.Value(10)).current;
 
   // Gesture animations
   const pan = useRef(new Animated.ValueXY()).current;
@@ -117,7 +130,7 @@ const MatchCard = ({ isCross, data }) => {
       rotation: 0,
     },
     {
-      colors: ["#1ED760", "#1ED76000"],
+      colors: ["#64CD75", "#64CD7500"],
       direction: "right",
       rotation: 8,
     },
@@ -198,27 +211,18 @@ const MatchCard = ({ isCross, data }) => {
     if (!backendKey) return true;
 
     const count =
-      userData?.[backendKey] ?? userData?.profile?.[backendKey] ?? 0;
+      userDataRef.current?.[backendKey] ??
+      userDataRef.current?.profile?.[backendKey] ??
+      0;
     if (count <= 0) {
-      Alert.alert(
-        `No more ${type === "superlike" ? "Super Like" : type}s`,
-        `You have no more ${
-          type === "superlike" ? "Super Like" : type
-        }s left. Would you like to buy more?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Buy More",
-            onPress: () => navigation.navigate("Plans"),
-          },
-        ],
-      );
+      // Figma "NOT ENOUGH EXTRAS" sheet (superlike / rewind / boost)
+      setExtrasSheet(type);
       return false;
     }
     return true;
   };
 
-  const handleInteraction = async (type, profileId) => {
+  const handleInteraction = async (type, profileId, profile) => {
     try {
       let body = {
         toUser: profileId,
@@ -239,7 +243,7 @@ const MatchCard = ({ isCross, data }) => {
         const backendKey = keyMap[type];
 
         if (backendKey) {
-          let newUserData = { ...userData };
+          let newUserData = { ...userDataRef.current };
           if (
             newUserData.profile &&
             newUserData.profile[backendKey] !== undefined
@@ -262,9 +266,31 @@ const MatchCard = ({ isCross, data }) => {
       }
 
       const response = await post("matching/interactions", body);
-      // console.log("interaction response------>", response.data);
+      const result = response?.data?.data;
+      if (result?.isMatch && profile) {
+        const id = profile._id || profile.id;
+        // The modal is normally already open (predicted from hasLikedMe):
+        // only add the server's matchData (conversationId for "Say hi!").
+        // Unpredicted match → open it now.
+        setMatch((prev) =>
+          prev && (prev.profile?._id || prev.profile?.id) === id
+            ? { ...prev, matchData: result.matchData }
+            : prev || {
+                profile,
+                matchData: result.matchData,
+                interactionType: type,
+              },
+        );
+      }
+      return result || null;
     } catch (error) {
+      // a like refused for a limit → "No more likes?" sheet
+      const status = error?.response?.status ?? error?.status;
+      if ((type === "like" || type === "superlike") && (status === 403 || status === 429)) {
+        setExtrasSheet(type === "like" ? "likes" : "superlike");
+      }
       console.error(`Error with ${type} interaction:`, error);
+      return null;
     }
   };
 
@@ -316,33 +342,20 @@ const MatchCard = ({ isCross, data }) => {
     isAnimatingRef.current = true;
 
     // Call API
-    handleInteraction(interactionType, profileId);
+    handleInteraction(interactionType, profileId, currentProfile);
+
+    // Liking someone who already liked you is always a match (the server
+    // checks the same like / super like). Open "It's a match" right away over
+    // THIS card and keep it on screen; it leaves once the modal is closed.
+    const willMatch =
+      ["like", "superlike", "boost"].includes(interactionType) &&
+      !!currentProfile.hasLikedMe;
 
     // Set gradient colors
     setCurrentGradientColors(action.colors);
 
     // Reset gradient position to bottom before animation
     gradientTranslateY.setValue(200);
-
-    // Animate next card coming forward
-    Animated.parallel([
-      Animated.timing(nextCardScale, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: false,
-      }),
-      Animated.timing(nextCardTranslateY, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: false,
-      }),
-      Animated.spring(nextCardLift, {
-        toValue: -25, // 👈 upward lift changed to -25 to match marginTop: 25
-        friction: 5,
-        tension: 60,
-        useNativeDriver: false,
-      }),
-    ]).start();
 
     // Animate gradient appearance from bottom to top
     Animated.sequence([
@@ -365,8 +378,7 @@ const MatchCard = ({ isCross, data }) => {
       }),
     ]).start();
 
-    // Animate card movement after a short delay
-    setTimeout(() => {
+    const flyOut = () => {
       const animations = [];
 
       if (action.direction === "left") {
@@ -414,7 +426,21 @@ const MatchCard = ({ isCross, data }) => {
           goToNextCard();
         }, 100);
       });
-    }, 400);
+    };
+
+    if (willMatch) {
+      setMatch({
+        profile: currentProfile,
+        matchData: null,
+        interactionType,
+        // called by the screen when the modal closes
+        onDone: () => setTimeout(flyOut, 150),
+      });
+      return;
+    }
+
+    // Animate card movement after a short delay
+    setTimeout(flyOut, 400);
   };
 
   const goToNextCard = () => {
@@ -461,17 +487,12 @@ const MatchCard = ({ isCross, data }) => {
     translateX.setValue(0);
     translateY.setValue(0);
     rotateCard.setValue(0);
-    nextCardLift.setValue(10);
     gradientOpacity.setValue(0);
     gradientTranslateY.setValue(200);
     setCurrentGradientColors(["transparent", "transparent"]);
     pan.setValue({ x: 0, y: 0 });
     rotate.setValue(0);
     sliderAnimation.setValue(0);
-
-    // Reset next card animation for next swipe
-    nextCardScale.setValue(0.9);
-    nextCardTranslateY.setValue(10);
   };
 
   // The animated values are shared by every card, so they are reset only when
@@ -518,7 +539,7 @@ const MatchCard = ({ isCross, data }) => {
             setCurrentGradientColors(["#FF4B4B", "#FF4B4B00"]);
           } else {
             // Swiping right - green gradient
-            setCurrentGradientColors(["#1ED760", "#1ED76000"]);
+            setCurrentGradientColors(["#64CD75", "#64CD7500"]);
           }
 
           // Calculate opacity based on swipe distance
@@ -588,7 +609,7 @@ const MatchCard = ({ isCross, data }) => {
           isAnimatingRef.current = true;
 
           // Set gradient for right swipe
-          setCurrentGradientColors(["#1ED760", "#1ED76000"]);
+          setCurrentGradientColors(["#64CD75", "#64CD7500"]);
           gradientTranslateY.setValue(200);
 
           // Animate gradient appearance
@@ -612,20 +633,27 @@ const MatchCard = ({ isCross, data }) => {
             }),
           ]).start();
 
-          Animated.parallel([
-            Animated.timing(pan, {
-              toValue: { x: screenWidth * 2, y: dy },
-              duration: 300,
-              useNativeDriver: false,
-            }),
-            Animated.timing(rotate, {
-              toValue: 15,
-              duration: 300,
-              useNativeDriver: false,
-            }),
-          ]).start(() => {
-            handleSwipe("right");
-          });
+          if (currentCardRef.current?.hasLikedMe) {
+            // predicted match: card settles back under "It's a match"
+            Animated.parallel([
+              Animated.spring(pan, { toValue: { x: 0, y: 0 }, ...MATCH_SETTLE }),
+              Animated.spring(rotate, { toValue: 0, ...MATCH_SETTLE }),
+            ]).start();
+          } else {
+            Animated.parallel([
+              Animated.timing(pan, {
+                toValue: { x: screenWidth * 2, y: dy },
+                duration: 300,
+                useNativeDriver: false,
+              }),
+              Animated.timing(rotate, {
+                toValue: 15,
+                duration: 300,
+                useNativeDriver: false,
+              }),
+            ]).start();
+          }
+          handleSwipe("right");
         }
         // Check if it's an upward swipe
         else if (dy < -swipeThreshold || vy < -velocityThreshold) {
@@ -656,13 +684,20 @@ const MatchCard = ({ isCross, data }) => {
           // Block further gestures until this card has been replaced
           isAnimatingRef.current = true;
 
-          Animated.timing(pan, {
-            toValue: { x: dx, y: -screenHeight * 2 },
-            duration: 300,
-            useNativeDriver: false,
-          }).start(() => {
-            handleSwipe("up");
-          });
+          if (currentCardRef.current?.hasLikedMe) {
+            // predicted match: card settles back under "It's a match"
+            Animated.parallel([
+              Animated.spring(pan, { toValue: { x: 0, y: 0 }, ...MATCH_SETTLE }),
+              Animated.spring(rotate, { toValue: 0, ...MATCH_SETTLE }),
+            ]).start();
+          } else {
+            Animated.timing(pan, {
+              toValue: { x: dx, y: -screenHeight * 2 },
+              duration: 300,
+              useNativeDriver: false,
+            }).start();
+          }
+          handleSwipe("up");
         }
         // If not a swipe, return to original position
         else {
@@ -727,6 +762,30 @@ const MatchCard = ({ isCross, data }) => {
   const currentProfile = cards[0];
   const nextProfile = cards[1];
 
+  // Figma › Matching › New-Home: everything is laid out from the safe-area
+  // top (story bars / title row) and from the nav bar (action row / info)
+  const barsTop = insets.top + BARS_TOP_FROM_INSET;
+  const titlesTop = barsTop + BARS_HEIGHT + TITLES_GAP;
+  const actionsBottom = navClearance + ACTIONS_ABOVE_NAV;
+  const infoBottom = actionsBottom + ACTIONS_HEIGHT + INFO_ABOVE_ACTIONS;
+
+  // Client: tapping the photo opens the person's profile directly (no
+  // MatchingDetail page in PSC)
+  const openDetail = (profile) => {
+    const userId = profile?._id || profile?.id;
+    if (userId) navigation.navigate("UserProfile", { userId });
+  };
+
+  // Client: no card pile. The next profile sits exactly under the top card
+  // (invisible at rest); warm its photos so it is ready when revealed.
+  useEffect(() => {
+    const p = nextProfile?.profile;
+    const uris = (
+      p?.matchingImages?.length ? p.matchingImages : p?.avatar ? [p.avatar] : []
+    ).filter((u) => typeof u === "string" && u);
+    if (uris.length) FastImage.preload(uris.map((uri) => ({ uri })));
+  }, [nextProfile?._id]);
+
   const renderCard = (profile, isCurrent = true) => {
     // Determine the images to show
     const imagesToDisplay =
@@ -743,6 +802,7 @@ const MatchCard = ({ isCross, data }) => {
     const calculateAge = (dobString) => {
       if (!dobString) return "";
       const birthDate = new Date(dobString);
+      if (isNaN(birthDate.getTime())) return "";
       const today = new Date();
       let ageValue = today.getFullYear() - birthDate.getFullYear();
       const m = today.getMonth() - birthDate.getMonth();
@@ -753,250 +813,327 @@ const MatchCard = ({ isCross, data }) => {
     };
 
     const age = calculateAge(profile?.dob);
+    const imageIndex = isCurrent
+      ? Math.min(currentImageIndex, imagesToDisplay.length - 1)
+      : 0;
+    const source = hasImages ? { uri: imagesToDisplay[imageIndex] } : null;
 
-    const source = hasImages
-      ? { uri: imagesToDisplay[isCurrent ? currentImageIndex : 0] }
-      : null;
+    const isVerified = !!profile?.profile?.isVerified;
+    const roleLabel = profile?.role === "company" ? "COMPANY" : "INDIVIDUAL";
+
+    const city = profile?.location?.city;
+    const country = profile?.location?.country;
+    // Figma: "Austin, US" — city + ISO country code
+    const countryCode = countryToCode(country);
+    const placeLabel = city
+      ? countryCode
+        ? `${city}, ${countryCode}`
+        : city
+      : countryCode;
+    const distance =
+      typeof profile?.distance === "number"
+        ? `${Math.round(profile.distance)} km`
+        : "";
+
+    const jobTitle = profile?.occupation?.jobTitle;
+    const company = profile?.occupation?.company;
+    const jobLabel =
+      jobTitle && company ? `${jobTitle} at ${company}` : jobTitle || company;
+
+    const monthlyViews = Number(profile?.monthlyViews) || 0;
+    const bio = profile?.profile?.bio;
+    const industries = Array.isArray(profile?.industry)
+      ? profile.industry.filter(Boolean).slice(0, 3)
+      : [];
+
+    // Figma "Frame 54": items 12 apart (vertical auto layout, trimmed text);
+    // the icon rows are 12pt frames with the 8pt text centred (2 inset)
+    const infoItems = [
+      {
+        key: "name",
+        fontSize: 44,
+        inset: 0,
+        node: (
+          <CustomText
+            label={`${profile?.firstName || ""}${age !== "" ? `, ${age}` : ""}`}
+            fontSize={44}
+            fontFamily={fonts.semiBold}
+            letterSpacing={-0.88}
+            color={COLORS.white}
+            textAlign="center"
+            numberOfLines={1}
+          />
+        ),
+      },
+    ];
+    if (placeLabel || distance) {
+      infoItems.push({
+        key: "place",
+        fontSize: 12,
+        inset: 2,
+        node: (
+          <View style={styles.iconRow}>
+            <Icons
+              family="MaterialSymbolsRoundedFilled"
+              name="location_on"
+              size={12}
+              color={META_ICON_COLOR}
+            />
+            {!!placeLabel && (
+              <CustomText
+                label={placeLabel}
+                fontSize={12}
+                fontFamily={fonts.medium}
+                color={COLORS.white}
+                numberOfLines={1}
+                containerStyle={styles.shrink}
+              />
+            )}
+            {!!distance && (
+              <CustomText
+                label={distance}
+                fontSize={12}
+                fontFamily={fonts.medium}
+                color={COLORS.gray64}
+              />
+            )}
+          </View>
+        ),
+      });
+    }
+    if (jobLabel) {
+      infoItems.push({
+        key: "job",
+        fontSize: 12,
+        inset: 2,
+        node: (
+          <View style={styles.iconRow}>
+            <Icons
+              family="MaterialSymbolsRoundedFilled"
+              name="work"
+              size={12}
+              color={META_ICON_COLOR}
+            />
+            <CustomText
+              label={jobLabel}
+              fontSize={12}
+              fontFamily={fonts.medium}
+              color={COLORS.white}
+              numberOfLines={1}
+              containerStyle={styles.shrink}
+            />
+          </View>
+        ),
+      });
+    }
+    infoItems.push({
+      key: "views",
+      fontSize: 11,
+      inset: 0,
+      node: (
+        <CustomText
+          label={`${monthlyViews} monthly profile view${
+            monthlyViews === 1 ? "" : "s"
+          }`}
+          fontSize={11}
+          fontFamily={fonts.medium}
+          color={COLORS.white}
+        />
+      ),
+    });
+    if (bio) {
+      infoItems.push({
+        key: "bio",
+        fontSize: 12,
+        inset: 0,
+        node: (
+          <CustomText
+            label={bio}
+            fontSize={12}
+            fontFamily={fonts.medium}
+            color={COLORS.gray64}
+            textAlign="center"
+            numberOfLines={2}
+          />
+        ),
+      });
+    }
+    if (industries.length > 0) {
+      infoItems.push({
+        key: "chips",
+        fontSize: 0,
+        inset: 0,
+        node: (
+          <View style={styles.chipsRow}>
+            {industries.map((item, index) => (
+              <View key={`${item}-${index}`} style={styles.chip}>
+                <GlassFill
+                  borderRadius={16}
+                  fill="rgba(255, 255, 255, 0.16)"
+                />
+                <CustomText
+                  label={item}
+                  fontSize={12}
+                  fontFamily={fonts.medium}
+                  textTransform="capitalize"
+                  color={COLORS.white}
+                />
+              </View>
+            ))}
+          </View>
+        ),
+      });
+    }
+    // the last frame sits 24 above the action row: give back the part of the
+    // text line box that hangs below its baseline (minus the row inset)
+    const lastItem = infoItems[infoItems.length - 1];
+    const infoBottomOffset =
+      infoBottom - (lastItem.fontSize * 0.35 - lastItem.inset);
 
     return (
       <View
         style={[
-          styles.image,
+          styles.card,
           !hasImages && { backgroundColor: profileColor },
-          { overflow: "hidden" },
         ]}
       >
         {hasImages ? (
           <ImageFast
             key={profile?._id || profile?.id}
             source={source}
-            style={[styles.image, { position: "absolute" }]}
-            onPress={() =>
-              navigation.navigate("MatchingDetail", { item: profile })
-            }
+            removeLoading
+            style={StyleSheet.absoluteFill}
+            onPress={() => openDetail(profile)}
           />
         ) : (
           <Pressable
             key={profile?._id || profile?.id}
-            style={styles.image}
-            onPress={() =>
-              navigation.navigate("MatchingDetail", { item: profile })
-            }
+            style={StyleSheet.absoluteFill}
+            onPress={() => openDetail(profile)}
           />
         )}
-        <View style={styles.overlay} pointerEvents="none" />
 
-        <View style={styles.innerContainer} pointerEvents="box-none">
-          <View style={styles.headerRow} pointerEvents="box-none">
-            <View style={styles.row}>
-              <Image source={Images.verifiedBadge} style={styles.verifyStar} />
-              <CustomText
-                label={profile?.profile?.category?.toUpperCase() || "MEMBER"}
-                fontSize={12}
-                marginLeft={8}
-                fontFamily={fonts.medium}
-                color={COLORS.white}
-              />
-            </View>
+        {/* Figma frame fill: #121212 8% (top) → 100% (bottom) over the photo */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(18, 18, 18, 0.08)", "rgba(18, 18, 18, 1)"]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
 
-            {isCross ? (
-              <TouchableOpacity
-                style={{
-                  height: 32,
-                  width: 32,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  overflow: "hidden",
-                  borderRadius: 99,
-                }}
-              >
-                <Blur />
-                <ImageFast
-                  onPress={() => navigation.goBack()}
-                  source={Images.cross}
-                  style={{ height: 20, width: 20 }}
+        {/* Story bars: 4 tall, 6 apart, active white, idle white 8% */}
+        {hasImages && (
+          <View
+            pointerEvents="none"
+            style={[styles.barsRow, { top: barsTop }]}
+          >
+            {imagesToDisplay.map((_, index) => (
+              <View key={index} style={styles.bar}>
+                <GlassFill
+                  fill="rgba(255, 255, 255, 0.08)"
+                  blurAmount={32}
                 />
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.bg}>
-                <CustomText
-                  label={`${profile?.compatibilityScore || 0}%`}
-                  fontFamily={fonts.semiBold}
-                  color={COLORS.white}
-                />
+                {isCurrent && index === imageIndex && (
+                  <Animated.View
+                    style={[
+                      styles.barFill,
+                      {
+                        width: sliderAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ["0%", "100%"],
+                        }),
+                      },
+                    ]}
+                  />
+                )}
+                {isCurrent && index < imageIndex && (
+                  <View style={[styles.barFill, { width: "100%" }]} />
+                )}
               </View>
-            )}
+            ))}
           </View>
+        )}
 
-          {/* footer */}
-          <View pointerEvents="box-none">
-            <CustomText
-              label={`${profile?.firstName || ""} ${age ? `, ${age}` : ""}`}
-              fontSize={40}
-              fontFamily={fonts.bold}
-              color={COLORS.white}
-            />
-
-            <View style={styles.locationRow}>
-              <Image source={PNGIcons.pin} style={styles.pinIcon} />
-              <CustomText
-                label={
-                  profile?.location?.city
-                    ? `${profile.location.city}, ${profile.location.country}`
-                    : "Unknown Location"
-                }
-                fontSize={12}
-                fontFamily={fonts.medium}
-                marginLeft={3}
-                color={COLORS.white}
+        {/* VERIFIED INDIVIDUAL · 64% */}
+        <View
+          pointerEvents="none"
+          style={[styles.titlesRow, { top: titlesTop }]}
+        >
+          <View style={styles.titleLeft}>
+            {isVerified && (
+              <Icons
+                family="MaterialSymbolsRoundedFilled"
+                name="verified_user"
+                size={18}
+                color="#0D72EA"
               />
-              {profile?.distance !== undefined && (
-                <CustomText
-                  label={`${profile.distance} km`}
-                  fontSize={12}
-                  color={COLORS.gray64}
-                  fontFamily={fonts.medium}
-                  marginLeft={4}
-                />
-              )}
-            </View>
-
+            )}
             <CustomText
-              label={`${profile?.profileViews || 0} total Profile View${
-                profile?.profileViews === 1 ? "" : "s"
-              }`}
-              fontSize={11}
+              label={`${isVerified ? "VERIFIED " : ""}${roleLabel}`}
+              fontSize={12}
               fontFamily={fonts.medium}
-              marginTop={8}
-              color={COLORS.white}
+              color={COLORS.gray64}
+              numberOfLines={1}
             />
-
-            <View style={styles.genreRow}>
-              {profile?.industry?.length > 0 &&
-                profile?.industry?.slice(0, 3)?.map((item, index) => (
-                  <View key={`${item}-${index}`} style={styles.genrePill}>
-                    <Blur />
-                    <CustomText
-                      label={item}
-                      fontFamily={fonts.medium}
-                      fontSize={12}
-                      textTransform="capitalize"
-                      color={COLORS.white}
-                    />
-                  </View>
-                ))}
-            </View>
-            {profile?.profile?.bio && (
-              <Pressable
-                style={styles.footerRow}
-                onPress={() =>
-                  navigation.navigate("MatchingDetail", { item: profile })
-                }
-              >
-                <CustomText
-                  label={profile?.profile?.bio || "No bio available."}
-                  fontSize={12}
-                  fontFamily={fonts.medium}
-                  color={COLORS.white}
-                />
-
-                <Image source={PNGIcons.forward} style={styles.forwardIcon} />
-              </Pressable>
-            )}
-
-            {/* Dynamic Slider */}
-            {hasImages && imagesToDisplay.length > 1 && (
-              <View style={styles.sliderContainer}>
-                <View style={styles.sliderTrack}>
-                  {imagesToDisplay.map((_, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.block,
-                        {
-                          backgroundColor: "#FFFFFF17",
-                          borderRadius: 99,
-                          overflow: "hidden",
-                        },
-                      ]}
-                    >
-                      {index === currentImageIndex && isCurrent && (
-                        <Animated.View
-                          style={[
-                            StyleSheet.absoluteFill,
-                            {
-                              backgroundColor: COLORS.white,
-                              width: sliderAnimation.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: ["0%", "100%"],
-                              }),
-                            },
-                          ]}
-                        />
-                      )}
-                      {index < currentImageIndex && isCurrent && (
-                        <View
-                          style={[
-                            StyleSheet.absoluteFill,
-                            {
-                              backgroundColor: COLORS.white,
-                            },
-                          ]}
-                        />
-                      )}
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
+          </View>
+          <View style={styles.scoreBadge}>
+            <GlassFill fill="rgba(255, 255, 255, 0.16)" />
+            <CustomText
+              label={`${profile?.compatibilityScore || 0}%`}
+              fontSize={14}
+              fontFamily={fonts.semiBold}
+              letterSpacing={-0.14}
+              color={COLORS.gray64}
+            />
           </View>
         </View>
 
-        {/* Animated Gradient Overlay - only for current card */}
-        {isCurrent && (
-          <Animated.View
-            style={[
-              styles.gradientOverlay,
-              {
-                opacity: gradientOpacity,
-                transform: [{ translateY: gradientTranslateY }],
-              },
-            ]}
-            pointerEvents="none"
-          >
-            <LinearGradient
-              colors={currentGradientColors}
-              start={{ x: 0.5, y: 1 }}
-              end={{ x: 0.5, y: 0 }}
-              style={styles.gradientFill}
-            />
-          </Animated.View>
-        )}
+        {/* Name · place · job · views · bio · industries */}
+        <View
+          pointerEvents="none"
+          style={[styles.info, { bottom: infoBottomOffset }]}
+        >
+          {infoItems.map((item, index) => {
+            const prev = infoItems[index - 1];
+            return (
+              <View
+                key={item.key}
+                style={[
+                  styles.infoItem,
+                  prev && {
+                    marginTop:
+                      capGap(
+                        12 + prev.inset + item.inset,
+                        prev.fontSize,
+                        item.fontSize,
+                      ),
+                  },
+                ]}
+              >
+                {item.node}
+              </View>
+            );
+          })}
+        </View>
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      {/* Next Card (Preview) - This will become the current card after swipe */}
+    <View style={styles.container} pointerEvents="box-none">
+      {/* Next profile, drawn exactly under the current card (same size and
+          position, no scale / offset), so no pile is ever visible: it only
+          shows through while the top card is dragged or flies away, instead
+          of a black screen. Stable key, only its content changes. */}
       {nextProfile && (
-        // Stable key: this native-animated wrapper must never unmount, only its
-        // content changes per card (see note on the current card below)
-        <Animated.View
+        <View
           key="next-card"
-          style={[
-            styles.cardWrapper,
-            styles.nextCard,
-            {
-              transform: [
-                { scale: nextCardScale },
-                { translateY: Animated.add(nextCardTranslateY, nextCardLift) },
-              ],
-            },
-          ]}
+          pointerEvents="none"
+          style={[styles.cardWrapper, styles.nextCard]}
         >
           {renderCard(nextProfile, false)}
-        </Animated.View>
+        </View>
       )}
 
       {/* Current Card */}
@@ -1016,7 +1153,6 @@ const MatchCard = ({ isCross, data }) => {
           styles.currentCard,
           isLastCardLeaving && styles.hidden,
           {
-            backgroundColor: "#FFFFFF29",
             transform: [
               {
                 translateX: Animated.add(
@@ -1038,183 +1174,277 @@ const MatchCard = ({ isCross, data }) => {
         {renderCard(currentProfile, true)}
       </Animated.View>
 
-      {/* Bottom Buttons */}
-      <View style={styles.bottomContainer}>
-        {[
-          PNGIcons.btn1,
-          PNGIcons.btn2,
-          PNGIcons.btn3,
-          PNGIcons.btn4,
-          PNGIcons.btn5,
-        ]?.map((item, index) => (
+      {/* Figma "Icons rt": rewind · nope · super like · like · boost */}
+      <View
+        pointerEvents="box-none"
+        style={[styles.actionsRow, { bottom: actionsBottom }]}
+      >
+        {ACTION_BUTTONS.map((item, index) => (
           <TouchableOpacity
-            key={index}
+            key={item.key}
             onPress={() => handleButtonPress(index)}
             activeOpacity={0.8}
+            style={[
+              styles.actionRing,
+              {
+                width: item.size,
+                height: item.size,
+                borderColor: item.color,
+              },
+            ]}
           >
-            <ImageFast
-              source={item}
-              removeLoading
-              style={[
-                styles.btnStyle,
-                index === 0 || index === 4 ? styles.smallBtn : styles.largeBtn,
-              ]}
-            />
+            <View style={[styles.actionFill, { backgroundColor: item.color }]}>
+              {/* rotation on a wrapper View: a transform on the icon's Text
+                  is not reliably kept on iOS (Fabric), which flipped the
+                  nope / super like arrows back to pointing right */}
+              <View
+                style={[
+                  {
+                    width: item.iconSize,
+                    height: item.iconSize,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  },
+                  item.rotate && { transform: [{ rotate: item.rotate }] },
+                ]}
+              >
+                {/* centre the glyph's outline (measured from the font) before
+                    rotating, so each arrow sits centred whichever way it
+                    points */}
+                <View
+                  style={{
+                    transform: [
+                      {
+                        translateX:
+                          (0.5 - (GLYPH_CENTER_X[item.icon] ?? 0.5)) *
+                          item.iconSize,
+                      },
+                      // the glyph lands 0.1em low in its box on iOS
+                      // (measured on all five buttons)
+                      { translateY: -0.1 * item.iconSize },
+                    ],
+                  }}
+                >
+                  <Icons
+                    family="MaterialSymbolsRoundedFilled"
+                    name={item.icon}
+                    size={item.iconSize}
+                    color="#121212"
+                  />
+                </View>
+              </View>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Swipe glow — Figma like state: nav container (32 above the bar to
+          the bottom) filled clear → colour 24% at 64% → colour */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.glow,
+          {
+            height: navClearance + 32,
+            opacity: gradientOpacity,
+            transform: [{ translateY: gradientTranslateY }],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={glowStops(currentGradientColors[0])}
+          locations={[0, 0.64, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
     </View>
   );
 };
 
 export default MatchCard;
 
+const COUNTRY_CODES = COUNTRIES.reduce((map, item) => {
+  if (item?.name && item?.code) map[item.name.toLowerCase()] = item.code;
+  return map;
+}, {});
+const countryToCode = (country) => {
+  if (!country || typeof country !== "string") return "";
+  const trimmed = country.trim();
+  if (/^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
+  return COUNTRY_CODES[trimmed.toLowerCase()] || trimmed;
+};
+
+// predicted match: the swiped card settles back under "It's a match"
+const MATCH_SETTLE = { friction: 7, tension: 60, useNativeDriver: false };
+
+// Figma: place / job glyphs (12) are #EBEAEC
+const META_ICON_COLOR = "#EBEAEC";
+
+// Figma "Frame 2085664017…21": 1px ring in the button colour, 4 padding,
+// inner disc with a 1px white 16% inside stroke, #121212 Material glyph
+const ACTION_BUTTONS = [
+  { key: "rewind", color: "#FF4B4B", size: 48, icon: "fast_rewind", iconSize: 24 },
+  { key: "nope", color: "#F41857", size: 56, icon: "play_arrow", iconSize: 40, rotate: "180deg" },
+  { key: "superlike", color: "#007AFF", size: 64, icon: "play_arrow", iconSize: 40, rotate: "-90deg" },
+  { key: "like", color: "#1ED760", size: 56, icon: "play_arrow", iconSize: 40 },
+  { key: "boost", color: "#8400E7", size: 48, icon: "bolt", iconSize: 24 },
+];
+
+// Horizontal centre of each glyph's outline as a fraction of its em box,
+// read from MaterialSymbolsRoundedFilled.ttf (vertically they are centred in
+// the font's 1.2em line box). play_arrow is drawn 4.4% right of centre, which
+// the 180° / −90° rotations turned into a left / up offset.
+const GLYPH_CENTER_X = {
+  play_arrow: 0.5443,
+  fast_rewind: 0.5167,
+  bolt: 0.4952,
+};
+
+const hexAlpha = (hex, alpha) =>
+  typeof hex === "string" && /^#[0-9a-f]{6}$/i.test(hex)
+    ? `${hex}${alpha}`
+    : "transparent";
+
+const glowStops = (base) => [
+  hexAlpha(base, "00"),
+  hexAlpha(base, "3D"), // 24%
+  hexAlpha(base, ""),
+];
+
 const styles = StyleSheet.create({
   container: {
-    marginTop: 16,
-    alignItems: "center",
-    width: "100%",
-    paddingHorizontal: 6,
+    ...StyleSheet.absoluteFillObject,
   },
   cardWrapper: {
-    width: "100%",
-    padding: 4,
-    backgroundColor: "#FFFFFF29",
-    borderColor: "#FFFFFF29",
-    borderRadius: 34,
-    borderWidth: 1,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#121212",
+    overflow: "hidden",
   },
   currentCard: {
-    position: "absolute",
     zIndex: 2,
+  },
+  nextCard: {
+    zIndex: 1,
   },
   hidden: {
     opacity: 0,
   },
-  nextCard: {
-    position: "absolute",
-    zIndex: 1,
-    marginTop: 25,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-  },
-  image: {
-    height: Platform.OS == "ios" ? screenHeight * 0.56 : screenHeight * 0.55,
-    width: "100%",
-    borderRadius: 32,
-  },
-  innerContainer: {
-    padding: 14,
-    justifyContent: "space-between",
+  card: {
     flex: 1,
+    overflow: "hidden",
   },
-  row: {
+  barsRow: {
+    position: "absolute",
+    left: CARD_PAD_H,
+    right: CARD_PAD_H,
+    height: BARS_HEIGHT,
     flexDirection: "row",
-    alignItems: "center",
+    gap: 6,
   },
-  headerRow: {
+  bar: {
+    flex: 1,
+    height: BARS_HEIGHT,
+    borderRadius: 100,
+    overflow: "hidden",
+  },
+  barFill: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: COLORS.white,
+  },
+  titlesRow: {
+    position: "absolute",
+    left: CARD_PAD_H,
+    right: CARD_PAD_H,
+    height: TITLES_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  verifyStar: {
-    height: 22,
-    width: 22,
-  },
-  bg: {
-    backgroundColor: "#FFFFFF29",
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: "#FFFFFF7A",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  pinIcon: {
-    height: 12,
-    width: 12,
-    tintColor: COLORS.white,
-  },
-  genreRow: {
+  titleLeft: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginVertical: 12,
+    marginRight: 8,
   },
-  genrePill: {
-    borderRadius: 99,
-    padding: 4,
-    paddingHorizontal: 12,
-    overflow: "hidden",
-  },
-  footerRow: {
-    flexDirection: "row",
+  scoreBadge: {
+    height: TITLES_HEIGHT,
+    paddingHorizontal: 10,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
     alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
+    justifyContent: "center",
   },
-  forwardIcon: {
-    height: 28,
-    width: 28,
-    tintColor: COLORS.gray64,
-  },
-  bottomContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop:
-      Platform.OS == "ios"
-        ? screenHeight * 0.56 + 30
-        : screenHeight * 0.55 + 30,
-    padding: 6,
-    gap: 16,
-  },
-  btnStyle: {
-    resizeMode: "contain",
-  },
-  smallBtn: {
-    height: 48,
-    width: 48,
-  },
-  largeBtn: {
-    height: 56,
-    width: 56,
-  },
-  gradientOverlay: {
+  info: {
     position: "absolute",
-    bottom: 0,
+    left: INFO_PAD_H,
+    right: INFO_PAD_H,
+    alignItems: "center",
+  },
+  infoItem: {
+    alignSelf: "stretch",
+    alignItems: "center",
+  },
+  iconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    maxWidth: "100%",
+  },
+  shrink: {
+    flexShrink: 1,
+  },
+  chipsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  chip: {
+    height: 28,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionsRow: {
+    position: "absolute",
     left: 0,
     right: 0,
-    height: 200,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    overflow: "hidden",
-  },
-  gradientFill: {
-    flex: 1,
-  },
-  sliderContainer: {
-    width: "100%",
-    alignItems: "center",
-    marginTop: 12,
-    marginBottom: 20,
-  },
-  sliderTrack: {
-    width: "100%",
+    height: ACTIONS_HEIGHT,
+    zIndex: 3,
     flexDirection: "row",
-    justifyContent: "space-between",
-    borderRadius: 100,
-    overflow: "hidden",
-    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
   },
-  block: {
+  actionRing: {
+    borderRadius: 100,
+    borderWidth: 1,
+    padding: 4,
+  },
+  actionFill: {
     flex: 1,
-    height: 6,
-    position: "relative",
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  glow: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 4,
   },
 });

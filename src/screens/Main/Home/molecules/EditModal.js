@@ -68,6 +68,7 @@ const EditModal = ({
           displayName={displayName}
           username={username}
           role={user?.role}
+          user={user}
           right={<SheetCloseButton onPress={onClose} />}
         />
       }

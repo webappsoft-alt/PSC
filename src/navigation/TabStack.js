@@ -110,10 +110,16 @@ const PagerPage = ({
   pagerChrome,
   pagerDrag,
   gap = true,
+  // iOS: react-native-pager-view 8 (SwiftUI TabView) lays every page out one
+  // status-bar inset lower. Full-bleed pages (Matching) undo that so their
+  // content spans the real screen, edge to edge, behind the status bar.
+  bleedTop = false,
   // PagerView clones each page with an absolute-fill style
   style,
   children,
 }) => {
+  const { top: safeTop } = useSafeAreaInsets();
+  const bleed = bleedTop && Platform.OS === "ios" ? safeTop : 0;
   // 1 when this page is centred, 0 one page away (Viral's 1 - progress)
   const closeness = pageScroll.interpolate({
     inputRange: [index - 1, index, index + 1],
@@ -136,6 +142,8 @@ const PagerPage = ({
           borderRadius: Animated.multiply(pagerChrome, PAGE_RADIUS_MAX),
           // Viral: Home only rounds; the other pages also inset and scale
           marginHorizontal: gap ? Animated.multiply(pagerChrome, PAGE_GAP) : 0,
+          marginTop: -bleed,
+          marginBottom: bleed,
           transform: gap ? [{ scale }] : [],
         }}
       >
@@ -207,6 +215,12 @@ const FAB_SIZE = 60;
 // #121212 0% → 100% linear fill, top → bottom; pad 32 above the 60 bar,
 // 20 below (= the bar's bottom offset, added at render)
 const NAV_PROGRESSIVE_HEIGHT = 32 + NAV_BAR_HEIGHT;
+// Distance from the screen bottom to the top of the nav bar, from the bar's
+// real geometry: container 70 + offset tall, bar drawn 20 below its top
+// (paddingTop 10 + marginTop 10) → bar top = container − 20. Screens that
+// stack content right above the bar use it.
+export const getNavBarClearance = (bottomInset = 0) =>
+  70 + Math.max(12, (bottomInset ?? 0) - 4) - 20;
 // iOS 26+: the bar is real Liquid Glass (same as Viral / Reddit) — the system
 // re-tints the glass and `labelColor` from the content behind it, natively.
 // Elsewhere we fall back to blur + the JS tone probe (utils/navTone).
@@ -653,6 +667,7 @@ const HomeWithCameraPager = ({ route, navigation }) => {
         <PagerPage
           key="matching"
           index={4}
+          bleedTop
           pageScroll={pageScroll}
           pagerChrome={pagerChrome}
           pagerDrag={pagerDrag}
@@ -675,23 +690,30 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           />
         </PagerPage>
 
-        {/* Page 6 - Shows (tab bar visible) */}
+        {/* Page 6 - Shows (tab bar visible). Full-bleed: the Figma
+            Show-Feed header gradient starts behind the status bar. */}
         <PagerPage
           key="shows-tab"
           index={6}
+          bleedTop
           pageScroll={pageScroll}
           pagerChrome={pagerChrome}
           pagerDrag={pagerDrag}
         >
-          <ViewerWatchScreen
+          <Shows
             isFocusedPage={currentPage === PAGER_SHOWS_INDEX && isFocused}
+            topics={enabledTopics}
+            onAddTopicPress={() => setTopicSheetVisible(true)}
           />
         </PagerPage>
 
         {/* Page 7 - Profile */}
+        {/* Full-bleed: the Profile header's tier gradient starts at the
+            top of the screen, behind the status bar (Figma 375×104) */}
         <PagerPage
           key="profile"
           index={7}
+          bleedTop
           pageScroll={pageScroll}
           pagerChrome={pagerChrome}
           pagerDrag={pagerDrag}
@@ -731,6 +753,8 @@ const HomeWithCameraPager = ({ route, navigation }) => {
 
 // Figma `Create` menu (FAB): top → bottom
 const CREATE_MENU_ITEMS = [
+  // Shows: Create An Episode (pick / create the show there) — Pro only, as Viral
+  { label: "Show", icon: "live_tv", filled: true, route: "CreateEpisode", pro: true },
   { label: "Go Live", icon: "fiber_manual_record", filled: true, route: "PublishLive" },
   { label: "Story", icon: "web_stories", filled: true, route: "CameraScreen" },
   { label: "Radio", icon: "mic", filled: true, route: "CreateAudio" },
@@ -741,9 +765,12 @@ const CREATE_MENU_ITEMS = [
 // Figma "New-Feed-Create": 48 rows, gap 8 (56 apart), and 24 between the
 // last row ("Post") and the close button. The rows are stacked 2pt apart
 // (marginBottom -46) above a 20pt bottom margin, from a container 30pt above
-// the FAB's bottom; these offsets lift row k to 84 + 56·(5 − k) above the
+// the FAB's bottom; these offsets lift row k to 84 + 56·(n − 1 − k) above the
 // FAB's bottom, i.e. the FAB's top (60) + 24.
-const CREATE_MENU_OFFSETS = [-304, -250, -196, -142, -88, -34];
+// With n rows: offset(k) = −34 − 54·(n − 1 − k) (row k ends 84 + 56·(n − 1 − k) up).
+const CREATE_MENU_OFFSETS = CREATE_MENU_ITEMS.map(
+  (_, k) => -34 - 54 * (CREATE_MENU_ITEMS.length - 1 - k),
+);
 
 // Default value = no-ops, so a render that lands on a stale context (Fast
 // Refresh re-creating this module) degrades gracefully instead of crashing
@@ -773,6 +800,16 @@ const TabBarVisibilityContext = createContext({
 });
 
 export const useTabBarVisibility = () => useContext(TabBarVisibilityContext);
+
+// Lets screens outside the tab stack (MainStack: Search, UserProfile, …) open
+// a bottom-bar tab: they pop back to TabStack, then call this to move the
+// pager to that tab's page. Set by TabBarVisibilityProvider while mounted.
+const pagerNavigatorRef = { current: null };
+export const openPagerTab = (routeName) => {
+  const pageIndex = TAB_TO_PAGER[routeName];
+  if (pageIndex === undefined) return;
+  pagerNavigatorRef.current?.(pageIndex);
+};
 
 export const TabBarVisibilityProvider = ({ children }) => {
   const [isTabBarVisible, setIsTabBarVisibleState] = useState(true);
@@ -899,6 +936,15 @@ export const TabBarVisibilityProvider = ({ children }) => {
 
     setRequestedPagerPage(pageIndex);
   }, []);
+
+  useEffect(() => {
+    pagerNavigatorRef.current = navigateToPagerPage;
+    return () => {
+      if (pagerNavigatorRef.current === navigateToPagerPage) {
+        pagerNavigatorRef.current = null;
+      }
+    };
+  }, [navigateToPagerPage]);
 
   const value = useMemo(
     () => ({
@@ -1189,6 +1235,12 @@ const CustomTabBar = ({ state, navigation }) => {
   const [leftMenuOpen, setLeftMenuOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [leftSelectedFeedType, setLeftSelectedFeedType] = useState("social");
+  // Pro = Pro subscription or a Pro (individual / company) account
+  const menuUser = useSelector((state) => state.users.userData);
+  const isProAccount =
+    !!menuUser?.profile?.isPro ||
+    menuUser?.role === "individual" ||
+    menuUser?.role === "company";
 
   const tabTranslateY = useRef(new Animated.Value(0)).current;
   const tabBarPillRef = useRef(null);
@@ -1505,7 +1557,8 @@ const CustomTabBar = ({ state, navigation }) => {
       ]),
     ]).start(() => {
       setMenuOpen(false);
-      navigation.navigate(route, params);
+      if (isProAccount) navigation.navigate(route, params);
+      else setShowUpgradeModal(true);
     });
   };
 

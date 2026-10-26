@@ -25,6 +25,7 @@ import { useSelector } from "react-redux";
 import { useIsFocused } from "@react-navigation/native";
 import { ActivityIndicator } from "react-native";
 import LottieView from "lottie-react-native";
+import UserBadge from "../../../../components/UserBadge";
 
 const { width, height } = Dimensions.get("window");
 
@@ -638,18 +639,7 @@ const StoryViewerById = ({ route, navigation }) => {
                       color={COLORS.black}
                       fontSize={12}
                     />
-                    {item?.postId?.userId?.role == "individual" && (
-                      <ImageFast
-                        source={Images.verified}
-                        style={styles.verifiedIcon}
-                      />
-                    )}
-                    {item?.postId?.userId?.role == "company" && (
-                      <ImageFast
-                        source={Images.grayStar}
-                        style={styles.verifiedIcon}
-                      />
-                    )}
+                    <UserBadge user={item?.postId?.userId} size={12} mutedColor="rgba(18, 18, 18, 0.64)" />
                   </View>
                   <CustomText
                     label={`@${item?.postId?.userId?.username}`}
@@ -941,10 +931,7 @@ const StoryViewerById = ({ route, navigation }) => {
                         fontFamily={fonts.semiBold}
                         fontSize={14}
                       />
-                      <Image
-                        source={Images.verified}
-                        style={styles.verifiedIcon}
-                      />
+                      <UserBadge user={userInfo.user[0]} />
                     </View>
                     <CustomText
                       label={`@${

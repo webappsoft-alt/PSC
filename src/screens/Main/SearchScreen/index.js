@@ -9,7 +9,11 @@ import { useNavigation } from "@react-navigation/native";
 
 const SearchScreen = ({ route }) => {
   const activeTab = route.params?.tab;
-  const [tab, setTab] = useState(activeTab == "people" ? 1 : 0);
+  // Opened from another user's profile → only their Followers / Following
+  const targetUserId = route.params?.userId;
+  const [tab, setTab] = useState(
+    activeTab == "people" || targetUserId ? 1 : 0,
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const navigation = useNavigation();
 
@@ -28,6 +32,7 @@ const SearchScreen = ({ route }) => {
             CrossPress={() => setSearchQuery("")}
             CrossPressBack={() => navigation.goBack()}
           />
+          {!targetUserId && (
           <TopTab
             rounded
             oval
@@ -42,6 +47,8 @@ const SearchScreen = ({ route }) => {
             borderColor="#A193750A"
             paddingHorizontal={14}
           />
+          )}
+          {!!targetUserId && <View style={{ height: 12 }} />}
         </View>
       )}
     >
@@ -52,6 +59,8 @@ const SearchScreen = ({ route }) => {
         <PeopleTab
           isActive={tab == 1}
           activeTab={activeTab}
+          initialPeopleTab={route.params?.peopleTab}
+          targetUserId={targetUserId}
           searchQuery={searchQuery}
         />
       </View>

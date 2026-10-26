@@ -91,6 +91,7 @@ const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
           displayName={displayName}
           username={username}
           role={user?.role}
+          user={user}
           onPressUser={openProfile}
           right={
             <>

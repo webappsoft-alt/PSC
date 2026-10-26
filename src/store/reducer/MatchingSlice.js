@@ -1,7 +1,9 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { DEFAULT_MATCHING_FILTERS } from "../../utils/matchingFilters";
 
 const initialState = {
   cardData: [],
+  filters: DEFAULT_MATCHING_FILTERS,
 };
 export const MatchingSlice = createSlice({
   name: "matching",
@@ -18,6 +20,9 @@ export const MatchingSlice = createSlice({
         (item) => item?._id && !existingIds.has(item._id),
       );
       state.cardData = [...state.cardData, ...newCards];
+    },
+    setMatchingFilters(state, action) {
+      state.filters = { ...DEFAULT_MATCHING_FILTERS, ...(action.payload || {}) };
     },
     removeCard(state) {
       state.cardData = state.cardData.slice(1);
@@ -43,5 +48,12 @@ export const MatchingSlice = createSlice({
   },
 });
 
-export const { setCardData, appendCardData, removeCard, addCardToTop, updateUserFollowers } =
+export const {
+  setCardData,
+  appendCardData,
+  removeCard,
+  addCardToTop,
+  updateUserFollowers,
+  setMatchingFilters,
+} =
   MatchingSlice.actions;

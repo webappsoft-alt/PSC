@@ -15,6 +15,7 @@ import { post } from "../../../../services/ApiRequest";
 import { setUserData } from "../../../../store/reducer/usersSlice";
 import { COLORS } from "../../../../utils/COLORS";
 import { ToastMessage } from "../../../../utils/ToastMessage";
+import UserBadge from "../../../../components/UserBadge";
 
 /**
  * Figma "Tagged" — "See who's tagged in this post" with SPONSORS and
@@ -72,15 +73,7 @@ const PersonRow = ({ user, marked, following, onToggle, isFirst, isLast }) => {
             numberOfLines={1}
             containerStyle={{ flexShrink: 1 }}
           />
-          {user?.role === "individual" || isCompany ? (
-            <Icons
-              family="MaterialSymbolsRoundedFilled"
-              name="verified"
-              size={14}
-              color="#007BFF"
-              style={{ marginLeft: 4 }}
-            />
-          ) : null}
+          <UserBadge user={user} style={{ marginLeft: 4 }} />
           {user?.username ? (
             <View style={[styles.usernameChip, { backgroundColor: colors.surfaceAlt }]}>
               {/* Figma: Regular 10 / 10 / 0%, centred, @64% */}

@@ -24,12 +24,13 @@ import { setUserData } from "../../../store/reducer/usersSlice";
 import { COLORS } from "../../../utils/COLORS";
 import { ToastMessage } from "../../../utils/ToastMessage";
 import { useTheme } from "../../../contexts/ThemeContext";
-import PostCard from "../Home/molecules/PostCard";
+import { accentA, getProfileTier } from "../../../utils/profileTier";
+import FeedPostItem from "../Home/molecules/FeedPostItem";
 import PostCardSkeleton from "../Home/molecules/PostCardSkeleton";
 import DelImagesModal from "./molecules/DelImagesModal";
 import LockInfo from "./molecules/LockInfo";
 import MediaGrid from "./molecules/MediaGrid";
-import ProfileCard from "./molecules/ProfileCard";
+import ProfileCard, { getProfileCardLayout } from "./molecules/ProfileCard";
 import ProfileCardSkeleton from "./molecules/ProfileCardSkeleton";
 import ProfileHeader from "./molecules/ProfileHeader";
 
@@ -348,82 +349,62 @@ const UserProfile = ({ route }) => {
     );
   };
 
-  const renderItem = useCallback(
-    ({ item, index }) => {
-      const author = item?.author || {};
-      const displayName =
-        `${author.firstName || ""} ${author.lastName || ""}`.trim() ||
-        "Display Name";
-      const username = author.username || "username";
-      const description = item?.description || "";
-      const images = item?.images || [];
-      const hashtags = item?.hashtags || [];
-      const topic = item?.topic || "Crypto";
-      const likesCount = item?.stats?.upvotes || 0;
-      const commentsCount = item?.stats?.comments || 0;
-      const repostsCount = item?.stats?.reposts || 0;
-      const stats = item?.stats || {};
-      const createdAt = item?.createdAt || "";
-      const timeAgo = getTimeAgo(createdAt);
-
-      return (
-        <View>
-          <PostCard
-            displayName={displayName}
-            username={username}
-            description={description}
-            images={images}
-            hashtags={hashtags}
-            topic={topic}
-            likesCount={likesCount}
-            commentsCount={commentsCount}
-            repostsCount={repostsCount}
-            stats={stats}
-            timeAgo={timeAgo}
-            formatCount={formatCount}
-            upvotes={item?.upvotes || []}
-            downvotes={item?.downvotes || []}
-            showFollowButton={author?._id !== userData?._id}
-            onCommentPress={() =>
-              navigation.navigate("CommentScreen", {
-                item: item,
-                postData: {
-                  displayName,
-                  username,
-                  description,
-                  likesCount,
-                  commentsCount,
-                  repostsCount,
-                  timeAgo,
-                  images,
-                },
-              })
-            }
-            onDeletePress={() => handleDeletePost(item?._id)}
-            onEditPress={() => handleEditPost(item)}
-            item={item}
-            onSwipeRight={() =>
-              navigation.navigate("CommentScreen", {
-                item: item,
-                postData: {
-                  displayName,
-                  username,
-                  description,
-                  likesCount,
-                  commentsCount,
-                  repostsCount,
-                  timeAgo,
-                  images,
-                },
-              })
-            }
-          />
-          <Divider marginBottom={12} marginTop={8} thickness={4} color={colors.surfaceAlt} />
-        </View>
-      );
-    },
-    [navigation, getTimeAgo, formatCount, userData?._id],
+  const openComments = useCallback(
+    (item, postData) =>
+      navigation.navigate("CommentScreen", { item, postData }),
+    [navigation],
   );
+
+  const hidePost = useCallback(async (postId) => {
+    try {
+      const response = await post("hide/post", { postId });
+      if (response?.data?.success) {
+        ToastMessage("Post hidden successfully", "success");
+        setPosts((prev) => prev.filter((p) => p._id !== postId));
+      }
+    } catch (e) {
+      console.log("hidePost error", e);
+    }
+  }, []);
+
+  const hideUserPosts = useCallback(async (authorId) => {
+    try {
+      const response = await post("hide/post", { authorId });
+      if (response?.data?.success) {
+        ToastMessage("User posts hidden successfully", "success");
+        setPosts((prev) => prev.filter((p) => p.author?._id !== authorId));
+      }
+    } catch (e) {
+      console.log("hideUserPosts error", e);
+    }
+  }, []);
+
+  // Same post rendering as the Home feed (FeedPostItem)
+  const renderItem = useCallback(
+    ({ item }) => (
+      <FeedPostItem
+        post={item}
+        shouldPlay={false}
+        formatCount={formatCount}
+        onOpenComments={openComments}
+        onDeletePress={handleDeletePost}
+        onEditPress={handleEditPost}
+        onHidePost={hidePost}
+        onHideUserPosts={hideUserPosts}
+      />
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [formatCount, openComments, hidePost, hideUserPosts],
+  );
+
+  const isMeProfile = userData?._id === localUser?._id;
+  const tier = getProfileTier(localUser);
+  const cardLayout = getProfileCardLayout(localUser, !isMeProfile);
+  // Figma: sections 2pt apart (Premium+ 1pt) on #262626
+  const sectionGapStyle = {
+    height: !isMeProfile && tier.key === "premiumPlus" ? 1 : 2,
+    backgroundColor: COLORS.authHeader,
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -440,18 +421,21 @@ const UserProfile = ({ route }) => {
           />
         }
         headerUnScrollable={() => (
-          <ProfileHeader
-            isBack
-            isImage
-            user={localUser}
-            isUser={userData?._id === localUser?._id}
-            name={`${localUser?.firstName || ""} ${localUser?.lastName || ""}`}
-            coverImage={
-              localUser?.profile?.hideCover === false
-                ? null
-                : localUser?.profile?.cover
-            }
-          />
+          <>
+            <ProfileHeader
+              isBack
+              loading={isProfileLoading}
+              user={localUser}
+              isUser={isMeProfile && !!localUser}
+              name={`${localUser?.firstName || ""} ${localUser?.lastName || ""}`}
+              coverImage={
+                localUser?.profile?.hideCover === false
+                  ? null
+                  : localUser?.profile?.cover
+              }
+            />
+            <View style={sectionGapStyle} />
+          </>
         )}
       >
         {isProfileLoading ? (
@@ -481,14 +465,17 @@ const UserProfile = ({ route }) => {
           />
         )}
 
-        {!isProfileLoading && (
-          <View
-            style={{
-              backgroundColor: colors.background,
-              paddingBottom: 8,
-              paddingHorizontal: 12,
-            }}
-          >
+        {/* Figma: tabs close the info block (Premium 20/16 · Premium+ 12/12),
+            32pt chips, padding 12, Medium 14 / −0.5, tier accent */}
+        <View
+          style={{
+            backgroundColor: colors.background,
+            paddingTop: cardLayout.outerGap,
+            paddingBottom: cardLayout.padTop,
+            paddingHorizontal: 12,
+          }}
+        >
+          {!isProfileLoading && (
             <TopTab
               rounded
               tab={tab}
@@ -497,20 +484,25 @@ const UserProfile = ({ route }) => {
               tabNames={[
                 "Posts",
                 "Reposts",
-                ...(userData?._id === localUser?._id
+                ...(isMeProfile
                   ? ["Mentions", "Media", "Replies", "Liked", "Saved"]
                   : []),
               ]}
-              paddingHorizontal={14}
+              paddingHorizontal={isMeProfile ? 14 : 12}
+              height={32}
               borderWidth={1}
-              borderColor={"rgba(161, 147, 117, 0.04)"}
-              activeColor={"rgba(161, 147, 117, 0.08)"}
-              ovalBg={"rgba(161, 147, 117, 0)"}
+              borderColor={accentA(tier, 0.04)}
+              activeBorderColor={"transparent"}
+              activeColor={accentA(tier, 0.08)}
+              ovalBg={accentA(tier, 0)}
+              textColor={accentA(tier, 1)}
+              textFontSize={isMeProfile ? 16 : 14}
+              textLetterSpacing={-0.5}
             />
-          </View>
-        )}
+          )}
+        </View>
 
-        <Divider marginBottom={12} marginTop={8} thickness={2} color={colors.surfaceAlt} />
+        <View style={sectionGapStyle} />
 
         {(() => {
           const isMe = userData?._id === localUser?._id;

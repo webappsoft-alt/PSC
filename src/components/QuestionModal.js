@@ -22,6 +22,7 @@ import CustomText from "./CustomText";
 import Icons from "./Icons";
 import { useTheme } from "../contexts/ThemeContext";
 import Text from "./ScaledText";
+import UserBadge from "./UserBadge";
 
 const BASE_WIDTH = 390;
 const QUESTION_PRICE_LABEL = "$5.00";
@@ -67,12 +68,8 @@ function getAccountMeta(account) {
       source?.profileImage ||
       source?.image ||
       null,
-    isVerified:
-      source?.profile?.isVerified ||
-      source?.profile?.isPro ||
-      source?.role === "company" ||
-      source?.role === "individual" ||
-      false,
+    isVerified: !!(source?.profile?.isVerified ?? source?.isVerified),
+    accountType: source?.accountType || "",
   };
 }
 
@@ -112,9 +109,11 @@ function AccountPreview({ account }) {
           >
             {meta.displayName}
           </Text>
-          {meta.isVerified ? (
-            <Image source={Images.verified} style={styles.accountVerified} />
-          ) : null}
+          <UserBadge
+            verified={meta.isVerified}
+            accountType={meta.accountType}
+            style={{ marginLeft: 4 }}
+          />
         </View>
         <Text
           style={[styles.accountUsername, { color: colors.textSecondary }]}

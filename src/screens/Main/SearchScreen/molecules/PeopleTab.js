@@ -1,4 +1,4 @@
-import { useIsFocused, useNavigation } from "@react-navigation/native";
+import { StackActions, useIsFocused, useNavigation } from "@react-navigation/native";
 import { useEffect, useState } from "react";
 import {
   Dimensions,
@@ -12,6 +12,8 @@ import { useSelector } from "react-redux";
 import CustomText from "../../../../components/CustomText";
 import TopTab from "../../../../components/TopTab";
 
+import { openPagerTab } from "../../../../navigation/TabStack";
+import LockInfo from "../../Profile/molecules/LockInfo";
 import SearchCard from "./SearchCard";
 import SearchCardSkeleton from "./SearchCardSkeleton";
 
@@ -25,12 +27,38 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-const PeopleTab = ({ searchQuery, activeTab, isActive }) => {
+// Signed-in user's own lists vs. another user's (opened from their profile:
+// only their Followers / Following, privacy enforced by the backend).
+const OWN_TABS = [
+  { key: "recommended", label: "Recommended", endpoint: "relationships/recommended" },
+  { key: "requests", label: "Requests", endpoint: "relationships/requests" },
+  { key: "followers", label: "Followers", endpoint: "relationships/followers" },
+  { key: "following", label: "Following", endpoint: "relationships/following" },
+  { key: "friends", label: "Friends", endpoint: "relationships/friends" },
+];
+const OTHER_USER_TABS = OWN_TABS.filter(
+  (t) => t.key === "followers" || t.key === "following",
+);
+
+const PeopleTab = ({
+  searchQuery,
+  activeTab,
+  isActive,
+  initialPeopleTab, // "followers" | "following" | …
+  targetUserId, // set → show this user's lists instead of mine
+}) => {
+  const TABS = targetUserId ? OTHER_USER_TABS : OWN_TABS;
   const { colors, isDark } = useTheme();
   const navigation = useNavigation();
   const isFocus = useIsFocused();
   const userData = useSelector((state) => state.users.userData);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(() =>
+    Math.max(
+      TABS.findIndex((t) => t.key === initialPeopleTab),
+      0,
+    ),
+  );
+  const [locked, setLocked] = useState(false); // private account, not allowed
   const [users, setAllUsers] = useState([]);
   const [localFollowState, setLocalFollowState] = useState({});
   const [loading, setLoading] = useState(false);
@@ -49,18 +77,10 @@ const PeopleTab = ({ searchQuery, activeTab, isActive }) => {
         setLoading(true);
       }
       setLocalFollowState({});
-      let endpoint = "";
-
-      if (selectedTab === 0) {
-        endpoint = "relationships/recommended";
-      } else if (selectedTab === 1) {
-        endpoint = "relationships/requests";
-      } else if (selectedTab === 2) {
-        endpoint = "relationships/followers";
-      } else if (selectedTab === 3) {
-        endpoint = "relationships/following";
-      } else if (selectedTab === 4) {
-        endpoint = "relationships/friends";
+      const tabDef = TABS[selectedTab] || TABS[0];
+      let endpoint = tabDef.endpoint;
+      if (targetUserId) {
+        endpoint += `?userId=${targetUserId}`;
       }
 
       if (query) {
@@ -69,10 +89,11 @@ const PeopleTab = ({ searchQuery, activeTab, isActive }) => {
 
       const response = await get(endpoint);
       const fetchedUsers = response.data?.data?.users || [];
+      setLocked(!!response.data?.data?.locked);
 
       // Filter for Recommended tab: exclude users already followed
       const filteredUsers =
-        selectedTab === 0
+        tabDef.key === "recommended"
           ? fetchedUsers.filter(
               (u) => !u?.stats?.followers?.includes(userData?._id),
             )
@@ -168,18 +189,13 @@ const PeopleTab = ({ searchQuery, activeTab, isActive }) => {
           rounded
           tab={tab}
           setTab={setTab}
-          tabNames={[
-            "Recommended",
-            "Requests",
-            "Followers",
-            "Following",
-            "Friends",
-          ]}
+          tabNames={TABS.map((t) => t.label)}
           marginBottom={12}
           activeColor={isDark ? COLORS.white : colors.text}
           inactiveTintColor={isDark ? COLORS.gray64 : colors.textSecondary}
           borderRadius={99}
           height={32}
+          scrollToActive
         />
 
         {/* <CustomText
@@ -218,7 +234,7 @@ const PeopleTab = ({ searchQuery, activeTab, isActive }) => {
                 isChange
                 user={item}
                 following={isFollowing(item)}
-                isRequestsTab={tab === 1}
+                isRequestsTab={TABS[tab]?.key === "requests"}
                 onFollow={handleFollow}
                 onUnfollow={handleUnfollow}
                 onAccept={handleAcceptRequest}
@@ -229,15 +245,28 @@ const PeopleTab = ({ searchQuery, activeTab, isActive }) => {
                 isRejecting={
                   processing.id === item?._id && processing.type === "reject"
                 }
-                onPress={() =>
-                  navigation.navigate("UserProfile", { userId: item?._id })
-                }
+                isSelf={item?._id === userData?._id}
+                onPress={() => {
+                  // My own row → the Profile tab of the bottom bar, not a
+                  // second copy of my profile
+                  if (item?._id && item._id === userData?._id) {
+                    // v7: navigate("TabStack") would push a new copy (opening
+                    // on Home); popTo returns to the existing one
+                    navigation.dispatch(StackActions.popTo("TabStack"));
+                    openPagerTab("Profile");
+                    return;
+                  }
+                  navigation.navigate("UserProfile", { userId: item?._id });
+                }}
               />
             </AnimatedListItem>
           )
         }
         ListEmptyComponent={
-          !loading && (
+          !loading &&
+          (locked ? (
+            <LockInfo />
+          ) : (
             <View style={styles.emptyContainer}>
               <Matching
                 height={80}
@@ -258,7 +287,7 @@ const PeopleTab = ({ searchQuery, activeTab, isActive }) => {
                 color={isDark ? COLORS.gray48 : colors.textSecondary}
               />
             </View>
-          )
+          ))
         }
       />
     </View>

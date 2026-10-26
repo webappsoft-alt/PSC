@@ -1,5 +1,5 @@
 import { StyleSheet, Image, View, TouchableOpacity } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import CustomText from "../../../../components/CustomText";
 import fonts from "../../../../assets/fonts";
 import { COLORS } from "../../../../utils/COLORS";
@@ -25,6 +25,10 @@ const ToggleCard = ({
   onPress,
 }) => {
   const { colors } = useTheme();
+  // Some cards (Reduce motion, Data saver, …) have no state wired yet; the old
+  // toggle flipped itself, so keep that behaviour locally for them.
+  const [localValue, setLocalValue] = useState(!!value);
+  const controlled = typeof setValue === "function";
 
   return (
     <TouchableOpacity
@@ -95,15 +99,15 @@ const ToggleCard = ({
           )}
         </View>
       </View>
-      <View style={{ width: "15%", alignItems: "flex-end" }}>
+      {/* the Figma toggle is 64 wide — a fixed 15% slot (~52) was too narrow */}
+      <View style={{ marginLeft: 12, alignItems: "flex-end" }}>
         {isOption ? (
           <CustomCheckBox value={value || false} onValueChange={setValue} />
         ) : (
           <CustomToggle
             activeColor={COLORS.buttonColor}
-            inactiveColor={colors.iconMuted}
-            value={value}
-            setValue={setValue}
+            value={controlled ? value : localValue}
+            setValue={controlled ? setValue : setLocalValue}
           />
         )}
       </View>

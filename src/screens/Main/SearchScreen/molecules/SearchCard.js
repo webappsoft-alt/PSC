@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
+import UserBadge from "../../../../components/UserBadge";
 import CustomText from "../../../../components/CustomText";
 import Divider from "../../../../components/Divider";
 import Icons from "../../../../components/Icons";
@@ -28,6 +29,7 @@ const SearchCard = ({
   isRejecting,
   item,
   onPress,
+  isSelf, // the signed-in user's own row (e.g. in someone's followers list)
 }) => {
   const { colors, isDark } = useTheme();
   const navigation = useNavigation();
@@ -79,18 +81,8 @@ const SearchCard = ({
             />
             {isChange && (
               <View style={[styles.row, { gap: 2 }]}>
-                {user?.role == "individual" && (
-                  <Image
-                    source={Images.verified}
-                    style={{ height: 14, width: 14 }}
-                  />
-                )}
-                {user?.role == "company" && (
-                  <Image
-                    source={Images.goldenStar}
-                    style={{ height: 12, width: 12 }}
-                  />
-                )}
+                {/* shield (verified blue / unverified grey) + Premium / Premium+ star */}
+                <UserBadge user={user} />
                 <View
                   style={[
                     styles.userContainer,
@@ -179,7 +171,7 @@ const SearchCard = ({
             />
           )}
         </View>
-        {isChange ? (
+        {isChange && isSelf ? null : isChange ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             {isRequestsTab ? (
               <>

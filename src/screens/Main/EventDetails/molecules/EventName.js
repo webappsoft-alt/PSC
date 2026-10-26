@@ -9,6 +9,7 @@ import Icons from "../../../../components/Icons";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import Text from "../../../../components/ScaledText";
+import UserBadge from "../../../../components/UserBadge";
 
 const EventName = ({ detail }) => {
   console.log("details---", detail);
@@ -39,14 +40,7 @@ const EventName = ({ detail }) => {
           marginLeft={8}
           marginRight={6}
         />
-        {detail?.user?.role === "pro" && (
-          <Icons
-            family="MaterialIcons"
-            name="verified"
-            size={16}
-            color="#007BFF"
-          />
-        )}
+        <UserBadge user={detail?.user} size={16} />
       </View>
       <TouchableOpacity
         activeOpacity={0.8}

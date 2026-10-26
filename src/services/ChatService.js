@@ -1,8 +1,35 @@
-import { get, post } from "./ApiRequest";
+import { get, patch, post } from "./ApiRequest";
 import { endPoints } from "./ENV";
 
 export const getConversations = async (userId, params = {}) => {
   return await get(`conversations/${userId}`, { ...params, t: Date.now() });
+};
+
+/** Long-press options: { pinned?: boolean, business?: boolean } for me only. */
+export const updateConversationFlags = async (conversationId, flags) => {
+  return await patch(`conversations/${conversationId}/flags`, flags);
+};
+
+/** Conversation settings screen — my 1 on 1 chat with `otherUserId`. */
+export const getConversationSettings = async (otherUserId) => {
+  return await get(`conversations/with/${otherUserId}/settings`, {
+    t: Date.now(),
+  });
+};
+
+/** { favorite?, business?, settings?: { blockLinks: true, ... } } */
+export const updateConversationSettings = async (otherUserId, body) => {
+  return await patch(`conversations/with/${otherUserId}/settings`, body);
+};
+
+/** Mutual follows ("friends"), each with isOnline. */
+export const getFriends = async (searchQuery = "") => {
+  return await get("relationships/friends", {
+    page: 1,
+    limit: 50,
+    ...(searchQuery ? { searchQuery } : {}),
+    t: Date.now(),
+  });
 };
 
 export const getMessages = async (conversationId) => {

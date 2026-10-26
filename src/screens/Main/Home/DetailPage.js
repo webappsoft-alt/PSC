@@ -39,6 +39,7 @@ import CommentModal from "../CommentScreen/molecules/CommentModal";
 import EditModal from "./molecules/EditModal";
 import PostCard from "./molecules/PostCard";
 import { useTheme } from "../../../contexts/ThemeContext";
+import UserBadge from "../../../components/UserBadge";
 
 const DetailPage = () => {
   const { colors, isDark } = useTheme();
@@ -860,18 +861,7 @@ const DetailPage = () => {
                   fontFamily={fonts.medium}
                   color={colors.text}
                 />
-                {author?.role == "individual" && (
-                  <Icons
-                    family="MaterialSymbolsRoundedFilled"
-                    name="verified"
-                    size={16}
-                    color="#007BFF"
-                    style={{ marginLeft: 4 }}
-                  />
-                )}
-                {author?.role == "company" && (
-                  <Image source={Images.grayStar} style={styles.verifiedIcon} />
-                )}
+                <UserBadge user={author} size={16} style={{ marginLeft: 4 }} />
               </View>
               <CustomText
                 label={`${username}`}

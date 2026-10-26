@@ -49,6 +49,7 @@ import {
   buildSubtitleLines,
   captionWords,
 } from "../../../../utils/subtitles";
+import UserBadge from "../../../../components/UserBadge";
 
 // Figma Detail fullscreen icon: 24 frame, 14×14 four-corner vector at 5,5,
 // white, bold rounded corners
@@ -1098,25 +1099,8 @@ const PostCard = ({
                         letterSpacing={-0.07}
                         fontFamily={fonts.medium}
                       />
-                      {/* Figma: 16px Material "verified" (blue) / "star" badges */}
-                      {item?.author?.role == "individual" && (
-                        <Icons
-                          family="MaterialSymbolsRoundedFilled"
-                          name="verified"
-                          size={16}
-                          color="#007BFF"
-                          style={styles.verifiedIcon}
-                        />
-                      )}
-                      {item?.author?.role == "company" && (
-                        <Icons
-                          family="MaterialSymbolsRounded"
-                          name="star"
-                          size={16}
-                          color={COLORS.gray48}
-                          style={styles.verifiedIcon}
-                        />
-                      )}
+                      {/* shield (verified / unverified) + Premium / Premium+ star */}
+                      <UserBadge user={item?.author} size={16} style={styles.verifiedIcon} />
                     </View>
                     {/* Figma: username Regular 14 / −2% @48% */}
                     <CustomText

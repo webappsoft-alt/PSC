@@ -6,6 +6,10 @@ export const Images = {
   onBoardingSign: require("./onBoardingSign.png"),
   // Registration slides (Figma NEW on-boarding: Move-People / Sightseeing)
   onBoardPeople: require("./onBoardPeople.jpg"),
+  // Figma Show-Feed "Famous Creators" section background
+  showsCreatorsBg: require("./showsCreatorsBg.jpg"),
+  showsFeedBg: require("./showsFeedBg.jpg"),
+  showsNike: require("./showsNike.png"),
   onBoard6: require("./onBoard6.png"),
 
   buttonBg: require("./buttonBg.png"),
@@ -185,6 +189,8 @@ export const Images = {
   nPref: require("./nPref.png"),
   nEmail: require("./nEmail.png"),
   goldenStar: require("./goldenStar.png"),
+  pscStarPremium: require("./pscStarPremium.png"),
+  pscStarPremiumPlus: require("./pscStarPremiumPlus.png"),
   friendGray: require("./friendGray.png"),
   dollar: require("./dollar.png"),
   subs: require("./subs.png"),

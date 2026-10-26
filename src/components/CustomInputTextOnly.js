@@ -163,10 +163,6 @@ const CustomInputTextOnly = ({
                       fontFamily={fonts.medium}
                       fontSize={16}
                     />
-                    <ImageFast
-                      source={Images.verified}
-                      style={{ width: 14, height: 14 }}
-                    />
                   </View>
                 ))}
                 {collabNames.length > 2 && (

@@ -1,7 +1,6 @@
 import { useNavigation } from "@react-navigation/native";
 import { useMemo } from "react";
 import {
-  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -9,15 +8,13 @@ import {
 } from "react-native";
 import { useSelector } from "react-redux";
 import fonts from "../../../../assets/fonts";
-import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
-import Divider from "../../../../components/Divider";
+import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
-import { COLORS } from "../../../../utils/COLORS";
 
 const FinalizeProfile = () => {
   const navigation = useNavigation();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const userData = useSelector((state) => state.users.userData);
 
   const completionData = useMemo(() => {
@@ -36,7 +33,7 @@ const FinalizeProfile = () => {
 
     const cards = [
       { id: 1, title: "ADD A PROFILE PICTURE", completed: profilePicDone },
-      { id: 2, title: "ADD A BIO", completed: bioDone },
+      { id: 2, title: "WRITE A BIO", completed: bioDone },
       { id: 3, title: "SET YOUR INDUSTRY", completed: industryDone },
       { id: 4, title: "LINK SOCIALS", completed: socialsDone },
       { id: 5, title: "ADD YOUR IMAGES", completed: imagesDone },
@@ -60,30 +57,48 @@ const FinalizeProfile = () => {
 
   if (completionData.allCompleted) return null;
 
+  const ink = (a) =>
+    isDark ? `rgba(255, 255, 255, ${a})` : `rgba(18, 18, 18, ${a})`;
+
+  /**
+   * Figma "Finalize your profil" section (375 fill, padding 16/12, gap 20):
+   * title row (Medium 16 @64% · "3/" Regular 16 @64% + "7" Medium 16 · 16pt
+   * green tick, gap 4) → 12 → description (Regular 12 @48%) → 20 → 120×132
+   * cards (gap 8, padding 12/8, radius 12, 2pt stroke, SemiBold 12 −0.5%
+   * uppercase, 24pt icon bottom-right).
+   * RN text boxes are 1.4×fontSize, Figma trims to cap height (0.7×fontSize):
+   * 0.35×fontSize per side is taken out of each gap (16pt → 3.2, 12pt → 4.2).
+   */
   return (
-    <View style={{ paddingHorizontal: 12, marginTop: 16 }}>
+    <>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* HEADER */}
       <View style={styles.header}>
         <CustomText
           label="Finalize your profile"
           fontSize={16}
           fontFamily={fonts.medium}
-          color={colors.textSecondary}
+          color={ink(0.64)}
         />
 
         <View style={styles.row}>
           <CustomText
             label={`${completionData.totalCompleted}/`}
             fontSize={16}
-            color={colors.textSecondary}
+            color={ink(0.64)}
           />
           <CustomText
             label={completionData.totalPossible.toString()}
             fontSize={16}
+            fontFamily={fonts.medium}
+            color={colors.text}
           />
-          <Image
-            source={Images.checkGreen}
-            style={{ width: 16, height: 16, marginLeft: 4 }}
+          <Icons
+            family="MaterialSymbolsRoundedFilled"
+            name="check_circle"
+            size={16}
+            color={GREEN}
+            style={{ marginLeft: 4 }}
           />
         </View>
       </View>
@@ -91,14 +106,16 @@ const FinalizeProfile = () => {
       <CustomText
         label="Complete your profile to gain up to 4.5x more followers and avoid being mistaken for inactive bots that risk bans."
         fontSize={12}
-        color={colors.textSecondary}
+        color={ink(0.48)}
+        marginTop={12 - 3.2 - 4.2}
       />
 
       {/* HORIZONTAL CARDS */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: 20 }}
+        style={styles.cardsScroll}
+        contentContainerStyle={styles.cardsContent}
       >
         {completionData.cards.map((item) => {
           return (
@@ -118,9 +135,9 @@ const FinalizeProfile = () => {
                 styles.card,
                 {
                   backgroundColor: item.completed
-                    ? "rgba(55,184,116,0.16)"
-                    : colors.surfaceAlt,
-                  borderColor: item.completed ? "#37B874" : colors.surfaceAlt,
+                    ? "rgba(55, 184, 116, 0.16)"
+                    : ink(0.04),
+                  borderColor: item.completed ? GREEN : ink(0.04),
                 },
               ]}
             >
@@ -128,34 +145,49 @@ const FinalizeProfile = () => {
                 label={item.title}
                 fontFamily={fonts.semiBold}
                 fontSize={12}
-                color={
-                  item.completed ? COLORS.green + "64" : colors.textSecondary
-                }
+                letterSpacing={-0.06}
+                textTransform={"uppercase"}
+                containerStyle={{ alignSelf: "stretch" }}
+                color={item.completed ? "rgba(55, 184, 116, 0.64)" : ink(0.64)}
               />
 
-              <View style={{ alignSelf: "flex-end" }}>
-                <Image
-                  source={item.completed ? Images.checkGreen : Images.plusWhite}
-                  style={{
-                    width: 24,
-                    height: 24,
-                    tintColor: item.completed ? undefined : colors.text,
-                  }}
-                  resizeMode="contain"
+              {item.completed ? (
+                <Icons
+                  family="MaterialSymbolsRoundedFilled"
+                  name="check_circle"
+                  size={24}
+                  color={GREEN}
                 />
-              </View>
+              ) : (
+                <Icons
+                  family="MaterialSymbolsRounded"
+                  name="add_circle"
+                  size={24}
+                  color={colors.text}
+                />
+              )}
             </TouchableOpacity>
           );
         })}
       </ScrollView>
-      <Divider marginTop={18} thickness={2} />
     </View>
+    {/* Figma: next section starts 2pt below on #262626 */}
+    <View style={styles.sectionGap} />
+    </>
   );
 };
 
 export default FinalizeProfile;
 
+const GREEN = "rgba(55, 184, 116, 1)";
+
 const styles = StyleSheet.create({
+  sectionGap: { height: 2, backgroundColor: "#262626" },
+  container: {
+    paddingTop: 16 - 3.2,
+    paddingBottom: 16,
+    paddingHorizontal: 12,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -165,13 +197,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  cardsScroll: {
+    marginTop: 20 - 4.2,
+    marginRight: -12,
+  },
+  cardsContent: {
+    gap: 8,
+    paddingRight: 12,
+  },
   card: {
     height: 132,
     width: 120,
-    padding: 8,
-    marginRight: 12,
+    paddingTop: 12 - 4.2,
+    paddingBottom: 12,
+    paddingHorizontal: 8,
     borderRadius: 12,
     borderWidth: 2,
     justifyContent: "space-between",
+    alignItems: "flex-end",
   },
 });

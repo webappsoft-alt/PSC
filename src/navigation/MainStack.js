@@ -21,6 +21,10 @@ import VerifyIdentity from "../screens/Auth/ProScreens/VerifyIdentity.js";
 import CameraScreen from "../screens/Main/CameraScreen";
 import Chat from "../screens/Main/Chat/Chat";
 import InboxScreen from "../screens/Main/Chat/InboxScreen";
+import OnlineFriends from "../screens/Main/Chat/OnlineFriends";
+import ConversationSettings from "../screens/Main/Chat/ConversationSettings";
+import ReportChat from "../screens/Main/Chat/ReportChat";
+import MatchingFilters from "../screens/Main/BandMateMatching/MatchingFilters";
 import CommentScreen from "../screens/Main/CommentScreen";
 import AddItems from "../screens/Main/CreateEvent/AddItems.js";
 import Branding from "../screens/Main/CreateEvent/Branding.js";
@@ -38,7 +42,6 @@ import MainScreen from "../screens/Main/Home/MainScreen.js";
 import StoryViewer from "../screens/Main/Home/molecules/StoryViewer";
 import StoryViewerById from "../screens/Main/Home/molecules/StoryViewerById.js";
 import ProgressiveBlur from "../screens/Main/Home/ProgressiveBlur.js";
-import MatchingDetail from "../screens/Main/MatchingDetail";
 import Notification from "../screens/Main/Notification/index.js";
 import AddPicture from "../screens/Main/Profile/molecules/AddPicture.js";
 import QrScreen from "../screens/Main/Profile/QrScreen.js";
@@ -96,6 +99,11 @@ import ViewerWatchScreen from "../screens/Main/LiveScreens/ViewerWatchScreen.js"
 import PublishLive from "../screens/PublishStory/PublishLive.js";
 import ViewStreamScreen from "../screens/ViewStream/ViewStreamScreen.js";
 import CreateAudio from "../screens/Main/Audio/CreateAudio.js";
+import CreateEpisode from "../screens/Main/TvShow/CreateEpisode";
+import ShowDetail from "../screens/Main/TvShow/ShowDetail";
+import SelectShow from "../screens/Main/TvShow/SelectShow";
+import SelectGenre from "../screens/Main/TvShow/SelectGenre";
+import ShowOptionPicker from "../screens/Main/TvShow/ShowOptionPicker";
 
 const Stack = createNativeStackNavigator();
 
@@ -196,7 +204,13 @@ const MainStack = () => {
         <Stack.Screen name="Chat" component={Chat} />
         <Stack.Screen name="SearchScreen" component={SearchScreen} />
         <Stack.Screen name="InboxScreen" component={InboxScreen} />
-        <Stack.Screen name="MatchingDetail" component={MatchingDetail} />
+        <Stack.Screen name="OnlineFriends" component={OnlineFriends} />
+        <Stack.Screen
+          name="ConversationSettings"
+          component={ConversationSettings}
+        />
+        <Stack.Screen name="ReportChat" component={ReportChat} />
+        <Stack.Screen name="FilterScreen" component={MatchingFilters} />
         <Stack.Screen name="InvestmentScreen" component={InvestmentScreen} />
         <Stack.Screen name="CommentScreen" component={CommentScreen} />
         <Stack.Screen name="UserProfile" component={UserProfile} />
@@ -314,6 +328,12 @@ const MainStack = () => {
 
         {/* audio screen */}
         <Stack.Screen name="CreateAudio" component={CreateAudio} />
+        {/* Shows: Create An Episode + its pickers (Figma Shows page) */}
+        <Stack.Screen name="CreateEpisode" component={CreateEpisode} />
+        <Stack.Screen name="ShowDetail" component={ShowDetail} />
+        <Stack.Screen name="SelectShow" component={SelectShow} />
+        <Stack.Screen name="SelectGenre" component={SelectGenre} />
+        <Stack.Screen name="ShowOptionPicker" component={ShowOptionPicker} />
 
         {/* Live Streaming Screens */}
         {/* host wali side pr data enter wali screen */}

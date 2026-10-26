@@ -37,6 +37,7 @@ import EditModal from "./molecules/EditModal";
 import PostCard from "./molecules/PostCard";
 import PostCardSkeleton from "./molecules/PostCardSkeleton";
 import { useTheme } from "../../../contexts/ThemeContext";
+import UserBadge from "../../../components/UserBadge";
 
 const DetailPageWithId = ({ route }) => {
   const { colors, isDark } = useTheme();
@@ -869,18 +870,7 @@ const DetailPageWithId = ({ route }) => {
               <View style={styles.userInfo}>
                 <View style={styles.nameRow}>
                   <CustomText label={displayName} />
-                  {author?.role == "individual" && (
-                    <Image
-                      source={Images.verified}
-                      style={styles.verifiedIcon}
-                    />
-                  )}
-                  {author?.role == "company" && (
-                    <Image
-                      source={Images.grayStar}
-                      style={styles.verifiedIcon}
-                    />
-                  )}
+                  <UserBadge user={author} style={{ marginLeft: 4 }} />
                 </View>
                 <CustomText label={`${username}`} color={colors.textSecondary} />
               </View>

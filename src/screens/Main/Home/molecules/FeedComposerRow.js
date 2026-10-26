@@ -12,6 +12,7 @@ import { post } from "../../../../services/ApiRequest";
 import { setNewFollower } from "../../../../store/reducer/NotiSlice";
 import { COLORS } from "../../../../utils/COLORS";
 import { ToastMessage } from "../../../../utils/ToastMessage";
+import UserBadge from "../../../../components/UserBadge";
 
 /**
  * Figma `Home-Feed` (moments state), section under the header:
@@ -116,15 +117,7 @@ const NewFollowerToast = ({ follower, onDismiss }) => {
               numberOfLines={1}
               containerStyle={{ flexShrink: 1 }}
             />
-            {user?.role === "individual" || user?.isVerified ? (
-              <Icons
-                family="MaterialSymbolsRoundedFilled"
-                name="verified"
-                size={16}
-                color="#007BFF"
-                style={{ marginLeft: 4 }}
-              />
-            ) : null}
+            <UserBadge user={user} size={16} style={{ marginLeft: 4 }} />
           </View>
         </View>
         <CircleButton

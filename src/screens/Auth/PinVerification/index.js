@@ -30,6 +30,9 @@ import {
 } from "../../../utils/profileLock";
 import { openSavedAccount } from "../../../utils/accountSession";
 
+/** Lets the filled 6th cell + the loader paint before heavy work (Home mount). */
+const paint = () => new Promise((resolve) => setTimeout(resolve, 300));
+
 /**
  * The PIN typed on the "define" step, kept for the "confirm" step that follows.
  * Module scope on purpose: route params are serialised and logged.
@@ -102,12 +105,43 @@ const PinVerification = () => {
       const ok = await openSavedAccount(dispatch, account);
       if (!ok) {
         ToastMessage("Session expired. Please log in again.", "error");
+        // Keep the selector underneath so Back returns to it; prefill Login.
         navigation.reset({
-          index: 0,
-          routes: [{ name: "AuthStack", params: { screen: "Login" } }],
+          index: 1,
+          routes: [
+            { name: "ProfileSelector" },
+            {
+              name: "AuthStack",
+              params: {
+                screen: "Login",
+                params: {
+                  identifier:
+                    account?.username || account?.email || account?.phone || "",
+                },
+              },
+            },
+          ],
         });
         return;
       }
+    }
+    // Opened from an in-app switcher (e.g. the Inbox account sheet): land back
+    // on that screen, with the tabs underneath so Back still works.
+    const returnTo = route?.params?.returnTo;
+    if (returnTo) {
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: "MainStack",
+            state: {
+              index: 1,
+              routes: [{ name: "TabStack" }, { name: returnTo }],
+            },
+          },
+        ],
+      });
+      return;
     }
     navigation.reset({ index: 0, routes: [{ name: "MainStack" }] });
   };
@@ -118,6 +152,7 @@ const PinVerification = () => {
       submitting.current = true;
       try {
         if (mode === "define") {
+          await paint();
           pendingPin = pin;
           navigation.push("PinVerification", {
             ...route.params,
@@ -135,6 +170,7 @@ const PinVerification = () => {
             return;
           }
           setBusy(true);
+          await paint();
           if (purpose === "register") {
             await post("user/create-pin", { pin });
             saveProfilePin(dispatch, users, accountId, pin);
@@ -163,6 +199,7 @@ const PinVerification = () => {
           return;
         }
         setBusy(true);
+        await paint();
         await enterApp();
       } catch (err) {
         setBusy(false);

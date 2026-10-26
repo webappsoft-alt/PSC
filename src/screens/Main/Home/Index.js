@@ -7,6 +7,7 @@ import moment from "moment/moment";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Animated,
   DeviceEventEmitter,
   FlatList,
@@ -36,8 +37,13 @@ import { ToastMessage } from "../../../utils/ToastMessage";
 import useLocation from "../../../utils/useLocation";
 import FeedComposerRow from "./molecules/FeedComposerRow";
 import { evaluateNavTone } from "../../../utils/navTone";
-import { feedHeaderHeight } from "./molecules/FeedHeader";
+import {
+  FEED_HEADER_COLLAPSE,
+  feedHeaderHeight,
+} from "./molecules/FeedHeader";
 import MomentCard from "./molecules/MomentCard";
+import NewPostsPill from "./molecules/NewPostsPill";
+import FeedPostItem from "./molecules/FeedPostItem";
 import PostCard from "./molecules/PostCard";
 import PostCardSkeleton from "./molecules/PostCardSkeleton";
 import RadioCard from "./molecules/RadioCard";
@@ -69,113 +75,6 @@ const areTopicListsEqual = (current = [], next = []) => {
   );
 };
 
-const FeedPostItem = memo(
-  ({
-    post,
-    shouldPlay,
-    formatCount,
-    onOpenComments,
-    onDeletePress,
-    onEditPress,
-    onHidePost,
-    onHideUserPosts,
-    topicPostsCount,
-  }) => {
-    const author = post?.author || {};
-    const displayName =
-      `${author.firstName || ""} ${author.lastName || ""}`.trim() ||
-      "Display Name";
-    const username = author.username || "username";
-    const profileColor = author?.profile?.profileColor || "red";
-    const description = post?.description || "";
-    const images = post?.images || [];
-    const hashtags = post?.hashtags || [];
-    const topic = post?.topic || "Crypto";
-    const likesCount = post?.stats?.upvotes || 0;
-    const commentsCount = post?.stats?.comments || 0;
-    const repostsCount = post?.stats?.reposts || 0;
-    const savedCount = post?.stats?.saved || 0;
-    const stats = post?.stats || {};
-    const createdAt = post?.createdAt || "";
-    const timeAgo = useMemo(() => moment(createdAt).fromNow(), [createdAt]);
-
-    const commentPayload = useMemo(
-      () => ({
-        displayName,
-        username,
-        description,
-        likesCount,
-        commentsCount,
-        repostsCount,
-        timeAgo,
-        images,
-      }),
-      [
-        commentsCount,
-        description,
-        displayName,
-        images,
-        likesCount,
-        repostsCount,
-        timeAgo,
-        username,
-      ],
-    );
-
-    const handleOpenComments = useCallback(() => {
-      onOpenComments(post, commentPayload);
-    }, [commentPayload, onOpenComments, post]);
-
-    const handleDelete = useCallback(() => {
-      onDeletePress(post?._id);
-    }, [onDeletePress, post?._id]);
-
-    const handleEdit = useCallback(() => {
-      onEditPress(post);
-    }, [onEditPress, post]);
-
-    const handleHidePost = useCallback(() => {
-      onHidePost(post?._id);
-    }, [onHidePost, post?._id]);
-
-    const handleHideUserPosts = useCallback(() => {
-      onHideUserPosts(author?._id);
-    }, [author?._id, onHideUserPosts]);
-
-    return (
-      <>
-        <PostCard
-          displayName={displayName}
-          username={username}
-          description={description}
-          images={images}
-          hashtags={hashtags}
-          topic={topic}
-          likesCount={likesCount}
-          commentsCount={commentsCount}
-          repostsCount={repostsCount}
-          stats={stats}
-          timeAgo={timeAgo}
-          formatCount={formatCount}
-          upvotes={post?.upvotes || []}
-          downvotes={post?.downvotes || []}
-          savedCount={savedCount}
-          profileColor={profileColor}
-          onCommentPress={handleOpenComments}
-          onDeletePress={handleDelete}
-          onEditPress={handleEdit}
-          onHidePost={handleHidePost}
-          onHideUserPosts={handleHideUserPosts}
-          item={post}
-          onSwipeRight={handleOpenComments}
-          shouldPlay={shouldPlay}
-          topicPostsCount={topicPostsCount}
-        />
-        <View style={{ height: 1, backgroundColor: COLORS.authHeader }} />
-      </>
-    );
-  },
-);
 
 const Home = ({
   route,
@@ -221,7 +120,8 @@ const Home = ({
 
   const [feedType, setFeedType] = useState(route?.params?.feedType || "social");
   const scrollY = useRef(new Animated.Value(0)).current;
-  const { setIsTabBarVisible, setFeedRowVisible } = useTabBarVisibility();
+  const { setIsTabBarVisible, setFeedRowVisible, feedRowAnim } =
+    useTabBarVisibility();
   const lastContentOffset = useRef(0);
   const scrollRef = useRef(null);
   const hasFeedContentRef = useRef(false);
@@ -529,6 +429,95 @@ const Home = ({
   useEffect(() => {
     fetchPosts(!isFocus);
   }, [fetchPosts, isFocus]);
+
+  // ── Figma "New posts available" ──────────────────────────────────────
+  // Any post newer than the newest one loaded in the feed shows the pill;
+  // checked every 30s while the feed is on screen (and the app is active),
+  // and right away when a "post" notification arrives. Tap → back to the top
+  // and the whole feed reloads.
+  // TEMP (client demo): force the pill on. After tapping it the feed
+  // reloads, it hides, then comes back 2s later so it can be shown again.
+  // Set to false to go back to real new-post detection.
+  const DEMO_NEW_POSTS_PILL = false;
+  const [showNewPosts, setShowNewPosts] = useState(DEMO_NEW_POSTS_PILL);
+  const newPostsAnim = useRef(new Animated.Value(0)).current;
+  const newestLoadedRef = useRef(0);
+  const newestRemoteRef = useRef(0);
+  const myId = useSelector((state) => state.users?.userData?._id);
+
+  useEffect(() => {
+    let newest = 0;
+    [...posts, ...unfollowedPosts].forEach((p) => {
+      const t = new Date(p?.createdAt || 0).getTime();
+      if (t > newest) newest = t;
+    });
+    newestLoadedRef.current = newest;
+    // a reload (pull, tap, upload) that brought the newest post in hides it
+    if (newestRemoteRef.current && newest >= newestRemoteRef.current) {
+      setShowNewPosts(false);
+    }
+  }, [posts, unfollowedPosts]);
+
+  const checkNewPosts = useCallback(async () => {
+    if (!newestLoadedRef.current) return;
+    try {
+      const res = await get("posts?&type=post&limit=1");
+      const latest = res?.data?.data?.[0];
+      if (!latest) return;
+      const t = new Date(latest.createdAt || 0).getTime();
+      const isMine =
+        String(latest?.author?._id || latest?.userId || "") === String(myId);
+      if (t > newestLoadedRef.current && !isMine) {
+        newestRemoteRef.current = t;
+        setShowNewPosts(true);
+      }
+    } catch (e) {
+      // silent: the pill is a hint only
+    }
+  }, [myId]);
+
+  useEffect(() => {
+    if (!activeFocus) return undefined;
+    let appActive = AppState.currentState === "active";
+    const sub = AppState.addEventListener("change", (state) => {
+      appActive = state === "active";
+      if (appActive) checkNewPosts();
+    });
+    const id = setInterval(() => {
+      if (appActive) checkNewPosts();
+    }, 30000);
+    return () => {
+      clearInterval(id);
+      sub.remove();
+    };
+  }, [activeFocus, checkNewPosts]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onNotification = (data) => {
+      if (data?.notificationType === "post") checkNewPosts();
+    };
+    socket.on("notification", onNotification);
+    return () => socket.off("notification", onNotification);
+  }, [socket, checkNewPosts]);
+
+  useEffect(() => {
+    Animated.timing(newPostsAnim, {
+      toValue: showNewPosts ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [showNewPosts, newPostsAnim]);
+
+  const handleNewPostsPress = useCallback(() => {
+    setShowNewPosts(false);
+    const list = scrollRef.current;
+    list?.scrollToOffset?.({ offset: 0, animated: true });
+    setFeedRowVisible?.(true);
+    fetchPosts(true);
+    fetchMetaData();
+    if (DEMO_NEW_POSTS_PILL) setTimeout(() => setShowNewPosts(true), 2000);
+  }, [fetchPosts, fetchMetaData, setFeedRowVisible, DEMO_NEW_POSTS_PILL]);
 
   useEffect(() => {
     fetchMetaData();
@@ -995,6 +984,30 @@ const Home = ({
               <ActivityIndicator size="small" color={colors.text} />
             </Animated.View>
           ) : null}
+          {/* Figma: centred, 12 below the 171pt header; follows the header
+              when its Feed/Shorts row collapses */}
+          <Animated.View
+            pointerEvents={showNewPosts ? "box-none" : "none"}
+            style={[
+              styles.newPostsWrap,
+              {
+                top: listTopPadding - 1 + 12,
+                opacity: newPostsAnim,
+                transform: [
+                  {
+                    translateY: feedRowAnim
+                      ? feedRowAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-FEED_HEADER_COLLAPSE, 0],
+                        })
+                      : 0,
+                  },
+                ],
+              },
+            ]}
+          >
+            <NewPostsPill onPress={handleNewPostsPress} />
+          </Animated.View>
         </ScreenWrapper>
       </View>
     </View>
@@ -1010,6 +1023,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
+  },
+  newPostsWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 5,
   },
   pullIndicator: {
     position: "absolute",
