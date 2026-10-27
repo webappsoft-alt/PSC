@@ -140,12 +140,24 @@ const GenreRow = ({
   );
 };
 
-const SelectGenre = ({ route }) => {
-  const navigation = useNavigation();
+/**
+ * The full-screen topic list (Shows genres, Circle topic). `single`: one
+ * topic, tapping a row picks it and closes; no reordering.
+ */
+export const TopicPicker = ({
+  initial = [],
+  initialOrder = [],
+  max = MAX_GENRES,
+  single = false,
+  placeholder = "Sci-Fi...",
+  emptyLabel = "No genre matches your search.",
+  onChange,
+  onClose,
+}) => {
   const insets = useSafeAreaInsets();
-  const [picked, setPicked] = useState(route?.params?.genres || []);
+  const [picked, setPicked] = useState(initial);
   const [order, setOrder] = useState(() => {
-    const saved = route?.params?.order || [];
+    const saved = initialOrder;
     // saved drag order, plus any topic that isn't in it yet
     return [...saved.filter((n) => ALL.includes(n)), ...ALL.filter((n) => !saved.includes(n))];
   });
@@ -172,26 +184,32 @@ const SelectGenre = ({ route }) => {
       first.current = false;
       return;
     }
-    emitShowPick({ genres: pickedOrdered, genreOrder: order });
+    if (!single) onChange?.(pickedOrdered, order);
   }, [pickedOrdered, order]);
 
   // side effects (the toast) stay out of the state updater — React may run
   // updaters during render, and a toast there updates another component
   const toggle = useCallback(
     (name) => {
+      if (single) {
+        setPicked([name]);
+        onChange?.([name], order);
+        onClose?.();
+        return;
+      }
       if (picked.includes(name)) {
         setPicked((prev) => prev.filter((g) => g !== name));
         return;
       }
-      if (picked.length >= MAX_GENRES) {
-        ToastMessage(`You can pick up to ${MAX_GENRES} genres`, "error");
+      if (picked.length >= max) {
+        ToastMessage(`You can pick up to ${max} genres`, "error");
         return;
       }
       setPicked((prev) =>
-        prev.includes(name) || prev.length >= MAX_GENRES ? prev : [...prev, name],
+        prev.includes(name) || prev.length >= max ? prev : [...prev, name],
       );
     },
-    [picked],
+    [picked, single, order, max, onChange, onClose],
   );
 
   const onDragStart = useCallback(() => {
@@ -205,7 +223,9 @@ const SelectGenre = ({ route }) => {
     setOrder((prev) => moveItem(prev, from, to));
   }, []);
 
-  const headerHeight = insets.top + 12 + 40 + (picked.length ? 8 + 32 : 0) + 8;
+  // single pick: the radio shows the choice, no chips row
+  const showChips = !single && pickedOrdered.length > 0;
+  const headerHeight = insets.top + 12 + 40 + (showChips ? 8 + 32 : 0) + 8;
 
   return (
     <View style={styles.page}>
@@ -227,7 +247,7 @@ const SelectGenre = ({ route }) => {
               checked={picked.includes(name)}
               last={index === rows.length - 1}
               // reordering works on the full list, not on search results
-              canDrag={!query}
+              canDrag={!query && !single}
               dragIndex={dragIndex}
               dragY={dragY}
               onToggle={toggle}
@@ -238,7 +258,7 @@ const SelectGenre = ({ route }) => {
           {rows.length === 0 ? (
             <View style={styles.empty}>
               <CustomText
-                label="No genre matches your search."
+                label={emptyLabel}
                 fontSize={14}
                 fontFamily={fonts.medium}
                 color={SHOWS.white48}
@@ -261,7 +281,7 @@ const SelectGenre = ({ route }) => {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Sci-Fi..."
+              placeholder={placeholder}
               placeholderTextColor={SHOWS.white48}
               selectionColor={SHOWS.gold}
               autoCorrect={false}
@@ -283,9 +303,9 @@ const SelectGenre = ({ route }) => {
             ) : null}
           </View>
           {/* picks are already synced to the form — close just leaves */}
-          <CircleButton icon="close" size={20} onPress={() => navigation.goBack()} />
+          <CircleButton icon="close" size={20} onPress={onClose} />
         </View>
-        {pickedOrdered.length ? (
+        {showChips ? (
           <View style={styles.chips}>
             {pickedOrdered.map((name) => (
               <TouchableOpacity
@@ -313,6 +333,18 @@ const SelectGenre = ({ route }) => {
         ) : null}
       </View>
     </View>
+  );
+};
+
+const SelectGenre = ({ route }) => {
+  const navigation = useNavigation();
+  return (
+    <TopicPicker
+      initial={route?.params?.genres || []}
+      initialOrder={route?.params?.order || []}
+      onChange={(genres, genreOrder) => emitShowPick({ genres, genreOrder })}
+      onClose={() => navigation.goBack()}
+    />
   );
 };
 

@@ -6,6 +6,7 @@ import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
 import { COLORS } from "../../../../utils/COLORS";
+import StatusAvatar from "./StatusAvatar";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
 /**
@@ -17,7 +18,6 @@ import { useTheme } from "../../../../contexts/ThemeContext";
  * Preview Medium 14 −0.5 @48%. Unread badge 24 #EE1045, SemiBold 12.
  */
 const GOLD = "#A19375";
-const ONLINE = "#1ED760";
 
 const ConversationBox = ({ item, onLongPress }) => {
   const navigation = useNavigation();
@@ -31,18 +31,21 @@ const ConversationBox = ({ item, onLongPress }) => {
     isDark ? `rgba(255, 255, 255, ${o})` : `rgba(18, 18, 18, ${o})`;
 
   // Group conversation (backend flags participants > 2): 2×2 avatar grid
-  const groupMembers = item?.isGroup
+  const groupMembers = item?.isGroup || item?.type === "group"
     ? (item?.participants || []).filter(
         (p) => p?._id && p._id !== userData?._id,
       )
     : [];
-  const isGroup = groupMembers.length > 1;
-  const title = isGroup
-    ? groupMembers
-        .map((p) => p?.firstName)
-        .filter(Boolean)
-        .join(", ")
-    : `${otherUser?.firstName || ""} ${otherUser?.lastName || ""}`.trim();
+  const isCircle = item?.type === "circle";
+  const isGroup = !isCircle && (item?.type === "group" || groupMembers.length > 1);
+  const title =
+    item?.name ||
+    (isGroup
+      ? groupMembers
+          .map((p) => p?.firstName)
+          .filter(Boolean)
+          .join(", ")
+      : `${otherUser?.firstName || ""} ${otherUser?.lastName || ""}`.trim());
   const unread = Number(item?.unreadCount) || 0;
 
   // PSC users keep their photo in profile.avatar (backend sets a default)
@@ -72,6 +75,21 @@ const ConversationBox = ({ item, onLongPress }) => {
       </View>
     );
 
+  // the group's own photo (Create a Group image), else its first letter
+  const renderGroupPicture = (style) =>
+    item?.picture ? (
+      <ImageFast source={{ uri: item.picture }} style={style} resizeMode="cover" />
+    ) : (
+      <View style={[style, styles.initials, { backgroundColor: tint(0.08) }]}>
+        <CustomText
+          label={(title?.[0] || "?").toUpperCase()}
+          fontSize={10}
+          fontFamily={fonts.semiBold}
+          color={colors.text}
+        />
+      </View>
+    );
+
   const preview =
     item?.lastMessage?.type == "voice"
       ? "🎤 Voice Message"
@@ -79,6 +97,8 @@ const ConversationBox = ({ item, onLongPress }) => {
       ? "📷 Image"
       : item?.lastMessage?.type == "file"
       ? "📹 Video"
+      : item?.lastMessage?.type == "meeting"
+      ? "📅 Meeting proposal"
       : item?.lastMessage?.content || "No messages yet · Say hi 👋";
 
   return (
@@ -91,38 +111,84 @@ const ConversationBox = ({ item, onLongPress }) => {
         item?.noConversation || !onLongPress ? undefined : () => onLongPress(item)
       }
       onPress={() =>
-        navigation.navigate("InboxScreen", {
-          recipientId: otherUser?._id,
-          recipientName: title,
-          otherUser,
-        })
+        isGroup || isCircle
+          ? navigation.navigate("InboxScreen", {
+              conversationId: item?._id,
+              isGroup: true,
+              groupType: isCircle ? "circle" : "group",
+              recipientName: title,
+              groupPicture: item?.picture,
+              memberCount: item?.memberCount,
+            })
+          : navigation.navigate("InboxScreen", {
+              recipientId: otherUser?._id,
+              recipientName: title,
+              otherUser: otherUser
+                ? { ...otherUser, status: item?.status, isOnline: item?.isOnline }
+                : otherUser,
+            })
       }
     >
-      {isGroup ? (
+      {isCircle ? (
+        // Figma Main-Chat-Circles: square 48, radius 12
+        item?.picture ? (
+          <ImageFast source={{ uri: item.picture }} style={styles.circleAvatar} />
+        ) : (
+          <View style={[styles.circleAvatar, styles.initials, { backgroundColor: tint(0.08) }]}>
+            <CustomText
+              label={(title?.[0] || "?").toUpperCase()}
+              fontSize={16}
+              fontFamily={fonts.semiBold}
+              color={colors.text}
+            />
+          </View>
+        )
+      ) : isGroup ? (
+        // 2×2: me · friend 1 / friend 2 · group photo. With 1 friend the
+        // group photo fills the whole bottom half.
         <View style={styles.groupGrid}>
-          {[0, 1, 2, 3].map((i) => (
-            <View key={i} style={[styles.groupCell, styles[`groupCell${i}`]]}>
-              {renderAvatar(
-                groupMembers[i % groupMembers.length],
-                styles.groupImage,
-                10,
-              )}
+          <View style={[styles.groupCell, styles.groupCell0]}>
+            {renderAvatar(userData, styles.groupImage, 10)}
+          </View>
+          <View style={[styles.groupCell, styles.groupCell1]}>
+            {renderAvatar(groupMembers[0], styles.groupImage, 10)}
+          </View>
+          {groupMembers.length > 1 ? (
+            <>
+              <View style={[styles.groupCell, styles.groupCell2]}>
+                {renderAvatar(groupMembers[1], styles.groupImage, 10)}
+              </View>
+              <View style={[styles.groupCell, styles.groupCell3]}>
+                {renderGroupPicture(styles.groupImage)}
+              </View>
+            </>
+          ) : (
+            <View style={[styles.groupCell, styles.groupHalf, styles.groupCell2, styles.groupCell3]}>
+              {renderGroupPicture(styles.groupHalfImage)}
             </View>
-          ))}
+          )}
         </View>
       ) : (
-        <View
-          style={[
-            styles.ring,
-            { backgroundColor: item?.isOnline ? ONLINE : tint(0.16) },
-          ]}
-        >
-          {renderAvatar(otherUser, styles.avatar, 15)}
-        </View>
+        <StatusAvatar
+          user={otherUser}
+          size={48}
+          ring
+          status={item?.status || (item?.isOnline ? "online" : "offline")}
+          isBirthday={!!item?.isBirthday}
+        />
       )}
 
       <View style={styles.textBox}>
         <View style={styles.nameRow}>
+          {/* client: favorite (star) stands before the briefcase, same color & size */}
+          {item?.isFavorite && (
+            <Icons
+              family="MaterialSymbolsRoundedFilled"
+              name="star"
+              size={12}
+              color={GOLD}
+            />
+          )}
           {item?.isBusiness && (
             <Icons
               family="MaterialSymbolsRoundedFilled"
@@ -208,8 +274,20 @@ const createStyles = (colors, isDark) =>
       height: 24,
       overflow: "hidden",
     },
+    circleAvatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
+    },
     groupImage: {
       width: 24,
+      height: 24,
+    },
+    groupHalf: {
+      width: 48,
+    },
+    groupHalfImage: {
+      width: 48,
       height: 24,
     },
     groupCell0: { borderTopLeftRadius: 12 },

@@ -86,14 +86,14 @@ const TierGradient = ({ id, color, innerOpacity = 1 }) => {
   );
 };
 
-const HeaderIcon = ({ name, onPress, color, disabled }) => (
+const HeaderIcon = ({ name, onPress, color, disabled, size = 24, box = 40 }) => (
   <TouchableOpacity
     activeOpacity={0.6}
     onPress={onPress}
     disabled={disabled}
-    style={styles.iconBox}
+    style={[styles.iconBox, { width: box }]}
   >
-    <Icons family={MSF} name={name} size={24} color={color} />
+    <Icons family={MSF} name={name} size={size} color={color} />
   </TouchableOpacity>
 );
 
@@ -129,7 +129,10 @@ const ProfileHeader = ({
   const tier = getProfileTier(user);
   const isVerified = !!user?.profile?.isVerified;
 
-  const hasTierBg = !!tier.headerColor;
+  // Client (Figma "Profile" vs "Profile-Premium/+"): the tier gradient is
+  // the visitor view of a Premium / Premium+ profile; my own profile keeps
+  // the plain #121212 header (with my banner image when I set one).
+  const hasTierBg = !isUser && !!tier.headerColor;
   // Dark header (gradient / cover) always carries white content.
   const onDarkBg = hasTierBg || !!coverImage || isDark;
   const contentColor = onDarkBg ? COLORS.white : colors.text;
@@ -268,7 +271,8 @@ const ProfileHeader = ({
                 color={contentColor}
                 onPress={onBannerPress}
               />
-              <HeaderIcon name="analytics" color={contentColor} disabled />
+              {/* Figma own header: insights box is 32 (palette / settings 40) */}
+              <HeaderIcon name="analytics" color={contentColor} box={32} disabled />
               <HeaderIcon
                 name="settings"
                 color={contentColor}

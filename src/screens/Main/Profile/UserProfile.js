@@ -24,7 +24,7 @@ import { setUserData } from "../../../store/reducer/usersSlice";
 import { COLORS } from "../../../utils/COLORS";
 import { ToastMessage } from "../../../utils/ToastMessage";
 import { useTheme } from "../../../contexts/ThemeContext";
-import { accentA, getProfileTier } from "../../../utils/profileTier";
+import { accentA, getProfileAccent, getProfileTier } from "../../../utils/profileTier";
 import FeedPostItem from "../Home/molecules/FeedPostItem";
 import PostCardSkeleton from "../Home/molecules/PostCardSkeleton";
 import DelImagesModal from "./molecules/DelImagesModal";
@@ -340,7 +340,7 @@ const UserProfile = ({ route }) => {
     return (
       <View style={styles.centerContainer}>
         <CustomText
-          label={"No posts found"}
+          label={"No post found"}
           color={colors.textSecondary}
           fontSize={16}
           textAlign={"center"}
@@ -399,6 +399,7 @@ const UserProfile = ({ route }) => {
 
   const isMeProfile = userData?._id === localUser?._id;
   const tier = getProfileTier(localUser);
+  const accent = getProfileAccent(localUser);
   const cardLayout = getProfileCardLayout(localUser, !isMeProfile);
   // Figma: sections 2pt apart (Premium+ 1pt) on #262626
   const sectionGapStyle = {
@@ -491,11 +492,11 @@ const UserProfile = ({ route }) => {
               paddingHorizontal={isMeProfile ? 14 : 12}
               height={32}
               borderWidth={1}
-              borderColor={accentA(tier, 0.04)}
+              borderColor={accentA(accent, 0.04)}
               activeBorderColor={"transparent"}
-              activeColor={accentA(tier, 0.08)}
-              ovalBg={accentA(tier, 0)}
-              textColor={accentA(tier, 1)}
+              activeColor={accentA(accent, 0.08)}
+              ovalBg={accentA(accent, 0)}
+              textColor={accentA(accent, 1)}
               textFontSize={isMeProfile ? 16 : 14}
               textLetterSpacing={-0.5}
             />

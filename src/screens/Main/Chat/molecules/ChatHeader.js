@@ -1,242 +1,118 @@
 import { useNavigation } from "@react-navigation/native";
 import { useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../../assets/fonts";
-import { Images } from "../../../../assets/images";
-import CustomButton from "../../../../components/CustomButton";
-import CustomModal from "../../../../components/CustomModal";
+import Blur from "../../../../components/Blur";
 import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
-import ImageFast from "../../../../components/ImageFast";
-import Blur from "../../../../components/Blur";
-import { COLORS } from "../../../../utils/COLORS";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import CallOptionsSheet from "./CallOptionsSheet";
 
-const ChatHeader = ({
-  title,
-  location,
-  type,
-  showIcons = false,
-  user,
-  onSettingsPress,
-}) => {
+/**
+ * Figma Chat page "Inbox_General-Default" (2212:7108) header — #262626 @64%
+ * + blur 16 (status bar included), row 60 (pad 12/12/8/12, gap 12):
+ *  back 40 white 8% + chevron_left 20 #F8F9FB ·
+ *  [online dot 8 #64CD75 · 6 · "Clark, 48" Medium 18 −2% white]
+ *  · 8 · ["Founder" Regular 12 #828186 · 4 dot #828186 · company Regular 12]
+ *  · call 40 white 8% + call 20 white (opens Call-Options).
+ * Tapping the name opens the conversation settings.
+ */
+const GRAY = "#828186";
+
+const ChatHeader = ({ title, subtitle, company, online, onSettingsPress, onVoiceCall, onVideoCall }) => {
   const navigation = useNavigation();
-  const [isViewModal, setIsViewModal] = useState(false);
   const { colors, isDark } = useTheme();
-  const styles = createStyles(colors, isDark);
-
-  console.log("location====", typeof location);
+  const tint = (o) => (isDark ? `rgba(255, 255, 255, ${o})` : `rgba(18, 18, 18, ${o})`);
+  const [calls, setCalls] = useState(false);
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.mainContainer]}>
-      <TouchableOpacity
-        activeOpacity={0.6}
-        style={[styles.backIcon]}
-        onPress={() => navigation.goBack()}
-      >
-        <Icons
-          size={26}
-          family="MaterialIcons"
-          color={colors.text}
-          name="keyboard-arrow-left"
-        />
+    <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <Blur blurType={isDark ? "dark" : "xlight"} blurAmount={16} borderRadius={0.01} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(38, 38, 38, 0.64)" : "rgba(255, 255, 255, 0.64)" }]} />
+      <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.circle, { backgroundColor: tint(0.08) }]}>
+        <Icons family="MaterialSymbolsRounded" name="chevron_left" size={20} color={isDark ? "#F8F9FB" : colors.text} />
       </TouchableOpacity>
 
-      {/* <ImageFast resizeMode="cover" source={source} style={styles.userImage} /> */}
-      <View style={{ flex: 1 }}>
-        <View style={styles.row}>
-          {/* <View style={styles.onlineDot} /> */}
+      <TouchableOpacity activeOpacity={0.7} onPress={onSettingsPress} disabled={!onSettingsPress} style={styles.texts}>
+        <View style={styles.nameRow}>
+          {online && <View style={styles.dot} />}
           <CustomText
-            label={title || "Catie, 24"}
-            fontSize={20}
-            fontFamily={fonts.semiBold}
-            onPress={() => navigation.navigate("UserProfile", { item: user })}
-          />
-        </View>
-        <View style={[styles.row, { flexWrap: "wrap" }]}>
-          {location && (
-            <>
-              <ImageFast
-                resizeMode="contain"
-                source={Images.pindrop}
-                tintColor={colors.textSecondary}
-                style={{ height: 15, width: 15, marginLeft: -3 }}
-              />
-              <CustomText
-                label={location ? location : "No Location Available"}
-                fontFamily={fonts.semiBold}
-                color={colors.textSecondary}
-                fontSize={12}
-              />
-              {type && <View style={styles.sparator} />}
-            </>
-          )}
-          {type && (
-            <CustomText
-              label={type}
-              fontFamily={fonts.semiBold}
-              color={colors.textSecondary}
-              fontSize={12}
-            />
-          )}
-        </View>
-      </View>
-      {/* Figma Inbox_General-Default: 40 circle, white 8% + blur, tune 20 */}
-      {onSettingsPress && (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={onSettingsPress}
-          style={styles.settingsBtn}
-        >
-          <Blur blurType={isDark ? "dark" : "xlight"} borderRadius={100} />
-          <Icons
-            family="MaterialSymbolsRounded"
-            name="tune"
-            size={20}
+            label={title || "Chat"}
+            fontSize={18}
+            fontFamily={fonts.medium}
+            letterSpacing={-0.36}
             color={colors.text}
+            numberOfLines={1}
+            containerStyle={styles.shrink}
           />
-        </TouchableOpacity>
-      )}
-      {showIcons && (
-        <>
-          <TouchableOpacity activeOpacity={0.6} style={[styles.backIcon]}>
-            <ImageFast
-              resizeMode="contain"
-              source={Images.ChatSetting}
-              style={{ height: 15, width: 15, marginLeft: -3 }}
-            />
-          </TouchableOpacity>
-        </>
-      )}
-
-      <CustomModal
-        isChange
-        isVisible={isViewModal}
-        onDisable={() => setIsViewModal(false)}
-      >
-        <View style={[styles.modalContainer]}>
-          <View style={[styles.container]}>
-            <CustomButton
-              title="Block"
-              marginBottom={10}
-              indicatorcolor={"#fff"}
-              customText={styles.txt}
-              customStyle={styles.btn}
-              backgroundColor="transparent"
-            />
-            <CustomButton
-              title="Report"
-              marginBottom={10}
-              customText={styles.txt}
-              customStyle={styles.btn}
-              backgroundColor="transparent"
-              onPress={() => {
-                setIsViewModal(false);
-                navigation.navigate("ReportChat");
-              }}
-            />
-            <CustomButton
-              height={50}
-              title="Cancel"
-              color={colors.background}
-              marginBottom={10}
-              backgroundColor={colors.text}
-              onPress={() => setIsViewModal(false)}
-              customText={{ fontFamily: fonts.medium }}
-            />
-          </View>
         </View>
-      </CustomModal>
+        {(!!subtitle || !!company) && (
+          <View style={styles.subRow}>
+            {!!subtitle && <CustomText label={subtitle} fontSize={12} color={GRAY} numberOfLines={1} containerStyle={styles.noShrink} />}
+            {!!subtitle && !!company && <View style={styles.sep} />}
+            {!!company && <CustomText label={company} fontSize={12} color={GRAY} numberOfLines={1} containerStyle={styles.shrink} />}
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity activeOpacity={0.7} onPress={() => setCalls(true)} style={[styles.circle, { backgroundColor: tint(0.08) }]}>
+        <Icons family="MaterialSymbolsRoundedFilled" name="call" size={20} color={colors.text} />
+      </TouchableOpacity>
+
+      <CallOptionsSheet visible={calls} onClose={() => setCalls(false)} onVoice={onVoiceCall} onVideo={onVideoCall} />
     </View>
   );
 };
 
 export default ChatHeader;
 
-const createStyles = (colors, isDark) => StyleSheet.create({
-  mainContainer: {
+const styles = StyleSheet.create({
+  header: {
+    paddingTop: 12,
+    paddingBottom: 8,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    width: "100%",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: 15,
+    gap: 12,
+    overflow: "hidden",
   },
-  backIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: colors.white04,
-    borderRadius: 100,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-  },
-  settingsBtn: {
+  circle: {
     width: 40,
     height: 40,
     borderRadius: 100,
-    overflow: "hidden",
-    justifyContent: "center",
     alignItems: "center",
-    marginLeft: 12,
-    backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(18, 18, 18, 0.08)",
+    justifyContent: "center",
   },
-  userImage: {
-    width: 24,
-    height: 24,
-    borderRadius: 50,
-    marginRight: 10,
+  texts: {
+    flex: 1,
   },
-  btn: {
-    height: 47,
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: colors.border,
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  txt: {
-    fontFamily: fonts.medium,
-    color: COLORS.red1,
-  },
-  modalContainer: {
-    padding: 5,
-    width: "95%",
-    alignSelf: "center",
-    borderRadius: 24,
-    borderWidth: 1,
-    backgroundColor: colors.card,
-    borderColor: isDark ? "rgba(255, 255, 255, 0.16)" : colors.border,
-    overflow: "hidden",
-    marginVertical: "auto",
-  },
-  container: {
-    width: "100%",
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: colors.background,
-    paddingBottom: 0,
-    overflow: "hidden",
-    paddingTop: 20,
-  },
-
-  onlineDot: {
-    backgroundColor: "#64CD75",
+  dot: {
     width: 8,
     height: 8,
-    marginRight: 3,
-    borderRadius: 100,
+    borderRadius: 1000,
+    backgroundColor: "#64CD75",
   },
-
-  sparator: {
-    backgroundColor: colors.textSecondary,
+  // Figma: name cap → sub cap 21; RN Medium 18 box 25.2 / Regular 12 box 16.8
+  // → 21 − (25.2 − 13)/2 − (16.8 − 8.6)/2 ≈ 10.8 − 4.1 = 6.8 → pull −1.9
+  subRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: -1.9,
+  },
+  sep: {
     width: 4,
     height: 4,
     borderRadius: 100,
+    backgroundColor: GRAY,
   },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-  },
+  shrink: { flexShrink: 1 },
+  noShrink: { flexShrink: 0 },
 });

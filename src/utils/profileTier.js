@@ -40,6 +40,27 @@ export const getProfileTier = (user) => {
 /** `rgba(accent, a)` helper for the tier accent. */
 export const accentA = (tier, a = 1) => `rgba(${tier?.accent || "161, 147, 117"}, ${a})`;
 
+const hexToRgbTriplet = (hex) => {
+  if (typeof hex !== "string") return null;
+  const m = hex.trim().match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+};
+
+/**
+ * A customised profile (cover image set, Figma "Careem") takes its accent from
+ * the cover: the colour sampled when the banner was saved
+ * (profile.coverAccent). Without one the tier accent applies.
+ */
+export const getProfileAccent = (user) => {
+  const tier = getProfileTier(user);
+  const hasCover = user?.profile?.hideCover !== false && !!user?.profile?.cover;
+  const custom = hasCover ? hexToRgbTriplet(user?.profile?.coverAccent) : null;
+  if (custom) return { ...tier, accent: custom, customised: true };
+  return tier;
+};
+
 /** Figma counts: 333.1K / 1.5M */
 export const formatProfileCount = (value) => {
   const n = Number(value) || 0;

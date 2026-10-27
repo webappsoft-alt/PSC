@@ -93,7 +93,7 @@ const EnableLocationModal = ({ visible, onDone }) => {
 const ProfilePrivacy = () => {
   const navigation = useNavigation();
   const p = useAuthPalette();
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState("public");
   const [loading, setLoading] = useState(null);
   const [locationOpen, setLocationOpen] = useState(false);
 

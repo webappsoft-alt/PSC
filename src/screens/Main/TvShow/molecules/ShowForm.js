@@ -168,7 +168,7 @@ export const InfoLine = ({
 
 /* ───────────────────────────── fields ──────────────────────────────── */
 
-const FieldLabel = ({ label }) => (
+export const FieldLabel = ({ label }) => (
   <CustomText
     label={label}
     textTransform="uppercase"
@@ -201,6 +201,7 @@ export const SelectField = ({
   onPress,
   disabled,
   style,
+  chevron = "chevron_right",
 }) => (
   <TouchableOpacity activeOpacity={0.8} onPress={onPress} disabled={disabled}>
     <FieldBox style={style}>
@@ -226,7 +227,7 @@ export const SelectField = ({
       </View>
       <Icons
         family="MaterialSymbolsRounded"
-        name="chevron_right"
+        name={chevron}
         size={24}
         color={SHOWS.white64}
       />

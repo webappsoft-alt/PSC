@@ -7,12 +7,15 @@ import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import ImageFastViewer from "../../../../components/ImageFastViewer";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import moment from "moment";
 import {
   accentA,
   formatProfileCount,
   getCountryCode,
+  getProfileAccent,
   getProfileTier,
 } from "../../../../utils/profileTier";
+import { getOrientation, getProfileLabel } from "../../../../utils/political";
 
 const MS = "MaterialSymbolsRounded";
 const MSF = "MaterialSymbolsRoundedFilled";
@@ -28,17 +31,18 @@ const MSF = "MaterialSymbolsRoundedFilled";
  */
 const ROW_EXTRA = 1.8;
 const BIO_EXTRA = 4.2;
-const STAT_EXTRA = 4.9;
 
 /**
  * Figma layouts:
- *  own profile  → "Profile"          (padding 16/12, gaps 16, stat boxes)
+ *  own profile  → "Profile"          (padding 16/12, gaps 20/16, 28 avatar,
+ *                                     follower avatars + inline counts)
  *  other user   → "Profile-Premium"  (padding 16/12, gaps 16/20, 28 avatar)
  *               → "Profile-Premium+" (padding 12, gaps 12, 40 avatar,
  *                                     follower avatars, white job title)
+ *  Company      → category + "Founded on" rows instead of job / education
  */
 const LAYOUTS = {
-  own: { padTop: 16, avatar: 28, nameRowExtra: 0, gap: 16, outerGap: 20 },
+  own: { padTop: 16, avatar: 28, nameRowExtra: 1.4, gap: 16, outerGap: 20 },
   premium: { padTop: 16, avatar: 28, nameRowExtra: 1.4, gap: 16, outerGap: 20 },
   premiumPlus: { padTop: 12, avatar: 40, nameRowExtra: 0, gap: 12, outerGap: 12 },
 };
@@ -72,8 +76,15 @@ export default function ProfileCard({
   const isOtherUser = !!isUser;
 
   const tier = getProfileTier(user);
+  // accent: cover-derived (customised banner) or the tier's
+  const accent = getProfileAccent(user);
   const layout = getProfileCardLayout(user, isOtherUser);
   const isPlus = layout === LAYOUTS.premiumPlus;
+  // Figma: follower avatars + white job title on Premium+ and on my own profile
+  const richRows = isPlus || !isOtherUser;
+  const isCompany = user?.role === "company";
+  const politicalValue = getProfileLabel(user);
+  const politicalChip = getOrientation(politicalValue);
 
   const ink = (a) =>
     isDark ? `rgba(255, 255, 255, ${a})` : `rgba(18, 18, 18, ${a})`;
@@ -186,23 +197,6 @@ export default function ProfileCard({
     </TouchableOpacity>
   );
 
-  const StatBox = ({ value, label, onPress }) => (
-    <TouchableOpacity
-      activeOpacity={0.6}
-      disabled={!onPress}
-      onPress={onPress}
-      style={[styles.statBox, { backgroundColor: ink(0.04) }]}
-    >
-      <CustomText label={value} fontFamily={fonts.medium} color={textColor} />
-      <CustomText
-        label={label}
-        fontFamily={fonts.medium}
-        color={text48}
-        marginTop={-(2 * STAT_EXTRA - 8)}
-      />
-    </TouchableOpacity>
-  );
-
   // Followers / Following → Search › People with that list's tab active
   // push (not navigate): a fresh Search screen even if one is already in the
   // stack, so it opens on this user's list and tab
@@ -217,6 +211,15 @@ export default function ProfileCard({
     );
 
   const hasJob = !!(jobTitle || company);
+  // The industry entered at registration (free text) is what the company row
+  // shows; the fixed Edit Profile category is only the fallback.
+  const companyCategory =
+    (Array.isArray(user?.industry) ? user.industry[0] : user?.industry) ||
+    user?.profile?.category ||
+    "";
+  const foundedLabel = user?.foundingDate
+    ? moment(user.foundingDate).format("D MMMM, YYYY")
+    : "";
   const hasEducation = !!(
     education?.degree ||
     education?.primaryMajor ||
@@ -234,7 +237,7 @@ export default function ProfileCard({
       ]}
     >
       {/* Avatar + username */}
-      <View style={[styles.nameRow, { minHeight: isOtherUser ? layout.avatar : 32 }]}>
+      <View style={[styles.nameRow, { minHeight: layout.avatar }]}>
         {renderAvatar()}
         <CustomText
           label={user?.username || name}
@@ -245,15 +248,6 @@ export default function ProfileCard({
           numberOfLines={1}
           containerStyle={styles.grow}
         />
-        {!isOtherUser && (
-          <TouchableOpacity
-            activeOpacity={0.6}
-            style={styles.qrBox}
-            onPress={() => navigation.navigate("QrScreen")}
-          >
-            <Icons family={MSF} name="qr_code" size={24} color={textColor} />
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Job · education · location · (other user) inline stats */}
@@ -263,81 +257,126 @@ export default function ProfileCard({
           { marginTop: layout.gap - layout.nameRowExtra - ROW_EXTRA },
         ]}
       >
-        <TouchableOpacity
-          activeOpacity={0.6}
-          disabled={isOtherUser || hasJob}
-          onPress={() => navigation.navigate("AccountInfo")}
-          style={styles.infoRow}
-        >
-          <Icons family={MSF} name="work" size={16} color={text64} />
-          {hasJob ? (
-            <>
-              {!!jobTitle && (
+        {isCompany ? (
+          <>
+            {/* Figma company profile: category + "Founded on" */}
+            <TouchableOpacity
+              activeOpacity={0.6}
+              disabled={isOtherUser || !!companyCategory}
+              onPress={() => navigation.navigate("AccountInfo")}
+              style={styles.infoRow}
+            >
+              <Icons family={MSF} name="category" size={16} color={text64} />
+              <CustomText
+                label={
+                  companyCategory ||
+                  (isOtherUser ? "No category added" : "Add your category")
+                }
+                fontFamily={fonts.medium}
+                letterSpacing={-0.07}
+                color={companyCategory ? textColor : text48}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.6}
+              disabled={isOtherUser || !!foundedLabel}
+              onPress={() => navigation.navigate("AccountInfo")}
+              style={styles.infoRow}
+            >
+              <Icons family={MSF} name="calendar_month" size={16} color={text64} />
+              {foundedLabel ? (
+                <>
+                  <CustomText label="Founded on" color={text48} />
+                  <CustomText label={foundedLabel} fontFamily={fonts.medium} color={textColor} />
+                </>
+              ) : (
                 <CustomText
-                  label={jobTitle}
+                  label={isOtherUser ? "No founding date added" : "Add your founding date"}
                   fontFamily={fonts.medium}
-                  color={isPlus ? textColor : text48}
+                  color={text48}
                 />
               )}
-              {!!jobTitle && !!company && (
-                <CustomText label="at" fontFamily={fonts.medium} color={text48} />
-              )}
-              {!!company && (
-                <CustomText label={company} fontFamily={fonts.medium} color={textColor} />
-              )}
-            </>
-          ) : (
-            <CustomText
-              label={isOtherUser ? "No occupation added" : "Add your occupation"}
-              fontFamily={fonts.medium}
-              color={text48}
-            />
-          )}
-        </TouchableOpacity>
-
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
         <TouchableOpacity
-          activeOpacity={0.6}
-          disabled={isOtherUser || hasEducation}
-          onPress={() => navigation.navigate("AccountInfo")}
-          style={styles.infoRow}
-        >
-          <Icons family={MSF} name="school" size={16} color={text64} />
-          {hasEducation ? (
-            <>
-              {!!education?.degree && (
-                <CustomText label={education.degree} fontFamily={fonts.medium} color={textColor} />
+              activeOpacity={0.6}
+              disabled={isOtherUser || hasJob}
+              onPress={() => navigation.navigate("AccountInfo")}
+              style={styles.infoRow}
+            >
+              <Icons family={MSF} name="work" size={16} color={text64} />
+              {hasJob ? (
+                <>
+                  {!!jobTitle && (
+                    <CustomText
+                      label={jobTitle}
+                      fontFamily={fonts.medium}
+                      color={richRows ? textColor : text48}
+                    />
+                  )}
+                  {!!jobTitle && !!company && (
+                    <CustomText label="at" fontFamily={fonts.medium} color={text48} />
+                  )}
+                  {!!company && (
+                    <CustomText label={company} fontFamily={fonts.medium} color={textColor} />
+                  )}
+                </>
+              ) : (
+                <CustomText
+                  label={isOtherUser ? "No occupation added" : "Add your occupation"}
+                  fontFamily={fonts.medium}
+                  color={text48}
+                />
               )}
-              {!!education?.primaryMajor && (
+            </TouchableOpacity>
+    
+            <TouchableOpacity
+              activeOpacity={0.6}
+              disabled={isOtherUser || hasEducation}
+              onPress={() => navigation.navigate("AccountInfo")}
+              style={styles.infoRow}
+            >
+              <Icons family={MSF} name="school" size={16} color={text64} />
+              {hasEducation ? (
                 <>
                   {!!education?.degree && (
-                    <CustomText label="in" fontFamily={fonts.medium} color={text48} />
+                    <CustomText label={education.degree} fontFamily={fonts.medium} color={textColor} />
                   )}
-                  <CustomText
-                    label={education.primaryMajor}
-                    fontFamily={fonts.medium}
-                    color={textColor}
-                  />
+                  {!!education?.primaryMajor && (
+                    <>
+                      {!!education?.degree && (
+                        <CustomText label="in" fontFamily={fonts.medium} color={text48} />
+                      )}
+                      <CustomText
+                        label={education.primaryMajor}
+                        fontFamily={fonts.medium}
+                        color={textColor}
+                      />
+                    </>
+                  )}
+                  {!!education?.school && (
+                    <>
+                      <CustomText label="from" fontFamily={fonts.medium} color={text48} />
+                      <CustomText label={education.school} fontFamily={fonts.medium} color={textColor} />
+                    </>
+                  )}
                 </>
+              ) : (
+                <CustomText
+                  label={isOtherUser ? "No education added" : "Add your education"}
+                  fontFamily={fonts.medium}
+                  color={text48}
+                />
               )}
-              {!!education?.school && (
-                <>
-                  <CustomText label="from" fontFamily={fonts.medium} color={text48} />
-                  <CustomText label={education.school} fontFamily={fonts.medium} color={textColor} />
-                </>
-              )}
-            </>
-          ) : (
-            <CustomText
-              label={isOtherUser ? "No education added" : "Add your education"}
-              fontFamily={fonts.medium}
-              color={text48}
-            />
-          )}
-        </TouchableOpacity>
+            </TouchableOpacity>
+          </>
+        )}
 
         {!!cityLabel && (
           <View style={styles.infoRow}>
-            {isOtherUser && flagCode ? (
+            {flagCode ? (
               <Image
                 source={{ uri: `https://flagcdn.com/w40/${flagCode}.png` }}
                 style={styles.flag}
@@ -355,67 +394,68 @@ export default function ProfileCard({
           </View>
         )}
 
-        {isOtherUser && (
-          <View style={[styles.infoRow, { gap: isPlus ? 6 : 8 }]}>
-            {isPlus && followerPreviews.length > 0 && (
-              <View style={styles.avatarStack}>
-                {followerPreviews.length > 1 && (
-                  <View style={styles.avatarStackCol}>
-                    {followerPreviews.slice(1, 3).map((p, i) => (
-                      <PreviewAvatar key={p?._id || i} item={p} size={8} />
-                    ))}
-                  </View>
-                )}
-                <PreviewAvatar item={followerPreviews[0]} size={16} />
-              </View>
-            )}
-            <Stat
-              value={formatProfileCount(followers)}
-              label="Followers"
-              onPress={() => openPeople("followers")}
-            />
-            <Stat
-              value={formatProfileCount(following)}
-              label="Following"
-              onPress={() => openPeople("following")}
-            />
-            <Stat value={formatProfileCount(inCommon)} label="In Common" />
-          </View>
-        )}
-      </View>
-
-      {/* Own profile: stat boxes */}
-      {!isOtherUser && (
-        <View style={[styles.statBoxes, { marginTop: layout.gap - ROW_EXTRA }]}>
-          <StatBox
+        <View style={[styles.infoRow, { gap: richRows ? 6 : 8 }]}>
+          {richRows && followerPreviews.length > 0 && (
+            <View style={styles.avatarStack}>
+              {followerPreviews.length > 1 && (
+                <View style={styles.avatarStackCol}>
+                  {followerPreviews.slice(1, 3).map((p, i) => (
+                    <PreviewAvatar key={p?._id || i} item={p} size={8} />
+                  ))}
+                </View>
+              )}
+              <PreviewAvatar item={followerPreviews[0]} size={16} />
+            </View>
+          )}
+          <Stat
             value={formatProfileCount(followers)}
             label="Followers"
             onPress={() => openPeople("followers")}
           />
-          <StatBox
+          <Stat
             value={formatProfileCount(following)}
             label="Following"
             onPress={() => openPeople("following")}
           />
+          {/* "In Common" is about the viewer and this user — not on my own profile */}
+          {isOtherUser && <Stat value={formatProfileCount(inCommon)} label="In Common" />}
         </View>
-      )}
+      </View>
 
-      {/* Other user: industry chips */}
-      {isOtherUser && industries.length > 0 && (
+      {/* Industry chips (other users) + PSC political label (Figma "Chips") */}
+      {(isOtherUser && industries.length > 0) || politicalChip ? (
         <View style={[styles.chips, { marginTop: layout.gap - ROW_EXTRA }]}>
-          {industries.map((item, index) => (
-            <View key={`${item}-${index}`} style={[styles.chip, { backgroundColor: ink(0.04) }]}>
+          {isOtherUser &&
+            industries.map((item, index) => (
+              <View key={`${item}-${index}`} style={[styles.chip, { backgroundColor: ink(0.04) }]}>
+                <CustomText
+                  label={item}
+                  fontFamily={fonts.medium}
+                  fontSize={12}
+                  color={text48}
+                  textTransform={"capitalize"}
+                />
+              </View>
+            ))}
+          {politicalChip && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() =>
+                navigation.navigate("PoliticalInformation", { value: politicalChip.value })
+              }
+              style={[styles.chip, styles.politicalChip, { backgroundColor: politicalChip.chipBg }]}
+            >
               <CustomText
-                label={item}
+                label={politicalChip.label}
                 fontFamily={fonts.medium}
                 fontSize={12}
-                color={text48}
-                textTransform={"capitalize"}
+                color="#FFFFFF"
               />
-            </View>
-          ))}
+              <Icons family={MS} name="info" size={12} color="rgba(255, 255, 255, 0.64)" />
+            </TouchableOpacity>
+          )}
         </View>
-      )}
+      ) : null}
 
       {/* Bio — previous block ends in a 24/52pt box (no extra) or a text row */}
       <CustomText
@@ -426,7 +466,7 @@ export default function ProfileCard({
         marginTop={
           layout.gap -
           BIO_EXTRA -
-          (isOtherUser && industries.length === 0 ? ROW_EXTRA : 0)
+          (!(isOtherUser && industries.length > 0) && !politicalChip ? ROW_EXTRA : 0)
         }
         marginBottom={isOtherUser ? 0 : -BIO_EXTRA}
       />
@@ -440,7 +480,7 @@ export default function ProfileCard({
             style={[
               styles.button,
               styles.grow,
-              { backgroundColor: accentA(tier, 1) },
+              { backgroundColor: accentA(accent, 1) },
               !isFollowState && { justifyContent: "center" },
             ]}
           >
@@ -461,15 +501,15 @@ export default function ProfileCard({
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleMention}
-            style={[styles.button, styles.grow, { backgroundColor: accentA(tier, 0.04) }]}
+            style={[styles.button, styles.grow, { backgroundColor: accentA(accent, 0.04) }]}
           >
-            <Icons family={MS} name="alternate_email" size={16} color={accentA(tier, 1)} />
+            <Icons family={MS} name="alternate_email" size={16} color={accentA(accent, 1)} />
             <CustomText
               label="Mention"
               fontFamily={fonts.medium}
               fontSize={16}
               letterSpacing={-0.5}
-              color={accentA(tier, 1)}
+              color={accentA(accent, 1)}
             />
           </TouchableOpacity>
 
@@ -477,9 +517,9 @@ export default function ProfileCard({
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleMessage}
-              style={[styles.messageButton, { backgroundColor: accentA(tier, 0.04) }]}
+              style={[styles.messageButton, { backgroundColor: accentA(accent, 0.04) }]}
             >
-              <Icons family={MSF} name="forum" size={16} color={accentA(tier, 1)} />
+              <Icons family={MSF} name="forum" size={16} color={accentA(accent, 1)} />
             </TouchableOpacity>
           )}
         </View>
@@ -517,12 +557,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  qrBox: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   rows: {
     gap: 6 - 2 * ROW_EXTRA,
   },
@@ -549,17 +583,6 @@ const styles = StyleSheet.create({
   avatarStackCol: {
     gap: 1,
   },
-  statBoxes: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  statBox: {
-    paddingHorizontal: 12,
-    paddingVertical: 12 - STAT_EXTRA,
-    borderRadius: 12,
-    alignItems: "flex-start",
-  },
   chips: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -571,6 +594,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
+  },
+  politicalChip: {
+    flexDirection: "row",
+    gap: 2,
   },
   buttonsRow: {
     flexDirection: "row",

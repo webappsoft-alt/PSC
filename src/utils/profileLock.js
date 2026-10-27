@@ -58,3 +58,18 @@ export function verifyProfilePin(users, userId, pin) {
   if (!stored || !salt || !pin) return false;
   return stored === hashPin(pin, salt);
 }
+
+/**
+ * Conversations unlocked with the PIN this app run ("Secure with PIN code" in
+ * the conversation settings uses the same PIN as the profile selector). Kept
+ * in memory on purpose: closing the app locks them again.
+ */
+const unlockedConversations = new Set();
+
+export function markConversationUnlocked(id) {
+  if (id) unlockedConversations.add(String(id));
+}
+
+export function isConversationUnlocked(id) {
+  return unlockedConversations.has(String(id));
+}

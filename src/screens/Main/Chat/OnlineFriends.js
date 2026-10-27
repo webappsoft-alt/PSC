@@ -18,14 +18,13 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { getFriends } from "../../../services/ChatService";
 import { COLORS } from "../../../utils/COLORS";
 import ConversationBoxSkeleton from "./molecules/ConversationBoxSkeleton";
-import InboxBottomBar, {
-  INBOX_BAR_CONTENT_HEIGHT,
-} from "./molecules/InboxBottomBar";
+import Blur from "../../../components/Blur";
 import UserBadge from "../../../components/UserBadge";
 
 /**
- * Online Friends — Figma Chat page "Inbox-1-on-1" (3732:1704), reached from
- * the Inbox bottom bar (groups icon) and the Inbox "+" (start a 1 on 1 chat).
+ * Online Friends — Figma Chat page "Inbox-1-on-1" (3732:1704). Now the "New
+ * chat" picker: opened from the Inbox "+" (start a 1 on 1 chat), with a back
+ * button; the Inbox bottom bar is 1 on 1 · Groups · Circles.
  * Header: search bar 44 (r100, white 4%, pad 12/10/12/12, search 22 @64%,
  * Medium 14 @48% placeholder, clear "cancel" 22 @48%).
  * List block: #121212, pad 16/12, "ALL FRIENDS" Medium 14 @64%, gap 20;
@@ -38,7 +37,8 @@ import UserBadge from "../../../components/UserBadge";
 const ONLINE = "#1ED760";
 const BLUE = "#007BFF";
 
-const OnlineFriends = () => {
+// `embedded`: page 1 of InboxPager (the shared bottom bar lives there)
+const OnlineFriends = ({ embedded = false }) => {
   const navigation = useNavigation();
   const isFocus = useIsFocused();
   const insets = useSafeAreaInsets();
@@ -213,9 +213,32 @@ const OnlineFriends = () => {
   return (
     <ScreenWrapper
       paddingHorizontal={0.1}
-      backgroundColor={isDark ? "#181818" : colors.background}
       headerUnScrollable={() => (
-        <View style={[styles.header, { backgroundColor: colors.background }]}>
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: colors.background,
+              // Figma: 4pt #181818 strip between the header and the list
+              borderBottomColor: isDark ? "#181818" : colors.surfaceAlt,
+            },
+          ]}
+        >
+          <View style={styles.headerRow}>
+          {/* New chat picker (Inbox "+"): same back button as the app Header */}
+          <TouchableOpacity
+            activeOpacity={0.6}
+            onPress={() => navigation.goBack()}
+            // Figma Inbox-1-on-1: 40 circle white 4%, chevron_left 24 @64%
+            style={[styles.back, { backgroundColor: tint(0.04) }]}
+          >
+            <Icons
+              name="chevron_left"
+              family="MaterialSymbolsRounded"
+              size={24}
+              color={tint(0.64)}
+            />
+          </TouchableOpacity>
           <View style={[styles.searchBar, { backgroundColor: tint(0.04) }]}>
             <Icons
               family="MaterialSymbolsRounded"
@@ -244,9 +267,9 @@ const OnlineFriends = () => {
               </TouchableOpacity>
             )}
           </View>
+          </View>
         </View>
       )}
-      footerUnScrollable={() => <InboxBottomBar active="friends" />}
       scrollEnabled
     >
       <View style={[styles.block, { backgroundColor: colors.background }]}>
@@ -307,7 +330,7 @@ const OnlineFriends = () => {
       </View>
       <View
         style={{
-          height: INBOX_BAR_CONTENT_HEIGHT + Math.max(insets.bottom, 16) + 16,
+          height: Math.max(insets.bottom, 16) + 16,
         }}
       />
     </ScreenWrapper>
@@ -321,9 +344,23 @@ const styles = StyleSheet.create({
     paddingTop: 8, // Figma 52 − 44pt status bar
     paddingHorizontal: 12,
     paddingBottom: 8,
-    marginBottom: 4,
+    borderBottomWidth: 4,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  back: {
+    width: 40,
+    height: 40,
+    borderRadius: 100,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
   },
   searchBar: {
+    flex: 1,
     height: 44,
     borderRadius: 100,
     flexDirection: "row",

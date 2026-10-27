@@ -424,7 +424,7 @@ const MatchingDetail = ({ route, navigation }) => {
           scrollEnabled={false}
           ListEmptyComponent={() => (
             <View style={{ padding: 40, alignItems: "center" }}>
-              <CustomText label="No posts found" color={COLORS.gray48} />
+              <CustomText label="No post found" color={COLORS.gray48} />
             </View>
           )}
         />

@@ -7,7 +7,7 @@ import CustomText from "../../../../components/CustomText";
 import Divider from "../../../../components/Divider";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
-const SettingsItems = ({ title, des, screen, img, isLast }) => {
+const SettingsItems = ({ title, des, screen, img, isLast, onPress }) => {
   const navigation = useNavigation();
   const { colors } = useTheme();
 
@@ -15,7 +15,7 @@ const SettingsItems = ({ title, des, screen, img, isLast }) => {
     <>
       <Pressable
         style={[styles.row, { paddingHorizontal: 12 }]}
-        onPress={() => navigation.navigate(screen)}
+        onPress={() => (onPress ? onPress() : navigation.navigate(screen))}
       >
         <View style={[styles.row, { flex: 1 }]}>
           <Image source={img ? img : PNGIcons.user} style={[styles.icon, { tintColor: colors.text }]} />

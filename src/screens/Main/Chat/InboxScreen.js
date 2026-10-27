@@ -18,19 +18,103 @@ import { useSocket } from "../../../components/SocketProvider";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { getMessages } from "../../../services/ChatService";
 import { COLORS } from "../../../utils/COLORS";
+import { ToastMessage } from "../../../utils/ToastMessage";
 import { uploadAndGetUrl, uploadFileGetUrl } from "../../../utils/constants";
+import {
+  hasProfilePin,
+  isConversationUnlocked,
+} from "../../../utils/profileLock";
 import ChatBubble from "./molecules/ChatBubble";
 import ChatBubbleSkeleton from "./molecules/ChatBubbleSkeleton";
 import ChatFooter from "./molecules/ChatFooter";
 import ChatHeader from "./molecules/ChatHeader";
+import GifPreviewSheet from "./molecules/GifPreviewSheet";
+import PhotoSharingPreview from "./molecules/PhotoSharingPreview";
+import { openCamera, openPicker } from "react-native-image-crop-picker";
+import moment from "moment";
 import AnimatedListItem from "../../../utils/AnimatedListItem";
 import { useTheme } from "../../../contexts/ThemeContext";
+
+/**
+ * Figma Inbox_General-Default (2212:7108) dividers.
+ * Date: 0.5 lines #828186 (right 50%) · 8 · chip 20 (r100 white 4%, pad
+ * 0/4/0/8, gap 4: "MAR 12, 2025" Regular 12 #828186 + expand_more 12) · 8.
+ * Info ("You matched with … on …", "… is not available at the moment"):
+ * full-width lines · 8 · Regular / Medium 12 #828186.
+ */
+const GRAY = "#828186";
+const dayKey = (m) => moment(m?.createdAt || m?.timestamp).format("YYYY-MM-DD");
+const dayLabel = (m) => {
+  const d = moment(m?.createdAt || m?.timestamp);
+  if (d.isSame(moment(), "day")) return "TODAY";
+  if (d.isSame(moment().subtract(1, "day"), "day")) return "YESTERDAY";
+  return d.format("MMM D, YYYY").toUpperCase();
+};
+const Lines = ({ children, bleed }) => (
+  <View style={[dividerStyles.row, bleed && dividerStyles.bleed]}>
+    <View style={[dividerStyles.line, dividerStyles.left]} />
+    {children}
+    <View style={[dividerStyles.line, dividerStyles.right]} />
+  </View>
+);
+const DateDivider = ({ label }) => {
+  const { isDark } = useTheme();
+  return (
+    <Lines>
+      <View style={[dividerStyles.chip, { backgroundColor: isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(18, 18, 18, 0.04)" }]}>
+        <CustomText label={label} fontSize={12} color={GRAY} />
+        <Icons family="MaterialSymbolsRounded" name="expand_more" size={12} color={GRAY} />
+      </View>
+    </Lines>
+  );
+};
+const InfoDivider = ({ label, medium }) => (
+  <Lines bleed>
+    <CustomText label={label} fontSize={12} fontFamily={medium ? fonts.medium : fonts.regular} color={GRAY} textAlign="center" containerStyle={dividerStyles.text} />
+  </Lines>
+);
+const dividerStyles = StyleSheet.create({
+  row: {
+    height: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 4, // Messages pad 16 (bubbles sit at 12)
+    marginBottom: 20,
+  },
+  bleed: {
+    marginHorizontal: -12, // full screen width
+  },
+  line: {
+    flex: 1,
+    minWidth: 24,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: GRAY,
+  },
+  left: {},
+  right: {
+    opacity: 0.5,
+  },
+  chip: {
+    height: 20,
+    borderRadius: 100,
+    paddingLeft: 8,
+    paddingRight: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  text: {
+    flexShrink: 1,
+  },
+});
 
 const InboxScreen = ({ route }) => {
   const navigation = useNavigation();
   const { socket } = useSocket();
   const flatListRef = useRef(null);
-  const { userData } = useSelector((state) => state.users);
+  const users = useSelector((state) => state.users);
+  const userData = users?.userData;
   const userId = userData?._id;
   const isFocus = useIsFocused();
   const { colors, isDark } = useTheme();
@@ -46,12 +130,50 @@ const InboxScreen = ({ route }) => {
   const [imageModal, setImageModal] = useState(false);
   const [imgLoading, setImgLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // Group / Circle welcome text, shown (centred) only to a new member
+  const [welcome, setWelcome] = useState(null);
+  // "Secure with PIN code": the chat stays hidden until the PIN is entered
+  const [locked, setLocked] = useState(false);
+  const [security, setSecurity] = useState({});
+  const [themeColor, setThemeColor] = useState("");
+  const [matchedAt, setMatchedAt] = useState(null);
+  const [otherInfo, setOtherInfo] = useState(route?.params?.otherUser || null);
+  const [recordSignal, setRecordSignal] = useState(0);
+  const [scrolledUp, setScrolledUp] = useState(false);
+  const [mediaPreview, setMediaPreview] = useState(null); // Photo-sharing-preview
+  const [gifPreview, setGifPreview] = useState(null); // GIF-Preview
+  const comingSoon = (what) => () => ToastMessage(`${what} is coming soon`);
+  const pinShown = useRef(false);
   const cameraRef = useRef(null);
 
   const otherUser = route?.params?.otherUser || null;
   const recipientId = route?.params?.recipientId; // This is the user ID of the other person
   const recipientName = route?.params?.recipientName || "Chat";
   const conversationId = route?.params?.conversationId; // Optional, can be derived or passed
+  // Group / Circle chat: messages go to the conversation, not one person
+  const isGroup = !!route?.params?.isGroup && !!conversationId;
+  const memberCount = route?.params?.memberCount;
+  const target = isGroup
+    ? { conversation_id: conversationId }
+    : { participant_id: recipientId };
+  const lockKey = conversationId || recipientId;
+
+  // Same PIN as the profile selector (client). No PIN yet → define it first.
+  const requirePin = () => {
+    pinShown.current = true;
+    navigation.navigate("PinVerification", {
+      mode: hasProfilePin(users, userId) ? "enter" : "define",
+      purpose: "unlock",
+      accountId: userId,
+      unlockId: lockKey,
+    });
+  };
+
+  useEffect(() => {
+    if (!isFocus || !locked) return;
+    if (isConversationUnlocked(lockKey)) setLocked(false);
+    else if (pinShown.current) navigation.goBack(); // left the PIN screen
+  }, [isFocus]);
 
   const fetchMessages = async (loading) => {
     try {
@@ -62,6 +184,18 @@ const InboxScreen = ({ route }) => {
       const res = await getMessages(idToUse);
       if (res?.data?.success) {
         setMessages(res.data.messages || []); // Ensure array
+        const info = res.data.conversationInfo;
+        setWelcome(info?.showWelcome ? info.initialMessage : null);
+        setSecurity(info?.security || {});
+        setThemeColor(info?.settings?.theme || "");
+        setMatchedAt(info?.matchedAt || null);
+        if (info?.other) setOtherInfo((o) => ({ ...(o || {}), ...info.other }));
+        if (info?.settings?.pinLock && !isConversationUnlocked(lockKey)) {
+          setLocked(true);
+          if (!pinShown.current) requirePin();
+        } else {
+          setLocked(false);
+        }
 
         // Emit read status for the latest message
         if (socket && res.data.messages?.length > 0) {
@@ -96,9 +230,10 @@ const InboxScreen = ({ route }) => {
       // Or check sender/receiver:
 
       const msg = data.message;
-      const isForThisChat =
-        (msg.senderId._id === recipientId && msg.receiverId === userId) ||
-        (msg.senderId._id === userId && msg.receiverId === recipientId); // should ideally check conversationId
+      const isForThisChat = isGroup
+        ? false // groups match on conversationId below
+        : (msg.senderId._id === recipientId && msg.receiverId === userId) ||
+          (msg.senderId._id === userId && msg.receiverId === recipientId);
 
       if (
         isForThisChat ||
@@ -169,6 +304,15 @@ const InboxScreen = ({ route }) => {
       );
     });
 
+    // C2. Meeting accepted / declined (card updates for everyone)
+    socket.on("meeting:status", (data) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === data.messageId ? { ...msg, meeting: data.meeting } : msg,
+        ),
+      );
+    });
+
     // D. User Typing Status
     socket.on("user:typing", (data) => {
       if (data.userId === recipientId) {
@@ -180,6 +324,7 @@ const InboxScreen = ({ route }) => {
       socket.off("new:message");
       socket.off("message:reaction");
       socket.off("message:status");
+      socket.off("meeting:status");
       socket.off("user:typing");
     };
   }, [socket, recipientId, conversationId, userId]);
@@ -213,14 +358,14 @@ const InboxScreen = ({ route }) => {
 
     if (!isTyping) {
       setIsTyping(true);
-      socket.emit("typing:start", { participant_id: recipientId });
+      if (!isGroup) socket.emit("typing:start", { participant_id: recipientId });
     }
 
     if (typingTimeout) clearTimeout(typingTimeout);
 
     const timeout = setTimeout(() => {
       setIsTyping(false);
-      socket.emit("typing:stop", { participant_id: recipientId });
+      if (!isGroup) socket.emit("typing:stop", { participant_id: recipientId });
     }, 1500);
 
     setTypingTimeout(timeout);
@@ -231,7 +376,7 @@ const InboxScreen = ({ route }) => {
     if (type === "text" && !inputText.trim()) return;
 
     const payload = {
-      participant_id: recipientId,
+      ...target,
       content: inputText,
       type: type,
       ...(attachment && { attachment }),
@@ -278,9 +423,50 @@ const InboxScreen = ({ route }) => {
     setReplyMessage(null);
   };
 
-  const handleMediaSelect = async (result) => {
+  // Picking from the camera / library opens the Photo-sharing-preview first
+  const handleMediaSelect = (result) => {
     if (!result) return;
     setImageModal(false);
+    if (String(result.mime || "").includes("gif")) setGifPreview(result);
+    else setMediaPreview(result);
+  };
+
+  const pickFromLibrary = async () => {
+    try {
+      const picked = await openPicker({ mediaType: "any", cropping: false });
+      if (picked?.path) handleMediaSelect(picked);
+    } catch (e) {
+      // cancelled
+    }
+  };
+
+  // Figma: camera → Photo-sharing-preview (no intermediate sheet)
+  const takePhoto = async () => {
+    try {
+      const shot = await openCamera({ mediaType: "any", cropping: false });
+      if (shot?.path) handleMediaSelect(shot);
+    } catch (e) {
+      if (String(e?.message || "").toLowerCase().includes("permission")) {
+        ToastMessage("Please allow camera access in Settings", "error");
+      }
+    }
+  };
+
+  const pickGif = async () => {
+    try {
+      const picked = await openPicker({ mediaType: "photo", cropping: false });
+      if (!picked?.path) return;
+      if (String(picked.mime || "").includes("gif")) setGifPreview(picked);
+      else ToastMessage("Please pick a GIF", "error");
+    } catch (e) {
+      // cancelled
+    }
+  };
+
+  const sendMedia = async (result, caption = "") => {
+    if (!result) return;
+    setMediaPreview(null);
+    setGifPreview(null);
 
     const isVideo = result.mime.startsWith("video");
     const tempId = Date.now().toString();
@@ -290,7 +476,7 @@ const InboxScreen = ({ route }) => {
       _id: tempId,
       senderId: { _id: userId },
       receiverId: recipientId,
-      content: "",
+      content: caption,
       type: isVideo ? "file" : "image",
       attachment: { url: result.path },
       status: "sending",
@@ -316,8 +502,8 @@ const InboxScreen = ({ route }) => {
       if (url) {
         // Send actual message
         const payload = {
-          participant_id: recipientId,
-          content: "",
+          ...target,
+          content: caption,
           type: isVideo ? "file" : "image",
           attachment: {
             url,
@@ -349,10 +535,8 @@ const InboxScreen = ({ route }) => {
     }
   };
 
-  const handleCapture = async (result) => {
-    if (result) {
-      await handleMediaSelect(result);
-    }
+  const handleCapture = (result) => {
+    if (result) handleMediaSelect(result);
   };
 
   const handleAudioSend = async (audioPath, duration, size) => {
@@ -401,7 +585,7 @@ const InboxScreen = ({ route }) => {
 
         // Send actual message
         const payload = {
-          participant_id: recipientId,
+          ...target,
           content: "",
           type: "voice",
           attachment: {
@@ -450,23 +634,34 @@ const InboxScreen = ({ route }) => {
 
   return (
     <ScreenWrapper
-      statusBarColor={isDark ? "rgba(38, 38, 38, 0.64)" : "rgba(255, 255, 255, 0.64)"}
+      // the header paints the status bar area itself (Figma: one 104 block)
+      translucent
+      statusBarColor="transparent"
       paddingHorizontal={10}
       headerUnScrollable={() => (
         <ChatHeader
-          source={Images.user}
-          title={recipientName}
-          user={otherUser}
-          location={
-            otherUser?.location?.city &&
-            `${otherUser?.location?.city}, ${otherUser?.location?.country}`
+          title={
+            isGroup
+              ? recipientName
+              : otherInfo?.firstName
+              ? `${otherInfo.firstName}${otherInfo?.age ? `, ${otherInfo.age}` : ""}`
+              : recipientName
           }
-          type={otherUser?.occupation?.jobTitle}
-          status={otherUserTyping ? "Typing..." : ""} // Basic status
+          subtitle={isGroup ? (memberCount ? `${memberCount} members` : undefined) : otherInfo?.occupation?.jobTitle}
+          company={isGroup ? undefined : otherInfo?.occupation?.company}
+          online={!isGroup && (otherInfo?.status === "online" || (otherInfo?.status === undefined && !!otherInfo?.isOnline))}
+          onVoiceCall={comingSoon("Voice calling")}
+          onVideoCall={comingSoon("Video calling")}
           onSettingsPress={() =>
             navigation.navigate("ConversationSettings", {
               recipientId,
               otherUser,
+              conversationId: isGroup ? conversationId : undefined,
+              isGroup,
+              groupType: route?.params?.groupType,
+              recipientName,
+              groupPicture: route?.params?.groupPicture,
+              memberCount,
             })
           }
         />
@@ -481,7 +676,16 @@ const InboxScreen = ({ route }) => {
           onClearReply={() => setReplyMessage(null)}
           recipientName={recipientName}
           otherUserTyping={otherUserTyping}
-          onCameraPress={() => setImageModal(true)}
+          onCameraPress={takePhoto}
+          onGalleryPress={pickFromLibrary}
+          onGifPress={pickGif}
+          typingName={isGroup ? "Someone" : otherInfo?.firstName || recipientName}
+          recordSignal={recordSignal}
+          showScrollDown={scrolledUp}
+          onScrollDown={() => flatListRef?.current?.scrollToOffset({ offset: 0, animated: true })}
+          onSchedulePress={() =>
+            navigation.navigate("ScheduleMeeting", { target, recipientName })
+          }
           onSendAudio={handleAudioSend}
           onSendAttachment={(file, type) => {
             // Upload first
@@ -492,7 +696,7 @@ const InboxScreen = ({ route }) => {
       )}
     >
       {/* <ListHeader  title={recipientName}/> */}
-      {loading ? (
+      {loading || locked ? (
         <View style={{ flex: 1, paddingVertical: 14 }}>
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((_, index) => (
             <ChatBubbleSkeleton key={index} isSender={index % 2 === 0} />
@@ -510,6 +714,28 @@ const InboxScreen = ({ route }) => {
             { paddingBottom: keyboardHeight + 10 },
             messages.length === 0 && { flexGrow: 1 },
           ]}
+          onScroll={(e) => setScrolledUp(e.nativeEvent.contentOffset.y > 200)}
+          scrollEventThrottle={100}
+          // inverted list: the footer sits at the top (above the oldest
+          // message), the header at the bottom (below the latest).
+          ListFooterComponent={
+            messages.length > 0 ? (
+              <View style={styles.intro}>
+                {!!matchedAt && (
+                  <InfoDivider label={`You matched with ${otherInfo?.firstName || recipientName} on ${moment(matchedAt).format("MMM D, YYYY")}`} />
+                )}
+                {!!welcome && (
+                  <CustomText label={welcome} fontSize={14} fontFamily={fonts.medium} letterSpacing={-0.28} color={COLORS.gray64} textAlign="center" containerStyle={styles.welcome} />
+                )}
+                <DateDivider label={dayLabel(messages[messages.length - 1])} />
+              </View>
+            ) : null
+          }
+          ListHeaderComponent={
+            !isGroup && ["dnd", "idle"].includes(otherInfo?.status) ? (
+              <InfoDivider medium label={`${otherInfo?.firstName || recipientName} is not available at the moment`} />
+            ) : null
+          }
           ListEmptyComponent={
             // inverted list flips its children — flip back so it reads normally
             <View style={styles.empty}>
@@ -543,7 +769,7 @@ const InboxScreen = ({ route }) => {
                   if (!socket) return;
                   socket.emit(
                     "send:message",
-                    { participant_id: recipientId, content: "Hi 👋", type: "text" },
+                    { ...target, content: "Hi 👋", type: "text" },
                     (response) => {
                       if (response?.success && response?.data) {
                         setMessages((prev) =>
@@ -574,8 +800,20 @@ const InboxScreen = ({ route }) => {
                   ? msg.senderId._id
                   : msg.senderId;
               if (senderId === userId) return "You";
+              if (isGroup && typeof msg.senderId === "object") {
+                return msg.senderId.firstName || "Member";
+              }
               return recipientName;
             };
+            // Name chip above the first received message of a run (list is
+            // inverted → the older message is index + 1); date pill when the
+            // day changes.
+            const senderOf = (m) =>
+              typeof m?.senderId === "object" ? m?.senderId?._id : m?.senderId;
+            const older = messages[index + 1];
+            const showSender = !isUserMessage(item) && senderOf(older) !== senderOf(item);
+            const showDate = older && dayKey(older) !== dayKey(item);
+            const sender = typeof item.senderId === "object" ? item.senderId : null;
 
             let repliedToMessage = null;
             if (item.replyTo && typeof item.replyTo === "object") {
@@ -595,19 +833,63 @@ const InboxScreen = ({ route }) => {
               }
             }
 
-            return (
+            const bubble = (
               <ChatBubble
                 item={item}
                 userId={userId}
                 isSender={isUserMessage(item)}
                 repliedToMessage={repliedToMessage}
                 onReply={(msg) => setReplyMessage(msg)}
+                onVoiceReply={(msg) => {
+                  setReplyMessage(msg);
+                  setRecordSignal((n) => n + 1);
+                }}
                 onReact={handleReaction}
+                allowCopy={!security.blockCopying}
+                themeColor={themeColor}
+                senderSelfName={userData?.firstName}
+                meetingWith={
+                  isGroup
+                    ? { name: recipientName, picture: route?.params?.groupPicture }
+                    : {
+                        name: otherInfo?.firstName || recipientName,
+                        picture: otherInfo?.profile?.avatar,
+                        color: otherInfo?.profile?.profileColor,
+                      }
+                }
+                senderName={showSender ? (isGroup ? sender?.firstName || "Member" : otherUser?.firstName || recipientName) : null}
+                senderColor={(isGroup ? sender?.profile?.profileColor : otherUser?.profile?.profileColor) || "#397050"}
+                onReport={() => navigation.navigate("ReportChat", { user: sender || otherInfo, conversationId })}
+                onMeetingStatus={(id, meeting) =>
+                  setMessages((prev) =>
+                    prev.map((m) => (m._id === id ? { ...m, meeting } : m)),
+                  )
+                }
               />
+            );
+            return showDate ? (
+              <View>
+                <DateDivider label={dayLabel(item)} />
+                {bubble}
+              </View>
+            ) : (
+              bubble
             );
           }}
         />
       )}
+      <PhotoSharingPreview
+        media={mediaPreview}
+        onCancel={() => setMediaPreview(null)}
+        onReplace={(next) => setMediaPreview(next)}
+        onSend={(m, caption) => sendMedia(m, caption)}
+      />
+      <GifPreviewSheet
+        visible={!!gifPreview}
+        gif={gifPreview}
+        onDismiss={() => setGifPreview(null)}
+        onShare={() => sendMedia(gifPreview)}
+      />
       <UploadImageCustom
         imageModal={imageModal}
         setImageModal={setImageModal}
@@ -628,8 +910,18 @@ const createStyles = (colors, isDark) => StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  // Figma: 40 under the header, 20 between items, bubbles 12 from the edges
   contentContainer: {
+    paddingHorizontal: 2, // + ScreenWrapper 10 = 12
+    paddingTop: 20,
     paddingBottom: 10,
+  },
+  intro: {
+    paddingTop: 40,
+  },
+  welcome: {
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
   empty: {
     flex: 1,

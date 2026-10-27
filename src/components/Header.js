@@ -84,9 +84,12 @@ const Header = ({
           >
             <Blur blurType={themeMode === "dark" ? "dark" : "xlight"} />
             <Icons
-              name="keyboard-arrow-left"
-              family="MaterialIcons"
-              size={26}
+              // name="keyboard-arrow-left"
+              // family="MaterialIcons"
+              // size={26}
+              family="MaterialSymbolsRounded"
+              name="chevron_left"
+              size={22}
               color={textColor || colors.iconMuted}
             />
           </TouchableOpacity>

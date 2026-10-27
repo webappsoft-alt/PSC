@@ -22,8 +22,17 @@ import CameraScreen from "../screens/Main/CameraScreen";
 import Chat from "../screens/Main/Chat/Chat";
 import InboxScreen from "../screens/Main/Chat/InboxScreen";
 import OnlineFriends from "../screens/Main/Chat/OnlineFriends";
+import InboxPager from "../screens/Main/Chat/InboxPager";
+import CreateGroupInvite from "../screens/Main/Chat/CreateGroupInvite";
+import SearchCircles from "../screens/Main/Chat/SearchCircles";
+import ScheduleMeeting from "../screens/Main/Chat/meeting/ScheduleMeeting";
+import Meetings from "../screens/Main/Chat/meeting/Meetings";
 import ConversationSettings from "../screens/Main/Chat/ConversationSettings";
 import ReportChat from "../screens/Main/Chat/ReportChat";
+import DisappearingMessages from "../screens/Main/Chat/DisappearingMessages";
+import ChatTheme from "../screens/Main/Chat/ChatTheme";
+import SelectLocation from "../screens/Main/Chat/meeting/SelectLocation";
+import SelectPickupOnMap from "../screens/Main/Chat/meeting/SelectPickupOnMap";
 import MatchingFilters from "../screens/Main/BandMateMatching/MatchingFilters";
 import CommentScreen from "../screens/Main/CommentScreen";
 import AddItems from "../screens/Main/CreateEvent/AddItems.js";
@@ -45,6 +54,7 @@ import ProgressiveBlur from "../screens/Main/Home/ProgressiveBlur.js";
 import Notification from "../screens/Main/Notification/index.js";
 import AddPicture from "../screens/Main/Profile/molecules/AddPicture.js";
 import QrScreen from "../screens/Main/Profile/QrScreen.js";
+import PoliticalInformation from "../screens/Main/Profile/PoliticalInformation";
 import RequestsScreen from "../screens/Main/Profile/RequestsScreen.js";
 import UserProfile from "../screens/Main/Profile/UserProfile";
 import CreatePost from "../screens/Main/PublishPost/Index";
@@ -201,7 +211,8 @@ const MainStack = () => {
             gestureEnabled: false,
           }}
         />
-        <Stack.Screen name="Chat" component={Chat} />
+        {/* Inbox + Online Friends pager with one shared bottom bar */}
+        <Stack.Screen name="Chat" component={InboxPager} />
         <Stack.Screen name="SearchScreen" component={SearchScreen} />
         <Stack.Screen name="InboxScreen" component={InboxScreen} />
         <Stack.Screen name="OnlineFriends" component={OnlineFriends} />
@@ -210,6 +221,14 @@ const MainStack = () => {
           component={ConversationSettings}
         />
         <Stack.Screen name="ReportChat" component={ReportChat} />
+        <Stack.Screen name="DisappearingMessages" component={DisappearingMessages} />
+        <Stack.Screen name="ChatTheme" component={ChatTheme} />
+        <Stack.Screen name="SelectLocation" component={SelectLocation} />
+        <Stack.Screen name="SelectPickupOnMap" component={SelectPickupOnMap} />
+        <Stack.Screen name="CreateGroupInvite" component={CreateGroupInvite} />
+        <Stack.Screen name="SearchCircles" component={SearchCircles} />
+        <Stack.Screen name="ScheduleMeeting" component={ScheduleMeeting} />
+        <Stack.Screen name="Meetings" component={Meetings} />
         <Stack.Screen name="FilterScreen" component={MatchingFilters} />
         <Stack.Screen name="InvestmentScreen" component={InvestmentScreen} />
         <Stack.Screen name="CommentScreen" component={CommentScreen} />
@@ -323,6 +342,10 @@ const MainStack = () => {
         <Stack.Screen name="ShortWithId" component={ShortWithId} />
         <Stack.Screen name="PublishShort" component={PublishShort} />
         <Stack.Screen name="QrScreen" component={QrScreen} />
+        <Stack.Screen
+          name="PoliticalInformation"
+          component={PoliticalInformation}
+        />
         <Stack.Screen name="PostFilter" component={PostFilter} />
         <Stack.Screen name="RequestsScreen" component={RequestsScreen} />
 

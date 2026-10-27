@@ -1,6 +1,6 @@
 import { BlurView } from "@react-native-community/blur";
 import { useNavigation } from "@react-navigation/native";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icons from "../../../../components/Icons";
@@ -12,8 +12,13 @@ import { useTheme } from "../../../../contexts/ThemeContext";
  * Side buttons: 56 circle, pad 4, #1E1E1E 64% + blur 16, 1px white 8% inside.
  * Centre pill: 208×56, same glass; three 72×48 segments, active #080808.
  * Icons 24 filled — active white, inactive white 64%.
- * Order (client): Inbox · Online Friends · Stories (icon only, no navigation).
+ * Order (client): 1 on 1 (person) · Groups (groups) · Circles (campaign).
+ *
+ * WhatsApp-style (client): inside InboxPager the bar is rendered once, outside
+ * the swiping pages — Home and Settings stay put, only the active pill glides
+ * between the centre icons with the swipe (`progress` = page position).
  */
+const SEGMENT_PITCH = 64; // 72 wide, overlapping by 8
 export const INBOX_BAR_CONTENT_HEIGHT = 8 + 56; // + bottom inset
 
 const Glass = ({ style, children }) => (
@@ -29,7 +34,10 @@ const Glass = ({ style, children }) => (
   </View>
 );
 
-const InboxBottomBar = ({ active = "chat" }) => {
+const KEYS = ["chat", "groups", "circles"];
+const ICONS = { chat: "person", groups: "groups", circles: "campaign" };
+
+const InboxBottomBar = ({ active = "chat", progress, onSelect }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -59,6 +67,29 @@ const InboxBottomBar = ({ active = "chat" }) => {
     );
   };
 
+  // Swipe-driven pill: indicator + icon colours follow `progress`
+  const liveSegment = (key, index, onPress) => {
+    const near = progress.interpolate({
+      inputRange: [index - 1, index, index + 1],
+      outputRange: [0, 1, 0],
+      extrapolate: "clamp",
+    });
+    return (
+      <TouchableOpacity
+        key={key}
+        activeOpacity={0.7}
+        disabled={!onPress}
+        onPress={onPress}
+        style={styles.segment}
+      >
+        {icon(ICONS[key], false)}
+        <Animated.View style={[StyleSheet.absoluteFill, styles.center, { opacity: near }]}>
+          {icon(ICONS[key], true)}
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: bottom }]}>
       <LinearGradient
@@ -76,12 +107,40 @@ const InboxBottomBar = ({ active = "chat" }) => {
         </TouchableOpacity>
       </Glass>
 
-      <Glass style={styles.pill}>
-        {segment("chat", "chat", () => navigation.navigate("Chat"))}
-        {segment("friends", "groups", () => navigation.navigate("OnlineFriends"))}
-        {/* Stories: icon only for now (client) */}
-        {segment("stories", "web_stories", null)}
-      </Glass>
+      {progress ? (
+        <Glass style={styles.pill}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.indicator,
+              {
+                transform: [
+                  {
+                    translateX: progress.interpolate({
+                      inputRange: [0, 1, 2],
+                      outputRange: [0, SEGMENT_PITCH, SEGMENT_PITCH * 2],
+                      extrapolate: "clamp",
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          {KEYS.map((key, i) =>
+            liveSegment(
+              key,
+              i,
+              () => onSelect?.(key),
+            ),
+          )}
+        </Glass>
+      ) : (
+        <Glass style={styles.pill}>
+          {segment("chat", ICONS.chat, () => navigation.popTo("Chat"))}
+          {segment("groups", ICONS.groups, () => navigation.popTo("Chat"))}
+          {segment("circles", ICONS.circles, () => navigation.popTo("Chat"))}
+        </Glass>
+      )}
 
       <Glass>
         <TouchableOpacity
@@ -145,6 +204,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   segmentActive: {
+    backgroundColor: "#080808",
+  },
+  center: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // sliding active pill (pill padding 3 + 1px border → first segment at 3)
+  indicator: {
+    position: "absolute",
+    left: 3,
+    top: 3,
+    width: 72,
+    height: 48,
+    borderRadius: 100,
     backgroundColor: "#080808",
   },
 });

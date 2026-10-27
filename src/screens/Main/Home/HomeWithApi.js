@@ -405,7 +405,7 @@ const Home = () => {
     return (
       <View style={styles.centerContainer}>
         <CustomText
-          label={"No posts found"}
+          label={"No post found"}
           color={COLORS.subtitle}
           fontSize={16}
           textAlign={"center"}

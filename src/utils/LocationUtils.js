@@ -8,6 +8,7 @@ import {
 
 const { GetCurrentLocation } = NativeModules;
 const API_KEY = "AIzaSyB3Tj9fWzywtOncQ7vNjcErxRM5E--WlDA";
+export const GOOGLE_API_KEY = API_KEY;
 
 // Global variables to manage location requests
 let isLocationRequestInProgress = false;
@@ -649,4 +650,42 @@ export const calculateRoadDistanceAndTime = async (
       fallback: true,
     };
   }
+};
+
+/** Google Places autocomplete → [{ placeId, name, secondary }] */
+export const searchPlaces = async (input, { latitude, longitude } = {}) => {
+  if (!input?.trim()) return [];
+  let url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?key=${API_KEY}&input=${encodeURIComponent(input.trim())}`;
+  if (latitude && longitude) url += `&location=${latitude},${longitude}&radius=50000&origin=${latitude},${longitude}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.status !== "OK") return [];
+  return data.predictions.map((p) => ({
+    placeId: p.place_id,
+    name: p.structured_formatting?.main_text || p.description,
+    secondary: p.structured_formatting?.secondary_text || "",
+    description: p.description,
+    // Figma Select-Location: "220 km" on the right
+    distance:
+      typeof p.distance_meters === "number"
+        ? p.distance_meters < 1000
+          ? `${Math.round(p.distance_meters)} m`
+          : `${Math.round(p.distance_meters / 1000)} km`
+        : "",
+  }));
+};
+
+/** Google Place details → { address, latitude, longitude } */
+export const placeDetails = async (placeId) => {
+  const res = await fetch(
+    `https://maps.googleapis.com/maps/api/place/details/json?key=${API_KEY}&place_id=${placeId}&fields=formatted_address,geometry,name`,
+  );
+  const data = await res.json();
+  if (data.status !== "OK") return null;
+  const r = data.result;
+  return {
+    address: r.formatted_address || r.name,
+    latitude: r.geometry?.location?.lat,
+    longitude: r.geometry?.location?.lng,
+  };
 };

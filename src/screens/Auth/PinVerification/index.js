@@ -25,6 +25,7 @@ import { post } from "../../../services/ApiRequest";
 import { ToastMessage } from "../../../utils/ToastMessage";
 import {
   PROFILE_PIN_LENGTH,
+  markConversationUnlocked,
   saveProfilePin,
   verifyProfilePin,
 } from "../../../utils/profileLock";
@@ -54,6 +55,10 @@ const SUBTITLE = {
  *            (user/create-pin) and locally, then continues the onboarding.
  *            "profile": from the profile selector; `accountId` is the saved
  *            account to open.
+ *            "unlock": a conversation secured with the PIN (`unlockId`); the
+ *            same account PIN is used, and on success the screen just goes
+ *            back to the chat. With no PIN saved yet, `mode: "define"`
+ *            defines it first.
  */
 const PinVerification = () => {
   const navigation = useNavigation();
@@ -189,6 +194,11 @@ const PinVerification = () => {
           }
           saveProfilePin(dispatch, users, accountId, pin);
           pendingPin = null;
+          if (purpose === "unlock") {
+            markConversationUnlocked(route?.params?.unlockId);
+            navigation.pop(2); // define + confirm → back to the chat
+            return;
+          }
           await enterApp();
           return;
         }
@@ -196,6 +206,11 @@ const PinVerification = () => {
         // enter
         if (!verifyProfilePin(users, accountId, pin)) {
           fail("Incorrect PIN code");
+          return;
+        }
+        if (purpose === "unlock") {
+          markConversationUnlocked(route?.params?.unlockId);
+          navigation.goBack();
           return;
         }
         setBusy(true);

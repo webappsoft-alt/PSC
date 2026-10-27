@@ -13,7 +13,7 @@ import CustomText from "../../../../components/CustomText";
 import fonts from "../../../../assets/fonts";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
-const NUM_BARS = 40;
+const NUM_BARS = 12;
 
 const AudioPlayer = ({
   audioUri,
@@ -303,173 +303,87 @@ const AudioPlayer = ({
   const progress =
     soundDuration > 0 ? (currentPosition / soundDuration) * 100 : 0;
 
-  if (isPending) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.audioContainer}>
-          <View style={styles.playButton}>
-            <ActivityIndicator size="small" color={COLORS.buttonColor} />
-          </View>
-          <View style={styles.infoContainer}>
-            <View
-              style={[
-                styles.progressBar,
-                {
-                  backgroundColor: isSender ? (isDark ? COLORS.gray : colors.border) : colors.white04,
-                },
-              ]}
-            >
-              <View style={[styles.progressFill, { width: "0%" }]} />
-            </View>
-            <CustomText
-              label="Uploading..."
-              fontSize={12}
-              fontFamily={fonts.medium}
-              color={colors.textSecondary}
-            />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
+  // Figma Inbox_General-Default voice message: pill 44 (r100, pad 12/16/12/8,
+  // gap 4; white 4% sent / 16% received) · play 24 · 12 bars 4 wide (r100,
+  // 4 apart) · 8 · chip 25 (r100 white 4%, Medium 12 −0.5) with the length.
+  const played = soundDuration > 0 ? currentPosition / soundDuration : 0;
+  const pillBg = isDark
+    ? isSender ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.16)"
+    : isSender ? "rgba(18, 18, 18, 0.04)" : "rgba(18, 18, 18, 0.08)";
+  const fg = colors.text;
   return (
-    <View style={styles.container}>
-      <View style={styles.audioContainer}>
-        <TouchableOpacity
-          style={[
-            styles.playButton,
-            {
-              backgroundColor: isSender
-                ? (isDark ? COLORS.gray2 : colors.white04)
-                : (isDark ? COLORS.lightGray : colors.surfaceAlt),
-            },
-          ]}
-          onPress={togglePlayPause}
-          activeOpacity={0.7}
-          disabled={isLoading || !audioUri}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color={colors.text} />
+    <View style={styles.row}>
+      <View style={[styles.pill, { backgroundColor: pillBg }]}>
+        <TouchableOpacity onPress={togglePlayPause} disabled={isPending || isLoading || !audioUri} hitSlop={8} style={styles.play}>
+          {isPending || isLoading ? (
+            <ActivityIndicator size="small" color={fg} />
           ) : (
-            <Icons
-              name={isPlaying ? "pause" : "play"}
-              family="Feather"
-              size={16}
-              color={isSender ? (isDark ? COLORS.white : colors.text) : COLORS.buttonColor}
-            />
+            <Icons family="MaterialSymbolsRoundedFilled" name={isPlaying ? "pause" : "play_arrow"} size={24} color={fg} />
           )}
         </TouchableOpacity>
-
-        <View style={styles.infoContainer}>
-          <View style={styles.wavesContainer}>
-            <View
+        {BAR_HEIGHTS.map((h, i) => {
+          const on = !isPlaying && played === 0 ? true : (i + 0.5) / BAR_HEIGHTS.length <= played;
+          return (
+            <Animated.View
+              key={i}
               style={[
-                styles.lineTrack,
+                styles.bar,
                 {
-                  backgroundColor: isSender
-                    ? (isDark ? COLORS.gray2 : colors.white04)
-                    : (isDark ? COLORS.lightGray : colors.surfaceAlt),
+                  height: waveActive ? barAnims[i] : h,
+                  backgroundColor: fg,
+                  opacity: on ? 1 : 0.48,
                 },
               ]}
             />
-            {barAnims.map((anim, i) => {
-              const barProgress = ((i + 0.5) / NUM_BARS) * 100;
-              const isFilled = barProgress <= progress;
-              return (
-                <View key={i} style={styles.barWrapper}>
-                  <Animated.View
-                    style={[
-                      styles.bar,
-                      {
-                        height: isFilled ? anim : 4,
-                        backgroundColor: isFilled
-                          ? (isDark ? COLORS.white : colors.text)
-                          : "transparent",
-                      },
-                    ]}
-                  />
-                </View>
-              );
-            })}
-          </View>
-          <View style={styles.timeContainer}>
-            <CustomText
-              label={formatTime(currentPosition)}
-              fontSize={11}
-              fontFamily={fonts.regular}
-              color={colors.textSecondary}
-            />
-            <CustomText
-              label={formatTime(soundDuration)}
-              fontSize={11}
-              fontFamily={fonts.regular}
-              color={colors.textSecondary}
-            />
-          </View>
-        </View>
+          );
+        })}
+      </View>
+      <View style={[styles.chip, { backgroundColor: isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(18, 18, 18, 0.04)" }]}>
+        <CustomText
+          label={isPending ? "…" : formatTime(isPlaying || currentPosition ? Math.max(0, soundDuration - currentPosition) : soundDuration)}
+          fontSize={12}
+          fontFamily={fonts.medium}
+          letterSpacing={-0.5}
+          color={fg}
+        />
       </View>
     </View>
   );
 };
 
+const BAR_HEIGHTS = [14, 16, 8, 22, 14, 12, 22, 12, 8, 4, 4, 16];
+
 const styles = StyleSheet.create({
-  container: {
-    minWidth: 200,
-  },
-  audioContainer: {
+  row: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 12,
-  },
-  playButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
     alignItems: "center",
+    gap: 8,
   },
-  infoContainer: {
-    flex: 1,
+  pill: {
+    height: 44,
+    borderRadius: 100,
+    paddingLeft: 8,
+    paddingRight: 16,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
-  progressBar: {
-    height: 4,
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: COLORS.buttonColor,
-    borderRadius: 2,
-  },
-  timeContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  wavesContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-evenly",
+  play: {
+    width: 24,
     height: 24,
-  },
-  lineTrack: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-    borderRadius: 2,
-  },
-  barWrapper: {
-    width: 3,
-    height: "100%",
-    justifyContent: "flex-end",
+    alignItems: "center",
+    justifyContent: "center",
   },
   bar: {
-    width: "100%",
-    borderRadius: 1.5,
+    width: 4,
+    borderRadius: 100,
+  },
+  chip: {
+    height: 25,
+    borderRadius: 100,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 

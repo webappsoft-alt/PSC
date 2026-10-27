@@ -36,7 +36,7 @@ import MediaGrid from "./molecules/MediaGrid";
 import ProfileCard, { getProfileCardLayout } from "./molecules/ProfileCard";
 import ProfileHeader from "./molecules/ProfileHeader";
 import { getProfile } from "../../../utils/constants";
-import { accentA, getProfileTier } from "../../../utils/profileTier";
+import { accentA, getProfileAccent } from "../../../utils/profileTier";
 import { post } from "../../../services/ApiRequest";
 
 const Profile = () => {
@@ -215,7 +215,7 @@ const Profile = () => {
     return (
       <View style={styles.centerContainer}>
         <CustomText
-          label={"No posts found"}
+          label={"No post found"}
           color={colors.textSecondary}
           fontSize={16}
           textAlign={"center"}
@@ -349,7 +349,7 @@ const Profile = () => {
     [viewablePostId, isFocus, formatCount, openComments, hidePost, hideUserPosts],
   );
 
-  const tier = getProfileTier(userData);
+  const accent = getProfileAccent(userData);
   const cardLayout = getProfileCardLayout(userData, false);
 
   return (
@@ -429,11 +429,11 @@ const Profile = () => {
             paddingHorizontal={14}
             height={32}
             borderWidth={1}
-            borderColor={accentA(tier, 0.04)}
+            borderColor={accentA(accent, 0.04)}
             activeBorderColor={"transparent"}
-            activeColor={accentA(tier, 0.08)}
-            ovalBg={accentA(tier, 0)}
-            textColor={accentA(tier, 1)}
+            activeColor={accentA(accent, 0.08)}
+            ovalBg={accentA(accent, 0)}
+            textColor={accentA(accent, 1)}
             textFontSize={16}
             textLetterSpacing={-0.5}
           />

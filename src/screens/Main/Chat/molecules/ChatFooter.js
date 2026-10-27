@@ -1,26 +1,36 @@
+import { BlurView } from "@react-native-community/blur";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
-  FlatList,
   Keyboard,
   Platform,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Image,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../../assets/fonts";
+import Blur from "../../../../components/Blur";
 import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
-import { COLORS } from "../../../../utils/COLORS";
-import UploadChatModal from "./UploadChatModal";
-import { Images } from "../../../../assets/images";
-import AudioRecorder from "./AudioRecorder";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import AudioRecorder from "./AudioRecorder";
 
-const quickMessages = ["Hello, What's Up?", "I'm outside"];
-
+/**
+ * Figma Chat page "Inbox_General-Default" footer — bar #262626 @64% + blur
+ * 32, pad 12/12/34/12. Three states:
+ *  idle (2212:6349): calendar · photos · GIF circles 44 #121212 (icons 22 /
+ *    22 / 28 @64%), 6 apart · input #121212 r100 pad 16 "Type your
+ *    message..." Regular 14 @48%
+ *  focused, empty (2212:6567): input 48 #121212 r100 (pad 0/16/0/12, gap 8):
+ *    add 24 @64% · "Type message" Regular 16 −1% @64% · photo_camera 24 ·
+ *    6 · mic circle 44 #121212 (mic 22 white)
+ *  typing (2212:7108): input 44 #121212 Regular 14 #F3F3F3 · 8 · send 44
+ *    #A19375 + chevron_right 22 #1E1E1E
+ * Above it: "Myles is typing..." Regular 14 #828186 (pad 16) and the 40
+ * "scroll to latest" circle (white 8%, expand_more 20) at the right.
+ */
 const ChatFooter = ({
   inputText,
   setInputText,
@@ -30,431 +40,262 @@ const ChatFooter = ({
   onClearReply,
   recipientName,
   otherUserTyping,
+  typingName,
   onCameraPress,
+  onGalleryPress,
+  onGifPress,
   onSendAudio,
+  onSchedulePress,
+  showScrollDown,
+  onScrollDown,
+  recordSignal, // bump to start a voice recording (voice reply chip)
 }) => {
-  const [isRecording, setIsRecording] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const keyboardHeight = useRef(new Animated.Value(0)).current;
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const actionsAnim = useRef(new Animated.Value(0)).current;
-  const inputFlexAnim = useRef(new Animated.Value(1)).current;
-  const autoCloseRef = useRef(null);
-  const audioRecorderRef = useRef(null);
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const styles = createStyles(colors, isDark);
+  const tint = (o) => (isDark ? `rgba(255, 255, 255, ${o})` : `rgba(18, 18, 18, ${o})`);
+  const field = isDark ? "#121212" : colors.surfaceAlt;
+  const [isRecording, setIsRecording] = useState(false);
+  const [keyboardShown, setKeyboardShown] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const keyboardHeight = useRef(new Animated.Value(0)).current;
+  const audioRecorderRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
-    const keyboardShowEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const keyboardHideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    if (recordSignal) setIsRecording(true);
+  }, [recordSignal]);
 
-    const keyboardShow = Keyboard.addListener(keyboardShowEvent, (event) => {
-      setIsKeyboardVisible(true);
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardShown(true);
       if (Platform.OS === "ios") {
-        Animated.timing(keyboardHeight, {
-          duration: event.duration,
-          toValue: event.endCoordinates.height,
-          useNativeDriver: false,
-        }).start();
+        Animated.timing(keyboardHeight, { duration: event.duration, toValue: event.endCoordinates.height, useNativeDriver: false }).start();
       } else {
         keyboardHeight.setValue(event.endCoordinates.height);
       }
     });
-
-    const keyboardHide = Keyboard.addListener(keyboardHideEvent, (event) => {
-      setIsKeyboardVisible(false);
+    const hide = Keyboard.addListener(hideEvent, (event) => {
+      setKeyboardShown(false);
       if (Platform.OS === "ios") {
-        Animated.timing(keyboardHeight, {
-          duration: event.duration,
-          toValue: 0,
-          useNativeDriver: false,
-        }).start();
+        Animated.timing(keyboardHeight, { duration: event.duration, toValue: 0, useNativeDriver: false }).start();
       } else {
         keyboardHeight.setValue(0);
       }
     });
-
     return () => {
-      keyboardShow.remove();
-      keyboardHide.remove();
+      show.remove();
+      hide.remove();
     };
   }, []);
 
-  const pb = Platform.OS === "android" ? 20 : isKeyboardVisible ? 20 : 35;
+  const bottomPad = keyboardShown ? 12 : Math.max(insets.bottom, 34);
+  const hasText = !!inputText && inputText.trim() !== "";
+  const state = isRecording ? "recording" : hasText ? "typing" : focused ? "focused" : "idle";
 
-  const closeActions = () => {
-    if (autoCloseRef.current) {
-      clearTimeout(autoCloseRef.current);
-      autoCloseRef.current = null;
-    }
-    Animated.parallel([
-      Animated.timing(actionsAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(inputFlexAnim, {
-        toValue: 0.87,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-    ]).start(() => setActionsOpen(false));
-  };
+  const circle = (icon, size, onPress, color = tint(0.64), bg = field, filled) => (
+    <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[styles.circle, { backgroundColor: bg }]}>
+      <Icons family={filled ? "MaterialSymbolsRoundedFilled" : "MaterialSymbolsRounded"} name={icon} size={size} color={color} />
+    </TouchableOpacity>
+  );
 
-  const actionsOpacity = actionsAnim;
-  const actionsScale = actionsAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.9, 1],
-  });
-  const actionsTranslateY = actionsAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [8, 0],
-  });
-  const actionsWidth = actionsAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 120],
-  });
+  const input = (
+    <TextInput
+      ref={inputRef}
+      value={inputText}
+      style={[
+        styles.textInput,
+        state === "focused"
+          ? { fontSize: 16, letterSpacing: -0.16 }
+          : { fontSize: 14 },
+        { color: isDark ? "#F3F3F3" : colors.text },
+      ]}
+      placeholder={state === "idle" ? "Type your message..." : "Type message"}
+      placeholderTextColor={state === "idle" ? tint(0.48) : tint(0.64)}
+      selectionColor="#A19375"
+      onFocus={() => setFocused(true)}
+      // let a tap on the mic / camera land before the bar switches back
+      onBlur={() => setTimeout(() => setFocused(false), 200)}
+      onChangeText={setInputText}
+      multiline
+    />
+  );
 
   return (
     <>
       {showChatFeatures && (
         <View>
-          <View style={styles.row}>
-            {otherUserTyping ? (
-              <View style={styles.typeBox}>
-                <View style={styles.dot} />
-                <CustomText
-                  fontSize={12}
-                  label={`${recipientName} is typing`}
+          {showScrollDown && (
+            // floats over the messages like the inbox "+" FAB (InboxPager):
+            // 56 blur circle, 1px white 8% border, #1E1E1E 64%, icon 24 @64%
+            <View pointerEvents="box-none" style={styles.scrollRow}>
+              <TouchableOpacity activeOpacity={0.8} onPress={onScrollDown} style={styles.scrollBtn}>
+                <BlurView
+                  style={StyleSheet.absoluteFill}
+                  blurType={isDark ? "dark" : "light"}
+                  blurAmount={16}
+                  reducedTransparencyFallbackColor="#1E1E1E"
                 />
-              </View>
-            ) : (
-              <View />
-            )}
-          </View>
-          <FlatList
-            horizontal
-            data={quickMessages}
-            contentContainerStyle={{ paddingLeft: 12 }}
-            showsHorizontalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => setInputText(item)}
-                style={styles.quickMsg}
-              >
-                <CustomText
-                  label={item}
-                  lineHeight={14 * 1.4}
-                  fontFamily={fonts.medium}
-                />
+                <View style={[StyleSheet.absoluteFill, styles.scrollTint]} />
+                <Icons family="MaterialSymbolsRounded" name="expand_more" size={24} color={tint(0.64)} />
               </TouchableOpacity>
-            )}
-          />
+            </View>
+          )}
+          {otherUserTyping && (
+            <CustomText label={`${typingName || recipientName} is typing...`} fontSize={14} color="#828186" containerStyle={styles.typing} />
+          )}
         </View>
       )}
 
       {replyMessage && (
-        <View
-          style={[styles.replyContainer, { borderColor: COLORS.buttonColor }]}
-        >
-          <View style={styles.replyContent}>
-            <View style={styles.replyTextContainer}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-              >
-                <Image
-                  source={Images.Reply}
-                  style={{ height: 16, width: 16 }}
-                />
-
-                <CustomText
-                  label={`Replying to ${
-                    replyMessage?.type == "text"
-                      ? recipientName
-                      : replyMessage?.type == "image"
-                      ? "Image"
-                      : replyMessage?.type == "voice"
-                      ? "Voice"
-                      : "Video"
-                  }`}
-                  fontFamily={fonts.medium}
-                />
-
-              </View>
-              <CustomText
-                label={`${
-                  replyMessage?.type == "text"
-                    ? replyMessage.content
-                    : replyMessage?.type == "image"
-                    ? "Image"
-                    : replyMessage?.type == "voice"
-                    ? "Voice message"
-                    : "Video"
-                }`}
-                fontSize={12}
-                color={colors.textSecondary}
-                marginTop={4}
-              />
-            </View>
-            <TouchableOpacity onPress={onClearReply} style={styles.closeReply}>
-              <Icons
-                name={"x"}
-                size={16}
-                color={colors.textSecondary}
-                family={"Feather"}
-              />
-            </TouchableOpacity>
+        <View style={[styles.reply, { backgroundColor: tint(0.04), borderLeftColor: "#A19375" }]}>
+          <View style={styles.flex}>
+            <CustomText
+              label={`Replying to ${replyMessage?.type === "text" ? recipientName : replyMessage?.type === "image" ? "Image" : replyMessage?.type === "voice" ? "Voice" : "Video"}`}
+              fontSize={12}
+              fontFamily={fonts.medium}
+              color={colors.text}
+            />
+            <CustomText
+              label={replyMessage?.type === "text" ? replyMessage.content : replyMessage?.type === "image" ? "Image" : replyMessage?.type === "voice" ? "Voice message" : "Video"}
+              fontSize={12}
+              color={tint(0.64)}
+              numberOfLines={1}
+            />
           </View>
+          <TouchableOpacity onPress={onClearReply} hitSlop={8}>
+            <Icons family="MaterialSymbolsRounded" name="close" size={16} color={tint(0.64)} />
+          </TouchableOpacity>
         </View>
       )}
+
       <Animated.View
         style={[
-          styles.mainContainer,
+          styles.footer,
           {
-            paddingBottom: pb,
-            marginBottom:
-              Platform.OS === "android" && Platform.Version < 35
-                ? 0
-                : keyboardHeight,
+            paddingBottom: bottomPad,
+            marginBottom: Platform.OS === "android" && Platform.Version < 35 ? 0 : keyboardHeight,
+            gap: state === "typing" ? 8 : 6,
           },
         ]}
       >
-        <Animated.View style={[styles.inputContainer, { flex: inputFlexAnim }]}>
-          {isRecording ? (
+        <Blur blurType={isDark ? "dark" : "xlight"} blurAmount={32} borderRadius={0.01} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(38, 38, 38, 0.64)" : "rgba(255, 255, 255, 0.64)" }]} />
+
+        {state === "recording" ? (
+          <View style={[styles.field, styles.fieldFocused, { backgroundColor: field }]}>
             <AudioRecorder
               ref={audioRecorderRef}
               onSend={async (path, duration, size) => {
                 setIsRecording(false);
-                if (onSendAudio) {
-                  onSendAudio(path, duration, size);
-                }
+                onSendAudio?.(path, duration, size);
               }}
-              onCancel={() => {
-                setIsRecording(false);
-              }}
+              onCancel={() => setIsRecording(false)}
             />
-          ) : (
-            <>
-              <TextInput
-                value={inputText}
-                style={[styles.input]}
-                placeholder="Type message"
-                placeholderTextColor={colors.textSecondary}
-                onChangeText={(text) => {
-                  setInputText(text);
-                  if (actionsOpen) closeActions();
-                }}
-              />
-              <TouchableOpacity onPress={onCameraPress}>
-                <Icons
-                  size={20}
-                  name={"camera"}
-                  family={"Feather"}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ marginLeft: 15 }}
-                onPress={() => setIsRecording(true)}
-              >
-                <Icons
-                  size={18}
-                  name={"mic"}
-                  family={"Feather"}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </>
-          )}
-        </Animated.View>
-
-        {!isRecording && (
-          <Animated.View
-            style={[
-              styles.actionsContainer,
-              {
-                opacity: actionsOpacity,
-                width: actionsWidth,
-                transform: [
-                  { scale: actionsScale },
-                  { translateY: actionsTranslateY },
-                ],
-              },
-            ]}
-            pointerEvents={actionsOpen ? "auto" : "none"}
-          >
-            <TouchableOpacity style={styles.actionBtn} onPress={closeActions}>
-              <Icons
-                size={18}
-                name={"calendar"}
-                family={"Feather"}
-                color={colors.textSecondary}
-              />
+          </View>
+        ) : state === "idle" ? (
+          <>
+            {circle("calendar_today", 22, onSchedulePress)}
+            {circle("photo_library", 22, onGalleryPress)}
+            {circle("gif", 28, onGifPress)}
+            <TouchableOpacity activeOpacity={1} onPress={() => inputRef.current?.focus()} style={[styles.field, { backgroundColor: field }]}>
+              {input}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={closeActions}>
-              <Icons
-                size={18}
-                name={"music"}
-                family={"Feather"}
-                color={colors.textSecondary}
-              />
+          </>
+        ) : state === "focused" ? (
+          <View style={[styles.field, styles.fieldFocused, { backgroundColor: field }]}>
+            <TouchableOpacity onPress={onGalleryPress} hitSlop={8}>
+              <Icons family="MaterialSymbolsRounded" name="add" size={24} color={tint(0.64)} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={closeActions}>
-              <Icons
-                size={18}
-                name={"gif"}
-                family={"MaterialIcons"}
-                color={colors.textSecondary}
-              />
+            {input}
+            <TouchableOpacity onPress={onCameraPress} hitSlop={8}>
+              <Icons family="MaterialSymbolsRounded" name="photo_camera" size={24} color={tint(0.64)} />
             </TouchableOpacity>
-          </Animated.View>
+          </View>
+        ) : (
+          <View style={[styles.field, { backgroundColor: field }]}>{input}</View>
         )}
 
-        <TouchableOpacity
-          onPress={
-            isRecording
-              ? () => audioRecorderRef.current?.stopAndSend?.()
-              : sendMessage
-          }
-          style={styles.sendBtn}
-          disabled={
-            isRecording
-              ? false
-              : !inputText || inputText?.trim() === ""
-          }
-        >
-          <Icons
-            name={isRecording ? "arrow-up" : "arrow-right"}
-            family={"Feather"}
-            size={18}
-          />
-        </TouchableOpacity>
+        {state === "focused" && circle("mic", 22, () => setIsRecording(true), colors.text, field, true)}
+        {state === "recording" && circle("arrow_upward", 22, () => audioRecorderRef.current?.stopAndSend?.(), "#1E1E1E", "#A19375")}
+        {state === "typing" && circle("chevron_right", 22, sendMessage, "#1E1E1E", "#A19375")}
       </Animated.View>
-      <UploadChatModal
-        isVisible={visible}
-        onDisable={() => setVisible(false)}
-      />
     </>
   );
 };
 
 export default ChatFooter;
 
-const createStyles = (colors, isDark) => StyleSheet.create({
-  mainContainer: {
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  // absolute: takes no row of its own, sits 16 above the bar, right 16
+  scrollRow: {
+    position: "absolute",
+    right: 16,
+    bottom: 16,
+    zIndex: 10,
+  },
+  scrollTint: {
+    backgroundColor: "rgba(30, 30, 30, 0.64)",
+  },
+  scrollBtn: {
+    width: 56,
+    height: 56,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  typing: {
+    paddingHorizontal: 16,
+    marginBottom: 6,
+  },
+  reply: {
+    marginHorizontal: 12,
+    marginBottom: 8,
     padding: 12,
-    width: "100%",
-    marginTop: 12,
+    borderRadius: 12,
+    borderLeftWidth: 2,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: isDark ? "#262626A3" : colors.card,
+    gap: 8,
   },
-  inputContainer: {
+  footer: {
+    paddingTop: 12,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    height: 48,
-    borderRadius: 25,
-    marginRight: 8,
-    backgroundColor: colors.background,
-    paddingLeft: 12,
-    paddingRight: 15,
-  },
-  input: {
-    flex: 1,
-    fontSize: 14,
-    paddingHorizontal: 8,
-    color: colors.text,
-    fontFamily: fonts.regular,
-    justifyContent: "center",
-    padding: 0,
-  },
-
-  sendBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 50,
-    backgroundColor: "#A19375",
-  },
-  actionsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    columnGap: 8,
-    marginRight: 8,
     overflow: "hidden",
   },
-  actionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.white04,
-  },
-  dot: {
-    backgroundColor: "#397050",
-    width: 12,
-    height: 12,
-    borderRadius: 10,
-  },
-  typeBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: isDark ? COLORS.primaryColor : colors.surfaceAlt,
-    borderRadius: 30,
-    width: 180,
-    columnGap: 5,
-  },
-  arrowDown: {
+  circle: {
     width: 44,
     height: 44,
+    borderRadius: 100,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.white04,
-    borderRadius: 50,
   },
-  row: {
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    flexDirection: "row",
-    paddingHorizontal: 12,
-  },
-  quickMsg: {
-    backgroundColor: colors.white04,
-    borderRadius: 99,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 7,
-    padding: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-  },
-  replyContainer: {
-    backgroundColor: "rgba(161, 147, 117, 0.08)",
-    borderLeftColor: COLORS.buttonColor,
-    marginHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 8,
-    marginBottom: -8,
-  },
-  replyContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-  },
-
-  replyTextContainer: {
+  field: {
     flex: 1,
+    minHeight: 44,
+    borderRadius: 100,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
   },
-  closeReply: {
-    padding: 4,
+  fieldFocused: {
+    minHeight: 48,
+    paddingLeft: 12,
+    paddingRight: 16,
+    gap: 8,
+  },
+  textInput: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    paddingTop: 0,
+    paddingBottom: 0,
+    maxHeight: 96,
   },
 });

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { getPalette } from "@somesoap/react-native-image-palette";
 import { useDispatch } from "react-redux";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
@@ -44,9 +45,19 @@ const BannerModal = ({ isVisible, onClose, user, onHidePress }) => {
       const url = await uploadAndGetUrl(result);
 
       if (url) {
+        // Figma "Careem": the profile's accent (buttons, tabs) follows the
+        // banner — sample its vibrant colour once, store it with the cover.
+        let coverAccent = "";
+        try {
+          const palette = await getPalette(url);
+          coverAccent = palette?.vibrant || palette?.dominant || "";
+        } catch (e) {
+          console.log("cover palette error", e);
+        }
         const payload = {
           profile: {
             cover: url,
+            coverAccent,
           },
         };
 
@@ -108,6 +119,7 @@ const BannerModal = ({ isVisible, onClose, user, onHidePress }) => {
       const payload = {
         profile: {
           cover: "",
+          coverAccent: "",
         },
       };
 

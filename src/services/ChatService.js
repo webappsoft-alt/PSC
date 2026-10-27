@@ -1,4 +1,4 @@
-import { get, patch, post } from "./ApiRequest";
+import { del, get, patch, post, put } from "./ApiRequest";
 import { endPoints } from "./ENV";
 
 export const getConversations = async (userId, params = {}) => {
@@ -8,6 +8,11 @@ export const getConversations = async (userId, params = {}) => {
 /** Long-press options: { pinned?: boolean, business?: boolean } for me only. */
 export const updateConversationFlags = async (conversationId, flags) => {
   return await patch(`conversations/${conversationId}/flags`, flags);
+};
+
+/** My Inbox "Online Status": "online" | "idle" | "dnd" | "invisible" */
+export const updatePresence = async (presence) => {
+  return await put("user/presence", { presence });
 };
 
 /** Conversation settings screen — my 1 on 1 chat with `otherUserId`. */
@@ -20,6 +25,44 @@ export const getConversationSettings = async (otherUserId) => {
 /** { favorite?, business?, settings?: { blockLinks: true, ... } } */
 export const updateConversationSettings = async (otherUserId, body) => {
   return await patch(`conversations/with/${otherUserId}/settings`, body);
+};
+
+/** Conversation settings › "Delete All Messages": hides them for me only. */
+export const deleteAllMessages = async (conversationId) => {
+  return await del(`conversations/${conversationId}/messages/mine`);
+};
+
+/**
+ * Create a Group (private: me + invited friends) or a Circle (open, topic).
+ * body: { type: "group"|"circle", name, description, picture, topic, members }
+ */
+export const createGroup = async (body) => {
+  return await post("conversations/groups", body);
+};
+
+/** Search-A-Circle: { search, topic } → circles with memberCount / isMember */
+export const searchCircles = async (params = {}) => {
+  return await get("conversations/circles/search", { ...params, t: Date.now() });
+};
+
+/** Join an open Circle (after the TOS guidelines modal). */
+export const joinCircle = async (circleId) => {
+  return await post(`conversations/circles/${circleId}/join`, {});
+};
+
+/** Leave a Group / Circle (conversation settings). */
+export const leaveGroup = async (conversationId) => {
+  return await post(`conversations/groups/${conversationId}/leave`);
+};
+
+/** Inbox calendar icon: all my meetings (upcoming first). */
+export const getMyMeetings = async () => {
+  return await get("conversations/meetings/mine", { t: Date.now() });
+};
+
+/** Accept / decline a meeting proposed to me. */
+export const respondToMeeting = async (messageId, accept) => {
+  return await post(`conversations/meetings/${messageId}/respond`, { accept });
 };
 
 /** Mutual follows ("friends"), each with isOnline. */

@@ -8,7 +8,7 @@ import { endPoints } from "./ENV";
 
 let instance = axios.create({
   baseURL: endPoints.BASE_URL,
-  timeout: 10000,
+  timeout: __DEV__ ? 30000 : 10000,
   headers: {
     "Content-Type": "application/json",
   },

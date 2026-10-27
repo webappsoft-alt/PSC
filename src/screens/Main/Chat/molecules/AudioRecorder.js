@@ -123,17 +123,15 @@ const AudioRecorder = React.forwardRef(({ onSend, onCancel }, ref) => {
     };
   }, []);
 
-  const handleDelete = () => {
+  // Delete: stop the recorder (discard the file) and close right away
+  const handleDelete = async () => {
     isMounted.current = false;
-    Animated.parallel(
-      barAnims.map((anim) =>
-        Animated.timing(anim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: false,
-        }),
-      ),
-    ).start(() => onCancel?.());
+    try {
+      await stopRecorder();
+    } catch (e) {
+      // already stopped
+    }
+    onCancel?.();
   };
 
   const stopAndSend = async () => {
@@ -183,11 +181,11 @@ const AudioRecorder = React.forwardRef(({ onSend, onCancel }, ref) => {
         </View>
       </View>
 
-      <TouchableOpacity onPress={handleDelete}>
+      <TouchableOpacity onPress={handleDelete} hitSlop={10}>
         <Icons
-          name="trash-2"
-          family="Feather"
-          size={20}
+          name="delete"
+          family="MaterialSymbolsRounded"
+          size={24}
           color={colors.textSecondary}
         />
       </TouchableOpacity>

@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
+import ContentPreferenceSheet from "../../../../components/ContentPreferenceSheet";
+import PoliticalOrientationSheet from "../../../../components/PoliticalOrientationSheet";
+import { isProAccount } from "../../../../utils/political";
 import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
 import Header from "../../../../components/Header";
@@ -57,14 +61,32 @@ const data = [
     img: Images.settings_usage,
     screen: "DataUsage",
   },
+  // PSC Political Classification System (V1)
+  {
+    id: 8,
+    title: "Content Preference",
+    des: "Choose the political perspectives you want to see in your feed.",
+    img: Images.settings_display,
+    sheet: "contentPreference",
+  },
+  {
+    id: 9,
+    title: "Political Orientation",
+    des: "Optionally declare your orientation and whether it shows on your profile.",
+    img: Images.settings_globe,
+    sheet: "politicalOrientation",
+    regularOnly: true,
+  },
 ];
 
 const AccessibilityPreferences = () => {
   const { colors } = useTheme();
 
   const { userData } = useSelector((state) => state.users);
-
-  console.log("userData: ", userData);
+  const [sheet, setSheet] = useState(null);
+  // Pro accounts (individual / company) are classified by PSC, so they don't
+  // declare an orientation themselves.
+  const rows = data.filter((r) => !r.regularOnly || !isProAccount(userData));
   return (
     <ScreenWrapper
       headerUnScrollable={() => <Header title="Accessibility & Preferences" />}
@@ -82,7 +104,7 @@ const AccessibilityPreferences = () => {
       </View>
 
       <FlatList
-        data={data}
+        data={rows}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
@@ -92,9 +114,18 @@ const AccessibilityPreferences = () => {
             des={item.des}
             screen={item.screen}
             img={item?.img}
-            isLast={index === data.length - 1}
+            isLast={index === rows.length - 1}
+            onPress={item.sheet ? () => setSheet(item.sheet) : undefined}
           />
         )}
+      />
+      <ContentPreferenceSheet
+        visible={sheet === "contentPreference"}
+        onDismiss={() => setSheet(null)}
+      />
+      <PoliticalOrientationSheet
+        visible={sheet === "politicalOrientation"}
+        onDismiss={() => setSheet(null)}
       />
     </ScreenWrapper>
   );

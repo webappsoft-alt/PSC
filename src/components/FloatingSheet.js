@@ -48,6 +48,9 @@ const FloatingSheet = ({
   // Optional node drawn over the backdrop, outside the card (e.g. the
   // matching "Secured" pill at the top of the screen)
   overlay,
+  // Chat sheets (Figma Chat page): close icon 16 @64% instead of 18 white
+  closeIconSize,
+  closeIconColor,
 }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -145,7 +148,7 @@ const FloatingSheet = ({
                           fontFamily={fonts.semiBold}
                           color={colors.text}
                         />
-                        <SheetCloseButton onPress={onDismiss} />
+                        <SheetCloseButton onPress={onDismiss} size={closeIconSize} color={closeIconColor} />
                       </View>
                       {subtitle ? (
                         <CustomText
@@ -219,21 +222,23 @@ export const SheetSectionLabel = ({ label }) => (
 );
 
 /** Figma: 32px translucent circle with a 18px icon (close / more / person_add). */
-export const SheetIconButton = ({ name, onPress, family = "MaterialSymbolsRounded", size = 18 }) => {
-  const { colors } = useTheme();
+export const SheetIconButton = ({ name, onPress, family = "MaterialSymbolsRounded", size = 18, color }) => {
+  const { colors, isDark } = useTheme();
+  // "muted" = Figma Chat sheets: icon @64%
+  const iconColor = color === "muted" ? (isDark ? "rgba(255, 255, 255, 0.64)" : "rgba(18, 18, 18, 0.64)") : color;
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
       style={[styles.close, { backgroundColor: colors.surfaceAlt }]}
     >
-      <Icons family={family} name={name} size={size} color={colors.text} />
+      <Icons family={family} name={name} size={size} color={iconColor || colors.text} />
     </TouchableOpacity>
   );
 };
 
-export const SheetCloseButton = ({ onPress }) => (
-  <SheetIconButton name="close" onPress={onPress} />
+export const SheetCloseButton = ({ onPress, size, color }) => (
+  <SheetIconButton name="close" onPress={onPress} size={size || 18} color={color} />
 );
 
 /**

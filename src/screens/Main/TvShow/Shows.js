@@ -162,6 +162,8 @@ const RANK_BLEED = 12;
 
 // Figma list gaps: ranked / roundel rows 16, the others 8
 const CARD_GAP = { large: 8, ranked: 16, square: 8, roundel: 16, poster: 8, tall: 8 };
+// card widths (ranked = 24 number + 8 + 240 card) → carousels snap card by card
+const CARD_WIDTH = { large: 240, ranked: 272, square: 140, roundel: 96, poster: 108, tall: 160 };
 
 const renderCard = (card, show, onPress) => {
   switch (card) {
@@ -200,6 +202,12 @@ const ShowsSection = ({ section, onPressShow }) => {
           renderCard(config.card, item, () => onPressShow?.(item))
         }
         showsHorizontalScrollIndicator={false}
+        // client: carousels scroll and snap — each swipe settles with a card
+        // on the 12pt left margin
+        snapToInterval={(CARD_WIDTH[config.card] ?? 240) + (CARD_GAP[config.card] ?? 8)}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        disableIntervalMomentum
         // a horizontal list clips at its own edges; the ranked row's big
         // numbers rise above the cards (Figma), so that row's list starts
         // RANK_BLEED higher and pads its content back down by the same amount

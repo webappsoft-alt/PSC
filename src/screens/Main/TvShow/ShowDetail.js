@@ -285,6 +285,11 @@ const Rail = ({ title, shows, onPressShow }) => {
           )}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.railList}
+          // carousels snap card by card (240 + 8)
+          snapToInterval={RAIL_CARD_W + 8}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          disableIntervalMomentum
         />
       ) : null}
     </View>
