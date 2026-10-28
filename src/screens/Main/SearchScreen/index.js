@@ -21,6 +21,7 @@ const SearchScreen = ({ route }) => {
     <ScreenWrapper
       paddingHorizontal={0.1}
       scrollEnabled={false}
+      headerBlur
       headerUnScrollable={() => (
         <View style={{ paddingHorizontal: 12 }}>
           <SearchInput

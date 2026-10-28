@@ -1,7 +1,7 @@
 import { FlatList, StyleSheet, View } from "react-native";
 import CustomText from "../../../components/CustomText";
 import Header from "../../../components/Header";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
 import { COLORS } from "../../../utils/COLORS";
 import SettingsItems from "./molecules/SettingsItems";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -47,21 +47,26 @@ const AccountAccess = () => {
       headerUnScrollable={() => <Header title="Security and account access" />}
       paddingHorizontal={0.1}
       backgroundColor={"black"}
+      headerBlur
     >
-      <View style={{ paddingHorizontal: 12 }}>
-        <CustomText
-          label={
-            "Manage your account’s security and keep track of your account’s usage, including apps that you have connected to your account."
-          }
-          fontSize={14}
-          lineHeight={14 * 1.4}
-          color={colors.textSecondary}
-          marginBottom={16}
-          marginTop={8}
-        />
-      </View>
-
       <FlatList
+        ListHeaderComponent={
+          <>
+            <ScreenHeaderSpacer />
+            <View style={{ paddingHorizontal: 12 }}>
+              <CustomText
+                label={
+                  "Manage your account’s security and keep track of your account’s usage, including apps that you have connected to your account."
+                }
+                fontSize={14}
+                lineHeight={14 * 1.4}
+                color={colors.textSecondary}
+                marginBottom={16}
+                marginTop={8}
+              />
+            </View>
+          </>
+        }
         data={data}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}

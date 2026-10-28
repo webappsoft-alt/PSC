@@ -15,7 +15,7 @@ import Divider from "../../../components/Divider";
 import ErrorComponent from "../../../components/ErrorComponent";
 import Header from "../../../components/Header";
 import Icons from "../../../components/Icons";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
 import { post } from "../../../services/ApiRequest";
 import { COLORS } from "../../../utils/COLORS";
 import { ToastMessage } from "../../../utils/ToastMessage";
@@ -220,6 +220,7 @@ const TicketDetail = () => {
   };
   return (
     <ScreenWrapper
+      headerBlur
       headerUnScrollable={() => (
         <>
           <Header title={"New event"} />
@@ -290,6 +291,8 @@ const TicketDetail = () => {
       paddingHorizontal={0.1}
     >
       <KeyboardAwareScrollView enableResetScrollToCoords={false}>
+        {/* content starts below the floating blurred header */}
+        <ScreenHeaderSpacer />
         <View style={{ marginHorizontal: 12 }}>
           <CustomText
             label={"Ticket Details"}

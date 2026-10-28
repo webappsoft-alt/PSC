@@ -44,6 +44,8 @@ const MediaBottomBlur = ({
   edge = "bottom",
   // Figma "Linear" fill colour (#121212 on the Shows preview, black on posts)
   tint = "0, 0, 0",
+  // Figma "Linear" fill layer opacity (16% on posts / Shows preview)
+  fillOpacity = 0.16,
 }) => {
   const top = edge === "top";
   const radii = top
@@ -95,12 +97,12 @@ const MediaBottomBlur = ({
       style={[styles.band, top ? styles.bandTop : styles.bandBottom, { height }, radii]}
     >
       {blurred}
-      {/* Figma "Linear" fill @16%: clear at the inner edge → dark at the outer */}
+      {/* Figma "Linear" fill (@fillOpacity): clear at the inner edge → dark at the outer */}
       <LinearGradient
         colors={
           top
-            ? [`rgba(${tint}, 0.16)`, `rgba(${tint}, 0)`]
-            : [`rgba(${tint}, 0)`, `rgba(${tint}, 0.16)`]
+            ? [`rgba(${tint}, ${fillOpacity})`, `rgba(${tint}, 0)`]
+            : [`rgba(${tint}, 0)`, `rgba(${tint}, ${fillOpacity})`]
         }
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}

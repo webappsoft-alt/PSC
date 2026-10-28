@@ -31,7 +31,7 @@ import Header from "../../../components/Header";
 import Icons from "../../../components/Icons";
 import ImageFast from "../../../components/ImageFast";
 import ProgressiveBlur from "../../../components/ProgressiveBlur";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { useUpload } from "../../../contexts/UploadContext";
 import { post, put } from "../../../services/ApiRequest";
@@ -842,6 +842,7 @@ const CreatePost = ({ route }) => {
 
   return (
     <ScreenWrapper
+      headerBlur
       headerUnScrollable={() => (
         <Header
           title={editMode ? "Edit Post" : "Publish A Post"}
@@ -883,6 +884,8 @@ const CreatePost = ({ route }) => {
       )}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* starts below the floating blurred header */}
+        <ScreenHeaderSpacer />
         {/* <CustomText
           label={editMode ? "Edit Post" : "Create Post"}
           fontFamily={fonts.semiBold}

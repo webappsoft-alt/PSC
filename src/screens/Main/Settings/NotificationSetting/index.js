@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
 import Header from "../../../../components/Header";
-import ScreenWrapper from "../../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../../components/ScreenWrapper";
 import { put } from "../../../../services/ApiRequest";
 import { setUserData } from "../../../../store/reducer/usersSlice";
 import { COLORS } from "../../../../utils/COLORS";
@@ -139,12 +139,18 @@ const NotificationSetting = () => {
     <ScreenWrapper
       paddingHorizontal={0.1}
       headerUnScrollable={() => <Header title={"Notifications"} />}
+      headerBlur
     >
       <FlatList
         data={notificationSettings}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={ListHeaderComponent}
+        ListHeaderComponent={
+          <>
+            <ScreenHeaderSpacer />
+            <ListHeaderComponent />
+          </>
+        }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
       />

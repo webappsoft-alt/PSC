@@ -1,4 +1,4 @@
-import { useIsFocused, useNavigation } from "@react-navigation/native";
+import { CommonActions, useIsFocused, useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { setIsTabBarVisible } from "../../../store/reducer/playerSlice";
@@ -32,7 +32,7 @@ import Header from "../../../components/Header";
 import ImageFast from "../../../components/ImageFast";
 import Icons from "../../../components/Icons";
 import ProgressiveBlur from "../../../components/ProgressiveBlur";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { useUpload } from "../../../contexts/UploadContext";
 import { post, put } from "../../../services/ApiRequest";
@@ -839,6 +839,7 @@ const PublishShort = ({ route }) => {
 
   return (
     <ScreenWrapper
+      headerBlur
       headerUnScrollable={() => (
         <Header
           title={editMode ? "Edit Reel" : "Publish Reel"}
@@ -880,6 +881,8 @@ const PublishShort = ({ route }) => {
       )}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* starts below the floating blurred header */}
+        <ScreenHeaderSpacer />
         {uploadedImages?.length > 0 && (
           <View style={styles.imageContainer}>
             <ScrollView

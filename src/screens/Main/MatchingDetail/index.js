@@ -381,6 +381,8 @@ const MatchingDetail = ({ route, navigation }) => {
         { useNativeDriver: true },
       )}
       headerFloating
+      // banner header (own design), not the progressive-blur page header
+      headerBlur={false}
       headerUnScrollable={renderFloatingHeader}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

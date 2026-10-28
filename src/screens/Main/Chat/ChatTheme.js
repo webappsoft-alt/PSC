@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
-import Blur from "../../../components/Blur";
+import { FloatingBlurHeader } from "../../../components/HeaderProgressiveBlur";
 import CustomText from "../../../components/CustomText";
 import Icons from "../../../components/Icons";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -34,6 +34,8 @@ const ChatTheme = () => {
   const settingsId = route?.params?.settingsId;
   const [theme, setTheme] = useState(route?.params?.value || "");
   const [saving, setSaving] = useState(false);
+  // floating header height (status bar included), content starts below it
+  const [headerH, setHeaderH] = useState(null);
   const sentColor = theme || "#006636";
 
   const pick = async (c) => {
@@ -55,9 +57,9 @@ const ChatTheme = () => {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      {/* header floats; content scrolls under the progressive blur */}
+      <FloatingBlurHeader onHeightChange={setHeaderH} includeStatusBar={false}>
       <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
-        <Blur blurType={isDark ? "dark" : "xlight"} blurAmount={32} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, opacity: 0.64 }]} />
         <View style={styles.headerRow}>
           <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} hitSlop={12}>
             <Icons family="MaterialSymbolsRounded" name="chevron_left" size={20} color={colors.text} />
@@ -66,8 +68,8 @@ const ChatTheme = () => {
           <View style={{ width: 20 }} />
         </View>
       </View>
-
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 14 }]} showsVerticalScrollIndicator={false}>
+      {/* preview stays pinned with the header; only the colour rows scroll */}
+      <View style={styles.pinned}>
         <View style={styles.previewBlock}>
           <View style={[styles.preview, { backgroundColor: tint(0.04) }]}>
             <View style={[styles.bubble, { backgroundColor: tint(0.04), alignSelf: "flex-start" }]}>
@@ -80,6 +82,15 @@ const ChatTheme = () => {
           <InfoLine label="This is how your conversation will look like." color="#828282" />
         </View>
         <View style={[styles.line, { backgroundColor: tint(0.16) }]} />
+      </View>
+      </FloatingBlurHeader>
+
+      <ScrollView
+        style={{ opacity: headerH == null ? 0 : 1 }}
+        contentContainerStyle={[styles.content, { paddingTop: headerH || 0, paddingBottom: insets.bottom + 14 }]}
+        scrollIndicatorInsets={{ top: headerH || 0 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.swatches}>
           {THEME_COLORS.map((c) => {
             const selected = (theme || "") === c;
@@ -119,8 +130,14 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   content: {
+    paddingHorizontal: 12,
+  },
+  // Figma content pad 14 (8 below the header rule) · gap 24 → preview, rule,
+  // then the colour rows 24 below the rule
+  pinned: {
     paddingTop: 14,
     paddingHorizontal: 12,
+    paddingBottom: 24,
     gap: 24,
   },
   previewBlock: {

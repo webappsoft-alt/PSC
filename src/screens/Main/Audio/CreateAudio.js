@@ -24,7 +24,7 @@ import ErrorComponent from "../../../components/ErrorComponent";
 import Header from "../../../components/Header";
 import Icons from "../../../components/Icons";
 import ImageFast from "../../../components/ImageFast";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { useUpload } from "../../../contexts/UploadContext";
 import { post } from "../../../services/ApiRequest";
@@ -295,6 +295,7 @@ const CreateAudio = () => {
 
   return (
     <ScreenWrapper
+      headerBlur
       headerUnScrollable={() => <Header title="Create Audio Post" />}
       footerUnScrollable={() => (
         <View
@@ -324,6 +325,8 @@ const CreateAudio = () => {
       )}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* content starts below the floating blurred header */}
+        <ScreenHeaderSpacer />
         {/* Title Input */}
         <View style={styles.section}>
           <CustomInput

@@ -97,7 +97,7 @@ export const AuthStepHeader = ({
   const progress =
     step && total ? Math.max(0, Math.min(1, step / total)) * 100 : 0;
   return (
-    <View style={[styles.header, { backgroundColor: p.bg }]}>
+    <View style={styles.header}>
       <View style={styles.headerRow}>
         <View style={styles.headerTexts}>
           <View style={styles.headerTitleRow}>

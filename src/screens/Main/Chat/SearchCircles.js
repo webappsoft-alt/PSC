@@ -128,7 +128,7 @@ const SearchCircles = () => {
     <ScreenWrapper
       paddingHorizontal={0.1}
       headerUnScrollable={() => (
-        <View style={[styles.header, { backgroundColor: colors.background }]}>
+        <View style={styles.header}>
           <View style={styles.searchRow}>
             <View style={[styles.searchBar, { backgroundColor: tint(0.04) }]}>
               <Icons family="MaterialSymbolsRounded" name="search" size={20} color={tint(0.64)} />

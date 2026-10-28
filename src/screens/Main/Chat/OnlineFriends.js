@@ -218,7 +218,6 @@ const OnlineFriends = ({ embedded = false }) => {
           style={[
             styles.header,
             {
-              backgroundColor: colors.background,
               // Figma: 4pt #181818 strip between the header and the list
               borderBottomColor: isDark ? "#181818" : colors.surfaceAlt,
             },

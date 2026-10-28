@@ -3,7 +3,7 @@ import { FlatList, StyleSheet, View } from "react-native";
 import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
 import Header from "../../../../components/Header";
-import ScreenWrapper from "../../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../../components/ScreenWrapper";
 import { COLORS } from "../../../../utils/COLORS";
 import SettingsItems from "../molecules/SettingsItems";
 import { useTheme } from "../../../../contexts/ThemeContext";
@@ -48,21 +48,26 @@ const TimeRegion = () => {
     <ScreenWrapper
       headerUnScrollable={() => <Header title="Time & Regions" />}
       paddingHorizontal={0.1}
+      headerBlur
     >
-      <View style={{ paddingHorizontal: 12 }}>
-        <CustomText
-          label={
-            "See how you can generate revenues on PSC and manage your monetisation options."
-          }
-          fontSize={14}
-          lineHeight={14 * 1.4}
-          color={colors.textSecondary}
-          marginBottom={16}
-          marginTop={8}
-        />
-      </View>
-
       <FlatList
+        ListHeaderComponent={
+          <>
+            <ScreenHeaderSpacer />
+            <View style={{ paddingHorizontal: 12 }}>
+              <CustomText
+                label={
+                  "See how you can generate revenues on PSC and manage your monetisation options."
+                }
+                fontSize={14}
+                lineHeight={14 * 1.4}
+                color={colors.textSecondary}
+                marginBottom={16}
+                marginTop={8}
+              />
+            </View>
+          </>
+        }
         data={timeRegionData}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}

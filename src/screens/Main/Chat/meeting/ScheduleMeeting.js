@@ -20,6 +20,7 @@ import CustomButton from "../../../../components/CustomButton";
 import CustomSwitch from "../../../../components/CustomSwitch";
 import CustomText from "../../../../components/CustomText";
 import FloatingSheet from "../../../../components/FloatingSheet";
+import { FloatingBlurHeader } from "../../../../components/HeaderProgressiveBlur";
 import Icons from "../../../../components/Icons";
 import { useSocket } from "../../../../components/SocketProvider";
 import { useTheme } from "../../../../contexts/ThemeContext";
@@ -69,6 +70,8 @@ const ScheduleMeeting = ({ route }) => {
   const recipientName = route?.params?.recipientName || "";
 
   const [step, setStep] = useState(2); // Figma numbering: 2 = date, 3 = details
+  // floating header height (status bar included), content starts below it
+  const [headerH, setHeaderH] = useState(null);
   const today = moment().startOf("day");
   const [date, setDate] = useState(today.clone());
   const [quick, setQuick] = useState("today");
@@ -324,8 +327,9 @@ const ScheduleMeeting = ({ route }) => {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* ───────── header ───────── */}
-      <View style={[styles.header, { paddingTop: insets.top + 28, backgroundColor: colors.background }]}>
+      {/* ───────── header (floats; content scrolls under the progressive blur) ───────── */}
+      <FloatingBlurHeader onHeightChange={setHeaderH} includeStatusBar={false}>
+      <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity
             activeOpacity={0.7}
@@ -343,9 +347,12 @@ const ScheduleMeeting = ({ route }) => {
           ))}
         </View>
       </View>
+      </FloatingBlurHeader>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: 134 + insets.bottom }]}
+        style={{ opacity: headerH == null ? 0 : 1 }}
+        contentContainerStyle={[styles.content, { paddingTop: 12 + (headerH || 0), paddingBottom: 134 + insets.bottom }]}
+        scrollIndicatorInsets={{ top: headerH || 0 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >

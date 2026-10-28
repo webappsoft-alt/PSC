@@ -10,6 +10,10 @@ import {
 import { useSelector } from "react-redux";
 
 import CustomText from "../../../../components/CustomText";
+import {
+  ScreenHeaderSpacer,
+  useScreenHeaderInset,
+} from "../../../../components/ScreenWrapper";
 import TopTab from "../../../../components/TopTab";
 
 import { openPagerTab } from "../../../../navigation/TabStack";
@@ -49,6 +53,7 @@ const PeopleTab = ({
 }) => {
   const TABS = targetUserId ? OTHER_USER_TABS : OWN_TABS;
   const { colors, isDark } = useTheme();
+  const headerInset = useScreenHeaderInset();
   const navigation = useNavigation();
   const isFocus = useIsFocused();
   const userData = useSelector((state) => state.users.userData);
@@ -184,47 +189,53 @@ const PeopleTab = ({
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ paddingHorizontal: 12 }}>
-        <TopTab
-          rounded
-          tab={tab}
-          setTab={setTab}
-          tabNames={TABS.map((t) => t.label)}
-          marginBottom={12}
-          activeColor={isDark ? COLORS.white : colors.text}
-          inactiveTintColor={isDark ? COLORS.gray64 : colors.textSecondary}
-          borderRadius={99}
-          height={32}
-          scrollToActive
-        />
-
-        {/* <CustomText
-          label={
-            tab === 0
-              ? "Recommended"
-              : tab === 1
-              ? "Followers"
-              : tab === 2
-              ? "Following"
-              : "Friends"
-          }
-          fontFamily={fonts.medium}
-          fontSize={16}
-          marginBottom={8}
-        /> */}
-      </View>
-
       <FlatList
         data={loading ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : users}
         refreshControl={
           <RefreshControl
             onRefresh={() => getUsers(tab, searchQuery, true)}
             refreshing={refreshing}
+            progressViewOffset={headerInset}
             tintColor={isDark ? COLORS.white : colors.text}
           />
         }
         keyExtractor={(item) => item?._id?.toString()}
         contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 20 }}
+        // starts below the floating blurred header; the tabs scroll under it
+        ListHeaderComponent={
+          <>
+            <ScreenHeaderSpacer />
+            <View>
+              <TopTab
+                rounded
+                tab={tab}
+                setTab={setTab}
+                tabNames={TABS.map((t) => t.label)}
+                marginBottom={12}
+                activeColor={isDark ? COLORS.white : colors.text}
+                inactiveTintColor={isDark ? COLORS.gray64 : colors.textSecondary}
+                borderRadius={99}
+                height={32}
+                scrollToActive
+              />
+
+              {/* <CustomText
+                label={
+                  tab === 0
+                    ? "Recommended"
+                    : tab === 1
+                    ? "Followers"
+                    : tab === 2
+                    ? "Following"
+                    : "Friends"
+                }
+                fontFamily={fonts.medium}
+                fontSize={16}
+                marginBottom={8}
+              /> */}
+            </View>
+          </>
+        }
         renderItem={({ item, index }) =>
           loading ? (
             <SearchCardSkeleton key={index} isChange />

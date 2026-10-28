@@ -17,6 +17,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
 import CustomText from "../../../components/CustomText";
+import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
 import Icons from "../../../components/Icons";
 import TopicLottie from "../../../components/TopicLottie";
 import { PSC_TOPICS } from "../../../utils/feedTopics";
@@ -269,6 +270,8 @@ export const TopicPicker = ({
       </ScrollView>
 
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        {/* Figma Header: progressive blur 16 → 0; the list scrolls under it */}
+        <HeaderProgressiveBlur />
         <View style={styles.searchRow}>
           <View style={styles.search}>
             <GlassFill fill={SHOWS.white04} />
@@ -364,7 +367,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    backgroundColor: SHOWS.section,
     paddingHorizontal: 12,
     paddingBottom: 8,
     gap: 8,

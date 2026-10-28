@@ -3,15 +3,15 @@ import { useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../../assets/fonts";
-import Blur from "../../../../components/Blur";
 import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import CallOptionsSheet from "./CallOptionsSheet";
 
 /**
- * Figma Chat page "Inbox_General-Default" (2212:7108) header — #262626 @64%
- * + blur 16 (status bar included), row 60 (pad 12/12/8/12, gap 12):
+ * Figma Chat page "Inbox_General-Default" (2212:7108) / "Conversation" header —
+ * floats over the messages with the progressive blur 16 → 0 behind it (drawn
+ * by ScreenWrapper `headerBlur`, status bar included), row 60 (pad 12/12/8/12, gap 12):
  *  back 40 white 8% + chevron_left 20 #F8F9FB ·
  *  [online dot 8 #64CD75 · 6 · "Clark, 48" Medium 18 −2% white]
  *  · 8 · ["Founder" Regular 12 #828186 · 4 dot #828186 · company Regular 12]
@@ -29,8 +29,7 @@ const ChatHeader = ({ title, subtitle, company, online, onSettingsPress, onVoice
 
   return (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-      <Blur blurType={isDark ? "dark" : "xlight"} blurAmount={16} borderRadius={0.01} />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(38, 38, 38, 0.64)" : "rgba(255, 255, 255, 0.64)" }]} />
+      {/* background: ScreenWrapper `headerBlur` draws the Figma progressive blur behind this header */}
       <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.circle, { backgroundColor: tint(0.08) }]}>
         <Icons family="MaterialSymbolsRounded" name="chevron_left" size={20} color={isDark ? "#F8F9FB" : colors.text} />
       </TouchableOpacity>

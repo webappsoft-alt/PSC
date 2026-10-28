@@ -64,7 +64,7 @@ const EmailNotification = () => {
   return (
     <ScreenWrapper
       headerUnScrollable={() => <Header title={"Email notifications"} />}
-      scrollEnabled={false}
+      scrollEnabled
     >
       <CustomText
         label="Control when and how often PSC sends you emails."

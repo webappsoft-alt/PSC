@@ -1,7 +1,6 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
 import moment from "moment";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BlurView } from "@react-native-community/blur";
 import {
   Animated,
   FlatList,
@@ -16,6 +15,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import fonts from "../../../assets/fonts";
 import CustomText from "../../../components/CustomText";
+import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
+import ProgressiveBlur from "../../../components/ProgressiveBlur";
 import UserBadge from "../../../components/UserBadge";
 import { openPagerTab } from "../../../navigation/TabStack";
 import { fetchShow, toggleSaveShow } from "../../../services/showApi";
@@ -722,6 +723,16 @@ const ShowDetail = () => {
           feed header fades in (blur 16 + #121212 64%) so content never
           shows through */}
       <View style={[styles.header, { height: headerHeight, paddingTop: insets.top + 8 }]}>
+        {/* Figma header (2234:2705): Background blur Progressive 16 → 0 over
+            the hero at the top of the page */}
+        <ProgressiveBlur
+          pointerEvents="none"
+          direction="top"
+          tint="ultraThinMaterialDark"
+          intensity={16}
+          borderRadius={0}
+          style={StyleSheet.absoluteFill}
+        />
         <LinearGradient
           pointerEvents="none"
           colors={["rgba(18, 18, 18, 0.64)", "rgba(18, 18, 18, 0)"]}
@@ -743,14 +754,8 @@ const ShowDetail = () => {
             },
           ]}
         >
-          <BlurView
-            style={StyleSheet.absoluteFill}
-            blurType="dark"
-            blurAmount={16}
-            overlayColor="transparent"
-            reducedTransparencyFallbackColor={SHOWS.section}
-          />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(18, 18, 18, 0.64)" }]} />
+          {/* solid PSC header with the progressive edge (as Conversation settings) */}
+          <HeaderProgressiveBlur color={SHOWS.section} />
         </Animated.View>
         <HeaderButton icon="chevron_left" size={24} onPress={() => navigation.goBack()} />
         <Fit

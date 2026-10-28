@@ -7,7 +7,10 @@ import fonts from "../../../assets/fonts";
 import CustomText from "../../../components/CustomText";
 import Divider from "../../../components/Divider";
 import Header from "../../../components/Header";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderInsetConsumer,
+  ScreenHeaderSpacer,
+} from "../../../components/ScreenWrapper";
 import { del, get, post } from "../../../services/ApiRequest";
 import { COLORS } from "../../../utils/COLORS";
 import { ToastMessage } from "../../../utils/ToastMessage";
@@ -236,25 +239,38 @@ const PostFilter = ({ route }) => {
   };
 
   return (
-    <ScreenWrapper paddingHorizontal={0.1}>
-      <Header title={hashtag ? `#${hashtag}` : "Posts"} />
-      <FlatList
-        ref={scrollRef}
-        data={posts}
-        renderItem={renderItem}
-        keyExtractor={(item) => item._id}
-        ListEmptyComponent={renderListEmpty}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing && !isFirstLoad}
-            onRefresh={onRefresh}
-            tintColor={isDark ? COLORS.white : colors.text}
+    <ScreenWrapper
+      paddingHorizontal={0.1}
+      headerBlur
+      headerUnScrollable={() => (
+        <Header title={hashtag ? `#${hashtag}` : "Posts"} />
+      )}
+    >
+      <ScreenHeaderInsetConsumer>
+        {(headerInset) => (
+          <FlatList
+            ref={scrollRef}
+            data={posts}
+            renderItem={renderItem}
+            keyExtractor={(item) => item._id}
+            // starts below the floating blurred header
+            ListHeaderComponent={<ScreenHeaderSpacer />}
+            ListEmptyComponent={renderListEmpty}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            scrollIndicatorInsets={{ top: headerInset }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing && !isFirstLoad}
+                onRefresh={onRefresh}
+                progressViewOffset={headerInset}
+                tintColor={isDark ? COLORS.white : colors.text}
+              />
+            }
+            contentContainerStyle={posts.length === 0 && { flex: 1 }}
           />
-        }
-        contentContainerStyle={posts.length === 0 && { flex: 1 }}
-      />
+        )}
+      </ScreenHeaderInsetConsumer>
     </ScreenWrapper>
   );
 };

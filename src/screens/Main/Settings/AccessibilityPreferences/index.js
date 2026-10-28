@@ -6,7 +6,7 @@ import { isProAccount } from "../../../../utils/political";
 import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
 import Header from "../../../../components/Header";
-import ScreenWrapper from "../../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../../components/ScreenWrapper";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import SettingsItems from "../molecules/SettingsItems";
 import { useSelector } from "react-redux";
@@ -91,19 +91,24 @@ const AccessibilityPreferences = () => {
     <ScreenWrapper
       headerUnScrollable={() => <Header title="Accessibility & Preferences" />}
       paddingHorizontal={0.1}
+      headerBlur
     >
-      <View style={{ paddingHorizontal: 12 }}>
-        <CustomText
-          label={"Manage how PSC content is displayed to you"}
-          fontSize={14}
-          lineHeight={14 * 1.4}
-          color={colors.textSecondary}
-          marginBottom={16}
-          marginTop={8}
-        />
-      </View>
-
       <FlatList
+        ListHeaderComponent={
+          <>
+            <ScreenHeaderSpacer />
+            <View style={{ paddingHorizontal: 12 }}>
+              <CustomText
+                label={"Manage how PSC content is displayed to you"}
+                fontSize={14}
+                lineHeight={14 * 1.4}
+                color={colors.textSecondary}
+                marginBottom={16}
+                marginTop={8}
+              />
+            </View>
+          </>
+        }
         data={rows}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}

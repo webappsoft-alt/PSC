@@ -15,7 +15,10 @@ import { Images } from "../../../assets/images";
 import { Movie, ShowsSvg } from "../../../assets/svgs";
 import CustomText from "../../../components/CustomText";
 import Icons from "../../../components/Icons";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderInsetConsumer,
+  ScreenHeaderSpacer,
+} from "../../../components/ScreenWrapper";
 import SearchInput from "../../../components/SearchInput";
 import TopTab from "../../../components/TopTab";
 import { useTabBarVisibility } from "../../../navigation/TabStack";
@@ -213,6 +216,7 @@ const Event = () => {
       paddingHorizontal={0.1}
       paddingBottom={0.1}
       translucent
+      headerBlur
       headerUnScrollable={() => (
         <View style={{ paddingHorizontal: 12 }}>
           {/* Search bar with filter badge */}
@@ -341,8 +345,12 @@ const Event = () => {
         </View>
       )}
     >
+      <ScreenHeaderInsetConsumer>
+        {(headerInset) => (
       <FlatList
         data={loading ? [1, 2, 3, 4, 5] : events || []}
+        // list starts below the floating blurred header, scrolls under it
+        ListHeaderComponent={<ScreenHeaderSpacer />}
         keyExtractor={(item, index) =>
           loading ? index.toString() : item._id || index.toString()
         }
@@ -398,6 +406,7 @@ const Event = () => {
         refreshControl={
           <RefreshControl
             refreshing={loading && events.length > 0}
+            progressViewOffset={headerInset}
             onRefresh={() => getEvents(tab, activeFilters, true)}
           />
         }
@@ -406,6 +415,8 @@ const Event = () => {
         }
         showsVerticalScrollIndicator={false}
       />
+        )}
+      </ScreenHeaderInsetConsumer>
 
       {/* <View style={{ height: 120 }} /> */}
 

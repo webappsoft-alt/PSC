@@ -12,6 +12,10 @@ import LinearGradient from "react-native-linear-gradient";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
+import {
+  ScreenHeaderSpacer,
+  useScreenHeaderInset,
+} from "../../../../components/ScreenWrapper";
 import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
 import TopTab from "../../../../components/TopTab";
@@ -36,6 +40,7 @@ const TAB_NAMES = [
 
 const PostTab = ({ isActive }) => {
   const { colors, isDark } = useTheme();
+  const headerInset = useScreenHeaderInset();
   const navigation = useNavigation();
   const [tab, setTab] = useState(null);
   const [trendingPost, setTrendingPost] = useState(null);
@@ -124,10 +129,13 @@ const PostTab = ({ isActive }) => {
             await Promise.all([fetchTrendingPosts(), fetchHashtagTrends()]);
             setRefreshing(false);
           }}
+          progressViewOffset={headerInset}
           tintColor={isDark ? COLORS.white : colors.text}
         />
       }
     >
+      {/* starts below the floating blurred header */}
+      <ScreenHeaderSpacer />
       <View
         style={[
           styles.row,

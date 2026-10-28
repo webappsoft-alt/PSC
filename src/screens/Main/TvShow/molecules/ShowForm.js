@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../../assets/fonts";
 import CustomSwitch from "../../../../components/CustomSwitch";
 import CustomText from "../../../../components/CustomText";
+import HeaderProgressiveBlur from "../../../../components/HeaderProgressiveBlur";
 import Icons from "../../../../components/Icons";
 import { GlassFill, SHOWS, baseline, capGap, capTop } from "./showsLayout";
 
@@ -27,7 +28,7 @@ export const LABEL_SIZE = 12;
 /* ───────────────────────────── header ──────────────────────────────── */
 
 /**
- * Header (status bar + 56): pad 8 / 12 / 8 / 12, #121212; 40 back circle
+ * Header (status bar + 56): pad 8 / 12 / 8 / 12, progressive blur; 40 back circle
  * (white 4%, 24 chevron_left @64%) · 16 · SemiBold 20 −0.5%; optional right
  * node. `children` render under the row (search field, chips).
  */
@@ -45,6 +46,9 @@ export const FormHeader = ({
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top + topPad }]}>
+      {/* Figma Header: progressive blur 16 → 0 + #121212 1%; the form
+          scrolls under it */}
+      <HeaderProgressiveBlur />
       <View style={styles.headerRow}>
         <View style={[styles.headerLeft, { gap: titleGap }]}>
           {onBack ? <CircleButton icon="chevron_left" onPress={onBack} /> : null}
@@ -409,7 +413,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    backgroundColor: SHOWS.section,
     paddingHorizontal: 12,
     paddingBottom: 8,
   },

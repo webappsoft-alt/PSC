@@ -19,7 +19,7 @@ import CustomInput from "../../components/CustomInput";
 import CustomInputTextOnly from "../../components/CustomInputTextOnly";
 import CustomModalGooglePlaces from "../../components/CustomModalGooglePlaces";
 import Header from "../../components/Header";
-import ScreenWrapper from "../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../components/ScreenWrapper";
 import Divider from "../../components/Divider";
 import ErrorComponent from "../../components/ErrorComponent";
 import Icons from "../../components/Icons";
@@ -262,6 +262,7 @@ const PublishLive = () => {
 
   return (
     <ScreenWrapper
+      headerBlur
       headerUnScrollable={() => <Header title="Launch A Live" />}
       footerUnScrollable={() => (
         <View
@@ -282,6 +283,8 @@ const PublishLive = () => {
       )}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* content starts below the floating blurred header */}
+        <ScreenHeaderSpacer />
         {/* Title */}
         <CustomInput
           withLabel="TITLE"

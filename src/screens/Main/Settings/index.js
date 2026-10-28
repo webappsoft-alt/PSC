@@ -7,7 +7,7 @@ import {
   Image,
 } from "react-native";
 import React, { useState } from "react";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
 import Header from "../../../components/Header";
 import SearchInput from "../../../components/SearchInput";
 import ExtrasCard from "./molecules/ExtrasCard";
@@ -182,32 +182,38 @@ const Settings = () => {
           marginTop={10}
         />
       )}
+      headerBlur
     >
-      <View style={{ paddingHorizontal: 12 }}>
-        <SearchInput
-          placeholder={"Search Settings..."}
-          value={search}
-          onChangeText={(text) => {
-            setSearch(text);
-            const filteredData = data.filter((item) =>
-              item.title.toLowerCase().includes(text.toLowerCase()),
-            );
-            setFilteredData(filteredData);
-          }}
-          height={44}
-          marginTop={16}
-        />
-
-        <View style={styles.row}>
-          <ExtrasCard onPress={() => navigation.navigate("Plans")} />
-          <ExtrasCard type="invite" onPress={handleInvite} />
-        </View>
-      </View>
-
       <FlatList
+        ListHeaderComponent={
+          <>
+            <ScreenHeaderSpacer />
+            <View style={{ paddingHorizontal: 12 }}>
+              <SearchInput
+                placeholder={"Search Settings..."}
+                value={search}
+                onChangeText={(text) => {
+                  setSearch(text);
+                  const filteredData = data.filter((item) =>
+                    item.title.toLowerCase().includes(text.toLowerCase()),
+                  );
+                  setFilteredData(filteredData);
+                }}
+                height={44}
+                marginTop={16}
+              />
+
+              <View style={styles.row}>
+                <ExtrasCard onPress={() => navigation.navigate("Plans")} />
+                <ExtrasCard type="invite" onPress={handleInvite} />
+              </View>
+            </View>
+          </>
+        }
         data={filteredData}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.list}
         renderItem={({ item, index }) => (
           <SettingsItems

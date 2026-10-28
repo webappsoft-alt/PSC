@@ -15,6 +15,7 @@ import fonts from "../../../assets/fonts";
 import CustomModalGooglePlaces from "../../../components/CustomModalGooglePlaces";
 import CustomSwitch from "../../../components/CustomSwitch";
 import CustomText from "../../../components/CustomText";
+import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
 import Icons from "../../../components/Icons";
 import ScreenWrapper from "../../../components/ScreenWrapper";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -510,6 +511,8 @@ const MatchingFilters = () => {
 
       {/* Header: status bar + 56 (pad 8 / 12) */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
+        {/* Figma Header: progressive background blur, content scrolls under */}
+        <HeaderProgressiveBlur />
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
@@ -604,7 +607,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: SECTION_BG,
   },
   headerRow: {
     height: HEADER_ROW,

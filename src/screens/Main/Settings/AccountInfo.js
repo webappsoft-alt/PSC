@@ -25,7 +25,7 @@ import ErrorComponent from "../../../components/ErrorComponent";
 import Header from "../../../components/Header";
 import Icons from "../../../components/Icons";
 import ImageFast from "../../../components/ImageFast";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { put } from "../../../services/ApiRequest";
 import { setUserData } from "../../../store/reducer/usersSlice";
@@ -974,7 +974,12 @@ const AccountInfo = () => {
         data={formData}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={
+          <>
+            <ScreenHeaderSpacer />
+            {renderHeader()}
+          </>
+        }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
       />
@@ -992,6 +997,7 @@ const AccountInfo = () => {
       {(formikProps) => (
         <ScreenWrapper
           headerUnScrollable={() => <Header title="PSC" />}
+          headerBlur
           footerUnScrollable={() => (
             <View style={{ paddingHorizontal: 12 }}>
               <CustomButton

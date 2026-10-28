@@ -12,6 +12,7 @@ import LinearGradient from "react-native-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
 import Blur from "../../../components/Blur";
+import { FloatingBlurHeader } from "../../../components/HeaderProgressiveBlur";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
 import FloatingSheet from "../../../components/FloatingSheet";
@@ -60,6 +61,8 @@ const ReportChat = () => {
   const [human, setHuman] = useState(false);
   const [picking, setPicking] = useState(false);
   const [sending, setSending] = useState(false);
+  // floating header height (status bar included), content starts below it
+  const [headerH, setHeaderH] = useState(null);
 
   const name = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "User";
   const canSubmit = !!user?._id && !!reason && note.trim().length > 0 && human && !sending;
@@ -87,10 +90,9 @@ const ReportChat = () => {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* ───────── header ───────── */}
+      {/* ───────── header (floats; content scrolls under the progressive blur) ───────── */}
+      <FloatingBlurHeader onHeightChange={setHeaderH} includeStatusBar={false}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Blur blurType={isDark ? "dark" : "xlight"} blurAmount={32} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, opacity: 0.9 }]} />
         <View style={styles.headerRow}>
           <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.back, { backgroundColor: tint(0.08) }]}>
             <Blur blurType={isDark ? "dark" : "xlight"} borderRadius={100} />
@@ -99,10 +101,13 @@ const ReportChat = () => {
           <CustomText label="Submit Report" fontSize={24} fontFamily={fonts.semiBold} letterSpacing={-0.12} color={colors.text} containerStyle={styles.shrink} />
         </View>
       </View>
+      </FloatingBlurHeader>
 
       <View style={styles.screen}>
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: 108 + Math.max(insets.bottom, 34) }]}
+          style={{ opacity: headerH == null ? 0 : 1 }}
+          contentContainerStyle={[styles.content, { paddingTop: 12 + (headerH || 0), paddingBottom: 108 + Math.max(insets.bottom, 34) }]}
+          scrollIndicatorInsets={{ top: headerH || 0 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="never"

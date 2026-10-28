@@ -18,6 +18,9 @@ import fonts from "../../../assets/fonts";
 import { Images } from "../../../assets/images";
 import ArtistDetailCard from "../../../components/ArtistDetailCard";
 import CustomText from "../../../components/CustomText";
+import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
+import ProgressiveBlur from "../../../components/ProgressiveBlur";
+import LinearGradient from "react-native-linear-gradient";
 import Divider from "../../../components/Divider";
 import Icons from "../../../components/Icons";
 import { get, post } from "../../../services/ApiRequest";
@@ -399,14 +402,36 @@ const EventDetail = ({ navigation }) => {
       </View>
 
       <Animated.View style={[styles.stickyHeader, { paddingTop: insets.top }]}>
+        {/* Figma Event-Detail-Page header (2234:2705) at the top of the page:
+            Background blur Progressive 16 → 0 + Linear #121212 64% → 0% */}
+        <ProgressiveBlur
+          pointerEvents="none"
+          direction="top"
+          tint={isDark ? "ultraThinMaterialDark" : "ultraThinMaterialLight"}
+          intensity={16}
+          borderRadius={0}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          pointerEvents="none"
+          colors={
+            isDark
+              ? ["rgba(18, 18, 18, 0.64)", "rgba(18, 18, 18, 0)"]
+              : ["rgba(250, 250, 250, 0.64)", "rgba(250, 250, 250, 0)"]
+          }
+          style={StyleSheet.absoluteFill}
+        />
+        {/* once the page scrolls the header turns into the solid PSC header
+            (progressive edge at the bottom), like Conversation settings */}
         <Animated.View
           pointerEvents="none"
           style={{
             ...StyleSheet.absoluteFillObject,
             opacity: headerBgOpacity,
-            backgroundColor: colors.background,
           }}
-        />
+        >
+          <HeaderProgressiveBlur color={colors.background} />
+        </Animated.View>
         <View style={styles.flexRow}>
           <View style={[styles.flexRow, { flex: 1, marginRight: 50 }]}>
             <TouchableOpacity

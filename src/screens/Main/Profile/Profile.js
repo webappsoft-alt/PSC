@@ -361,6 +361,8 @@ const Profile = () => {
         scrollEventThrottle={16}
         translucent
         stickyHeaderIndices={[1]}
+        // banner header (own design), not the progressive-blur page header
+        headerBlur={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

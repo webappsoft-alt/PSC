@@ -8,7 +8,7 @@ import fonts from "../../../assets/fonts";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
 import Icons from "../../../components/Icons";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderInsetConsumer } from "../../../components/ScreenWrapper";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { createGroup, getFriends } from "../../../services/ChatService";
 import { ToastMessage } from "../../../utils/ToastMessage";
@@ -151,8 +151,10 @@ const CreateGroupInvite = ({ route }) => {
       <ScreenWrapper
         paddingHorizontal={0.1}
         backgroundColor={isDark ? "#181818" : colors.background}
+        // header area is #121212 on the #181818 page
+        headerBlurColor={colors.background}
         headerUnScrollable={() => (
-          <View style={[styles.header, { backgroundColor: colors.background }]}>
+          <View style={styles.header}>
             <View style={[styles.searchBar, { backgroundColor: tint(0.04) }]}>
               <Icons family="MaterialSymbolsRounded" name="search" size={20} color={tint(0.64)} />
               <TextInput
@@ -175,6 +177,16 @@ const CreateGroupInvite = ({ route }) => {
         )}
         scrollEnabled
       >
+        {/* header area keeps its #121212 at rest (screen is #181818); scrolls away under the blur */}
+        <ScreenHeaderInsetConsumer>
+          {(headerInset) => (
+            <View
+              pointerEvents="none"
+              // minus the header's 4pt #181818 gap (marginBottom), which stays as is
+              style={{ marginTop: -headerInset, height: Math.max(headerInset - 4, 0), marginBottom: 4, backgroundColor: colors.background }}
+            />
+          )}
+        </ScreenHeaderInsetConsumer>
         <View style={[styles.block, { backgroundColor: colors.background }]}>
           <View style={styles.titleRow}>
             <CustomText label="ALL FRIENDS" fontSize={14} fontFamily={fonts.medium} letterSpacing={-0.07} color={tint(0.64)} />

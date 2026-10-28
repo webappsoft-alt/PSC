@@ -13,7 +13,7 @@ import CustomText from "../../../components/CustomText";
 import Icons from "../../../components/Icons";
 import { useSelector } from "react-redux";
 import { Images } from "../../../assets/images";
-import ScreenWrapper from "../../../components/ScreenWrapper";
+import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
 import { useSocket } from "../../../components/SocketProvider";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { getMessages } from "../../../services/ChatService";
@@ -638,6 +638,8 @@ const InboxScreen = ({ route }) => {
       translucent
       statusBarColor="transparent"
       paddingHorizontal={10}
+      // header floats; messages scroll under its progressive blur
+      headerBlur
       headerUnScrollable={() => (
         <ChatHeader
           title={
@@ -698,6 +700,7 @@ const InboxScreen = ({ route }) => {
       {/* <ListHeader  title={recipientName}/> */}
       {loading || locked ? (
         <View style={{ flex: 1, paddingVertical: 14 }}>
+          <ScreenHeaderSpacer />
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((_, index) => (
             <ChatBubbleSkeleton key={index} isSender={index % 2 === 0} />
           ))}
@@ -718,8 +721,11 @@ const InboxScreen = ({ route }) => {
           scrollEventThrottle={100}
           // inverted list: the footer sits at the top (above the oldest
           // message), the header at the bottom (below the latest).
+          // + the floating header's height at the very top (inverted → footer)
           ListFooterComponent={
-            messages.length > 0 ? (
+            <>
+            <ScreenHeaderSpacer />
+            {messages.length > 0 ? (
               <View style={styles.intro}>
                 {!!matchedAt && (
                   <InfoDivider label={`You matched with ${otherInfo?.firstName || recipientName} on ${moment(matchedAt).format("MMM D, YYYY")}`} />
@@ -729,7 +735,8 @@ const InboxScreen = ({ route }) => {
                 )}
                 <DateDivider label={dayLabel(messages[messages.length - 1])} />
               </View>
-            ) : null
+            ) : null}
+            </>
           }
           ListHeaderComponent={
             !isGroup && ["dnd", "idle"].includes(otherInfo?.status) ? (

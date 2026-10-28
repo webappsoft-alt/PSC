@@ -1,6 +1,7 @@
 import { BlurView } from "@react-native-community/blur";
 import { useEffect, useRef } from "react";
 import {
+  Animated,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -11,6 +12,7 @@ import LinearGradient from "react-native-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../../assets/fonts";
 import CustomText from "../../../../components/CustomText";
+import HeaderProgressiveBlur from "../../../../components/HeaderProgressiveBlur";
 import Icons from "../../../../components/Icons";
 import { GlassFill, SHOWS } from "./showsLayout";
 
@@ -51,6 +53,7 @@ const ShowsHeader = ({
   onSearchClose,
   search,
   onSearchChange,
+  scrollY,
 }) => {
   const insets = useSafeAreaInsets();
   const inputRef = useRef(null);
@@ -78,6 +81,25 @@ const ShowsHeader = ({
         locations={[0, 0.48]}
         style={StyleSheet.absoluteFill}
       />
+      {/* once the feed scrolls under it the header turns into the solid PSC
+          header (progressive edge at the bottom), like Conversation settings */}
+      {scrollY ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              opacity: scrollY.interpolate({
+                inputRange: [0, 24],
+                outputRange: [0, 1],
+                extrapolate: "clamp",
+              }),
+            },
+          ]}
+        >
+          <HeaderProgressiveBlur color={SHOWS.section} />
+        </Animated.View>
+      ) : null}
 
       {/* Row 1 — title + search, or the search field */}
       {searching ? (

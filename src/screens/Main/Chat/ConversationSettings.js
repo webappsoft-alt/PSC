@@ -7,6 +7,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import FastImage from "react-native-fast-image";
 import LinearGradient from "react-native-linear-gradient";
@@ -17,7 +18,10 @@ import fonts from "../../../assets/fonts";
 import Blur from "../../../components/Blur";
 import CustomSwitch from "../../../components/CustomSwitch";
 import CustomText from "../../../components/CustomText";
+import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
 import Icons from "../../../components/Icons";
+import MediaBottomBlur from "../../../components/MediaBottomBlur";
+import ProgressiveBlur from "../../../components/ProgressiveBlur";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { del, get, post } from "../../../services/ApiRequest";
 import {
@@ -52,6 +56,8 @@ const GOLD = "#A19375";
 const NOTE = "#828186";
 const RED = "#EE1045";
 const BANNER = 375;
+// Figma Banner: bottom-left / bottom-right radius 24
+const BANNER_RADIUS = 24;
 
 // Figma trims text to cap height; RN 1.4 line boxes add space above/below the
 // glyphs. Offsets below are measured (Figma raster vs simulator, 3x):
@@ -283,6 +289,7 @@ const Tile = ({ icon, color, style, onPress }) => {
 const ConversationSettings = ({ route }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const isFocused = useIsFocused();
   const { colors, isDark, themeMode, toggleTheme } = useTheme();
   const { userData } = useSelector((state) => state.users);
@@ -497,7 +504,7 @@ const ConversationSettings = ({ route }) => {
 
   // Figma banner top overlay (pad 52/12/12/12): back · name · "Manage your
   // conversation". Pinned like every other PSC header — it stays while the
-  // page scrolls; once the banner has scrolled away it turns solid #121212.
+  // page scrolls; once the banner has scrolled away its progressive blur fades in.
   const scrollY = useRef(new Animated.Value(0)).current;
   const solid = scrollY.interpolate({
     inputRange: [0, BANNER - 140, BANNER - 100],
@@ -509,21 +516,33 @@ const ConversationSettings = ({ route }) => {
       style={[styles.fixedHeader, { paddingTop: insets.top + 8 }]}
       pointerEvents="box-none"
     >
-      <LinearGradient
+      {/* Figma banner top frame (1 on 1 7937:2873 / group 7937:2163):
+          Background blur Progressive 16 → 0 (top → bottom) + Linear #121212
+          100% → 0% at 64% (1 on 1) / 48% (group) layer opacity */}
+      <ProgressiveBlur
         pointerEvents="none"
-        colors={["#121212", "rgba(18, 18, 18, 0)"]}
+        direction="top"
+        tint={isDark ? "ultraThinMaterialDark" : "ultraThinMaterialLight"}
+        intensity={16}
+        borderRadius={0}
         style={StyleSheet.absoluteFill}
       />
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          `rgba(${isDark ? "18, 18, 18" : "250, 250, 250"}, ${isGroup ? 0.48 : 0.64})`,
+          isDark ? "rgba(18, 18, 18, 0)" : "rgba(250, 250, 250, 0)",
+        ]}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* client rule: progressive blur (not a solid fill) once the banner
+          has scrolled away — the content scrolls under it */}
       <Animated.View
         pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            backgroundColor: isDark ? "#121212" : colors.background,
-            opacity: solid,
-          },
-        ]}
-      />
+        style={[StyleSheet.absoluteFill, { opacity: solid }]}
+      >
+        <HeaderProgressiveBlur />
+      </Animated.View>
       <View style={styles.titleRow}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -581,16 +600,23 @@ const ConversationSettings = ({ route }) => {
           ]}
         />
       )}
-      {/* bottom overlay: transparent → page colour, QR 48 centred */}
+      {/* Figma banner bottom frame (7937:2885, 375 × 72, bottom radius 24):
+          Background blur Progressive 0 → 16 (top → bottom) + Linear #121212
+          0% → 100% at 48% layer opacity; the picture itself is blurred so it
+          keeps its colours (same as post media) */}
+      <MediaBottomBlur
+        uri={picture || null}
+        width={windowWidth}
+        mediaHeight={BANNER}
+        height={72}
+        blurRadius={16}
+        borderBottomLeftRadius={BANNER_RADIUS}
+        borderBottomRightRadius={BANNER_RADIUS}
+        tint={isDark ? "18, 18, 18" : "250, 250, 250"}
+        fillOpacity={0.48}
+      />
+      {/* QR 48 centred in the bottom frame */}
       <View style={styles.bannerBottom}>
-        <LinearGradient
-          pointerEvents="none"
-          colors={[
-            "rgba(18, 18, 18, 0)",
-            isDark ? "#121212" : colors.background,
-          ]}
-          style={StyleSheet.absoluteFill}
-        />
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={() =>
@@ -971,6 +997,8 @@ const styles = StyleSheet.create({
   },
   banner: {
     height: BANNER,
+    borderBottomLeftRadius: BANNER_RADIUS,
+    borderBottomRightRadius: BANNER_RADIUS,
     marginHorizontal: -0, // full bleed
     overflow: "hidden",
     justifyContent: "flex-end",
@@ -1013,6 +1041,8 @@ const styles = StyleSheet.create({
   },
   bannerBottom: {
     height: 72,
+    // above the blur band (MediaBottomBlur zIndex 1)
+    zIndex: 2,
     alignItems: "center",
     justifyContent: "center",
   },

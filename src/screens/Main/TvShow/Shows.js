@@ -1,6 +1,7 @@
 import { useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -288,6 +289,10 @@ const Shows = ({ isFocusedPage, topics, onAddTopicPress }) => {
     if (topic && !chipTopics.includes(topic)) setTopic(null);
   }, [chipTopics, topic]);
 
+  // header: Figma purple gradient + blur at the top; turns into the solid
+  // PSC header (progressive edge) once the feed scrolls under it
+  const scrollY = useRef(new Animated.Value(0)).current;
+
   // tab bar hides on scroll down (the + button shows), returns on scroll up
   const lastY = useRef(0);
   const barVisible = useRef(true);
@@ -365,7 +370,10 @@ const Shows = ({ isFocusedPage, topics, onAddTopicPress }) => {
   return (
     <View style={styles.page}>
       <ScrollView
-        onScroll={onScroll}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false, listener: onScroll },
+        )}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -444,6 +452,7 @@ const Shows = ({ isFocusedPage, topics, onAddTopicPress }) => {
       </ScrollView>
 
       <ShowsHeader
+        scrollY={scrollY}
         topics={chipTopics}
         topic={topic}
         onTopicChange={setTopic}

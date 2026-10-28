@@ -15,7 +15,7 @@ const Visions = () => {
   return (
     <ScreenWrapper
       headerUnScrollable={() => <Header title={"Vision"} />}
-      scrollEnabled={false}
+      scrollEnabled
     >
       <CustomText
         label="Manage visual settings like font size and color contrast."

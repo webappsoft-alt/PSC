@@ -622,7 +622,6 @@ export default Chat;
 const createStyles = (colors, isDark) =>
   StyleSheet.create({
     header: {
-      backgroundColor: colors.background,
       paddingTop: 8, // Figma 52 − 44pt status bar (ScreenWrapper pads the inset)
       paddingHorizontal: 12,
       paddingBottom: 8,

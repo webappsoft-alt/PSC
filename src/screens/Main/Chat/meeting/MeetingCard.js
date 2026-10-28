@@ -147,7 +147,7 @@ const MeetingCard = ({ item, isSender, onStatusChange, withWho }) => {
           />
         </View>
         <View style={styles.bottom}>
-          <View>
+          <View style={{ flex: 1 }}>
             <CustomText
               label={proposer}
               fontSize={16}
@@ -155,14 +155,7 @@ const MeetingCard = ({ item, isSender, onStatusChange, withWho }) => {
               color="#FFFFFF"
               numberOfLines={1}
             />
-            <View
-              style={[
-                styles.timeRow,
-                {
-                  marginTop: 180 - capTop(12) - (157 - capTop(16) + box(16)),
-                },
-              ]}
-            >
+            <View style={[styles.timeRow]}>
               <Icons
                 family="MaterialSymbolsRounded"
                 name="schedule"
@@ -281,6 +274,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    marginTop: 3,
+    marginBottom: 7,
   },
   // row = the 24 icon (Figma 196×24), fixed; 2-line text overflows down
   // like Figma's 22-tall text box, so name / time never move
