@@ -7,7 +7,11 @@ import {
   Image,
 } from "react-native";
 import React, { useState } from "react";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenFlatList,
+  ScreenFooterSpacer,
+} from "../../../components/ScreenWrapper";
 import Header from "../../../components/Header";
 import SearchInput from "../../../components/SearchInput";
 import ExtrasCard from "./molecules/ExtrasCard";
@@ -183,8 +187,11 @@ const Settings = () => {
         />
       )}
       headerBlur
+      footerBlur
     >
-      <FlatList
+      <ScreenFlatList
+        // content ends above the floating footer
+        ListFooterComponent={<ScreenFooterSpacer />}
         ListHeaderComponent={
           <>
             <ScreenHeaderSpacer />

@@ -27,6 +27,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import { COLORS } from "../../../../utils/COLORS";
 import { ToastMessage } from "../../../../utils/ToastMessage";
 
+import useScrollEdgeBlur from "../../../../hooks/useScrollEdgeBlur";
 /**
  * Figma Chat page "Schedule-meeting-step-2" (2212:5753) → "step-3"
  * (2212:5942 in person · 2307:7913 online) → "Select-Platform" (2307:8067).
@@ -62,6 +63,8 @@ const weekend = (base, weeksAhead) => {
 const ScheduleMeeting = ({ route }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  // header blur only while content sits under it (client rule)
+  const edge = useScrollEdgeBlur();
   const { socket } = useSocket();
   const { colors, isDark } = useTheme();
   const tint = (o) => (isDark ? `rgba(255, 255, 255, ${o})` : `rgba(18, 18, 18, ${o})`);
@@ -328,7 +331,7 @@ const ScheduleMeeting = ({ route }) => {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* ───────── header (floats; content scrolls under the progressive blur) ───────── */}
-      <FloatingBlurHeader onHeightChange={setHeaderH} includeStatusBar={false}>
+      <FloatingBlurHeader visible={edge.headerVisible} onHeightChange={setHeaderH} includeStatusBar={false}>
       <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity
@@ -350,6 +353,8 @@ const ScheduleMeeting = ({ route }) => {
       </FloatingBlurHeader>
 
       <ScrollView
+
+        {...edge.scrollProps()}
         style={{ opacity: headerH == null ? 0 : 1 }}
         contentContainerStyle={[styles.content, { paddingTop: 12 + (headerH || 0), paddingBottom: 134 + insets.bottom }]}
         scrollIndicatorInsets={{ top: headerH || 0 }}

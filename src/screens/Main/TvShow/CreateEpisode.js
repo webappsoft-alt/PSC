@@ -48,6 +48,7 @@ import {
 } from "./molecules/ShowForm";
 import { GlassFill, SHOWS, capGap, capTop } from "./molecules/showsLayout";
 
+import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
 /**
  * Figma Shows › "Create-A-Show" (7580:13422) — "Create An Episode".
  * 375 wide, #121212, pad 116 (header 100 + 16) / 12 / 126; blocks 24 apart
@@ -110,6 +111,8 @@ const userName = (u) =>
 const CreateEpisode = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  // header blur only while content sits under it (client rule)
+  const edge = useScrollEdgeBlur();
   const { width: windowWidth } = useWindowDimensions();
   // 351 frame (12 page pad each side) − 2pt stroke − 2pt pad on each side
   const previewWidth = windowWidth - 24 - 8;
@@ -347,6 +350,7 @@ const CreateEpisode = () => {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
+          {...edge.scrollProps()}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
@@ -782,7 +786,7 @@ const CreateEpisode = () => {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <FormHeader title="Create An Episode" onBack={() => navigation.goBack()} />
+      <FormHeader blurVisible={edge.headerVisible} title="Create An Episode" onBack={() => navigation.goBack()} />
       <BottomCTA label="Submit Show" onPress={submit} loading={submitting} />
 
       <DatePicker

@@ -42,6 +42,7 @@ import {
   SHOWS,
 } from "./molecules/showsLayout";
 
+import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
 /**
  * Figma › Shows › "Show-Feed" (3738:2915 / search state 3746:2248).
  * #262626 page, #121212 sections stacked 1pt apart under a fixed blurred
@@ -227,7 +228,11 @@ const Shows = ({ isFocusedPage, topics, onAddTopicPress }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const userData = useSelector((state) => state.users.userData);
-  const { setIsTabBarVisible } = useTabBarVisibility();
+  const { setIsTabBarVisible, reportPageEdges } = useTabBarVisibility();
+  // bottom-nav blur only while the shows sit under it
+  const edge = useScrollEdgeBlur({
+    onChange: (edges) => reportPageEdges?.("Shows", edges),
+  });
 
   const [topic, setTopic] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -370,9 +375,16 @@ const Shows = ({ isFocusedPage, topics, onAddTopicPress }) => {
   return (
     <View style={styles.page}>
       <ScrollView
+        {...edge.scrollProps()}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false, listener: onScroll },
+          {
+            useNativeDriver: false,
+            listener: (e) => {
+              edge.onScroll(e);
+              onScroll(e);
+            },
+          },
         )}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"

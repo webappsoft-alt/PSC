@@ -9,7 +9,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import SoundPlayer from "react-native-sound-player";
+import Video from "react-native-video";
+import {
+  radioPlayback,
+  useRadioPlayback,
+} from "../../../../utils/radioPlayback";
 import Svg, {
   Defs,
   LinearGradient as SvgLinearGradient,
@@ -26,8 +30,10 @@ import {
   setLoading,
   setPlaying,
   setPlayingRadioData,
+  setPlayerSuppressed,
   setPlayingRadioId,
   setShowRadioPlayer,
+  resetRadioPlayback,
 } from "../../../../store/reducer/playerSlice";
 import { COLORS } from "../../../../utils/COLORS";
 import Blur from "../../../../components/Blur";
@@ -60,6 +66,9 @@ const WAVE_AMPLITUDE = 8;
 const WAVE_CYCLES = 3; // full waves visible across one card width
 const WAVE_DURATION = 2400; // ms for one full horizontal loop
 
+// once per JS runtime (launch / reload), not per mount (account switch)
+let playbackSessionStarted = false;
+
 const PlayerCard = () => {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
@@ -71,12 +80,15 @@ const PlayerCard = () => {
   const playingRadioData = useSelector(
     (state) => state.player.playingRadioData,
   );
+  const isPlayerSuppressed = useSelector(
+    (state) => state.player.isPlayerSuppressed,
+  );
+  const playRequest = useSelector((state) => state.player.playRequest);
   const { colors, isDark } = useTheme();
 
   const animValue = useRef(new Animated.Value(isTabBarVisible ? 1 : 0)).current;
   const tabBarHeight = 90 + insets.bottom;
   const mountedRef = useRef(true);
-  const isInitialRender = useRef(true);
 
   // sound-wave animation state
   const [waveWidth, setWaveWidth] = useState(0);
@@ -84,23 +96,18 @@ const PlayerCard = () => {
 
   useEffect(() => {
     mountedRef.current = true;
-
-    const onFinishedPlayingSubscription = SoundPlayer.onFinishedPlaying(() => {
-      if (mountedRef.current) {
-        dispatch(setPlaying(false));
-        dispatch(setLoading(false));
-        dispatch(setShowRadioPlayer(false));
-        dispatch(setAudioUrl(null));
-        dispatch(setPlayingRadioId(null));
-        dispatch(setPlayingRadioData(null));
-      }
-    });
-
+    if (!playbackSessionStarted) {
+      // first mount since the app (re)started: the persisted player slice
+      // still says a radio is playing, but nothing is loaded
+      playbackSessionStarted = true;
+      dispatch(resetRadioPlayback());
+      radioPlayback.reset();
+    } else {
+      // the player slice is persisted — never start hidden by a stale flag
+      dispatch(setPlayerSuppressed(false));
+    }
     return () => {
       mountedRef.current = false;
-      if (onFinishedPlayingSubscription?.remove) {
-        onFinishedPlayingSubscription.remove();
-      }
     };
   }, [dispatch]);
 
@@ -158,45 +165,74 @@ const PlayerCard = () => {
     );
   }, [waveWidth]);
 
+  // ─── the radio engine ───────────────────────────────────────────────────
+  // One react-native-video player (audio only) for every radio / Audio
+  // Post, the same engine as the feed videos. It takes part in their shared
+  // iOS audio session, so a muted feed video mounting / unmounting can no
+  // longer switch the radio's sound off (react-native-sound-player was
+  // outside that session and kept being silenced). `playRequest` remounts it
+  // so the same radio opened again starts from the beginning.
+  const videoRef = useRef(null);
+  const { muted } = useRadioPlayback();
   useEffect(() => {
-    if (isInitialRender.current) {
-      isInitialRender.current = false;
-      return;
-    }
+    radioPlayback.attach(videoRef);
+    return () => radioPlayback.detach(videoRef);
+  }, []);
+  useEffect(() => {
     if (!audioUrl || !showRadioPlayer) return;
-    playAudio();
-  }, [audioUrl, showRadioPlayer]);
+    radioPlayback.reset();
+    dispatch(setLoading(true));
+    dispatch(setPlaying(true));
+  }, [audioUrl, showRadioPlayer, playRequest, dispatch]);
 
-  const playAudio = async () => {
-    try {
-      dispatch(setLoading(true));
-      dispatch(setPlaying(false));
-
-      try {
-        SoundPlayer.stop();
-      } catch (_) {}
-
-      SoundPlayer.playUrl(audioUrl);
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      if (mountedRef.current) {
-        dispatch(setLoading(false));
-        dispatch(setPlaying(true));
-      }
-    } catch (error) {
-      console.error("Error playing audio:", error);
-      if (mountedRef.current) {
-        dispatch(setLoading(false));
-        dispatch(setPlaying(false));
-      }
-    }
+  const onRadioLoad = ({ duration }) => {
+    radioPlayback.progress(0, (Number(duration) || 0) * 1000);
+    dispatch(setLoading(false));
+  };
+  const onRadioProgress = ({
+    currentTime,
+    seekableDuration,
+    playableDuration,
+  }) => {
+    const dur = Number(seekableDuration) || Number(playableDuration) || 0;
+    radioPlayback.progress((Number(currentTime) || 0) * 1000, dur * 1000);
+  };
+  const onRadioEnd = () => {
+    radioPlayback.reset();
+    dispatch(setPlaying(false));
+    dispatch(setLoading(false));
+    dispatch(setShowRadioPlayer(false));
+    dispatch(setAudioUrl(null));
+    dispatch(setPlayingRadioId(null));
+    dispatch(setPlayingRadioData(null));
+  };
+  const onRadioError = (e) => {
+    console.log("Radio playback error", e?.error || e);
+    dispatch(setLoading(false));
+    dispatch(setPlaying(false));
   };
 
+  const engine =
+    showRadioPlayer && audioUrl ? (
+      <Video
+        key={`${audioUrl}-${playRequest}`}
+        ref={videoRef}
+        source={{ uri: audioUrl }}
+        audioOnly
+        paused={!isPlaying}
+        muted={muted}
+        ignoreSilentSwitch="ignore"
+        progressUpdateInterval={250}
+        onLoad={onRadioLoad}
+        onProgress={onRadioProgress}
+        onEnd={onRadioEnd}
+        onError={onRadioError}
+        style={styles.engine}
+      />
+    ) : null;
+
   const handleStop = () => {
-    try {
-      SoundPlayer.stop();
-    } catch (_) {}
+    radioPlayback.reset();
     dispatch(setPlaying(false));
     dispatch(setLoading(false));
     dispatch(setShowRadioPlayer(false));
@@ -205,154 +241,168 @@ const PlayerCard = () => {
     dispatch(setPlayingRadioData(null));
   };
 
-  if (!showRadioPlayer) return null;
+  // the engine keeps the same place in the tree whether or not the card
+  // shows, so hiding the card (detail page open) never restarts playback
+  const cardVisible = showRadioPlayer && !isPlayerSuppressed;
 
   return (
-    <Animated.View
-      style={[
-        styles.playerContainer,
-        {
-          bottom: 0,
-          overflow: "hidden",
-          marginBottom: isTabBarVisible ? 0 : insets.bottom,
-          transform: [{ translateY }],
-        },
-      ]}
-    >
-      <Blur blurType={isDark ? "dark" : "light"} />
-      <View
-        style={[
-          styles.cardInner,
-          { backgroundColor: isDark ? COLORS.black : colors.surface },
-        ]}
-      >
-        <View
-          style={styles.bottomGradient}
-          onLayout={(e) => {
-            const w = e.nativeEvent.layout.width;
-            if (w > 0 && Math.round(w) !== Math.round(waveWidth)) {
-              setWaveWidth(w);
-            }
-          }}
+    <>
+      {engine}
+      {cardVisible && (
+        <Animated.View
+          style={[
+            styles.playerContainer,
+            {
+              bottom: 0,
+              overflow: "hidden",
+              marginBottom: isTabBarVisible ? 0 : insets.bottom,
+              transform: [{ translateY }],
+            },
+          ]}
         >
-          {waveWidth > 0 && (
-            <Animated.View
-              style={{
-                width: waveWidth * 2,
-                height: WAVE_HEIGHT,
-                transform: [{ translateX: waveTranslate }],
+          <Blur blurType={isDark ? "dark" : "light"} />
+          <View
+            style={[
+              styles.cardInner,
+              { backgroundColor: isDark ? COLORS.black : colors.surface },
+            ]}
+          >
+            <View
+              style={styles.bottomGradient}
+              onLayout={(e) => {
+                const w = e.nativeEvent.layout.width;
+                if (w > 0 && Math.round(w) !== Math.round(waveWidth)) {
+                  setWaveWidth(w);
+                }
               }}
             >
-              <Svg
-                width={waveWidth * 2}
-                height={WAVE_HEIGHT}
-                viewBox={`0 0 ${waveWidth * 2} ${WAVE_HEIGHT}`}
+              {waveWidth > 0 && (
+                <Animated.View
+                  style={{
+                    width: waveWidth * 2,
+                    height: WAVE_HEIGHT,
+                    transform: [{ translateX: waveTranslate }],
+                  }}
+                >
+                  <Svg
+                    width={waveWidth * 2}
+                    height={WAVE_HEIGHT}
+                    viewBox={`0 0 ${waveWidth * 2} ${WAVE_HEIGHT}`}
+                  >
+                    <Defs>
+                      <SvgLinearGradient
+                        id="waveGrad"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <Stop offset="0" stopColor="#06632D" stopOpacity="0" />
+                        <Stop offset="1" stopColor="#06632D" stopOpacity="1" />
+                      </SvgLinearGradient>
+                    </Defs>
+                    <Path d={wavePathD} fill="url(#waveGrad)" />
+                  </Svg>
+                </Animated.View>
+              )}
+            </View>
+            {playingRadioData?.userId?.profile?.avatar ? (
+              <Image
+                source={{
+                  uri: playingRadioData?.userId?.profile?.avatar,
+                }}
+                style={styles.image}
+              />
+            ) : (
+              <View
+                style={{
+                  height: 38,
+                  width: 38,
+                  borderRadius: 8,
+                  backgroundColor:
+                    playingRadioData?.userId?.profile?.profileColor ||
+                    colors.primaryColor,
+                }}
+              />
+            )}
+
+            <View style={styles.infoSection}>
+              <View style={styles.row}>
+                <Image
+                  source={Images.friendGray}
+                  style={[
+                    styles.smallIcon,
+                    { tintColor: isDark ? colors.white : COLORS.black },
+                  ]}
+                />
+                <CustomText
+                  label={`${playingRadioData?.play?.length || 0} listener${
+                    (playingRadioData?.play?.length || 0) !== 1 ? "s" : ""
+                  }`}
+                  fontSize={10}
+                  fontFamily={fonts.medium}
+                  color={isDark ? COLORS.gray48 : colors.textSecondary}
+                />
+                <View
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor: isDark
+                        ? COLORS.white16
+                        : "rgba(18, 18, 18, 0.16)",
+                    },
+                  ]}
+                />
+                <CustomText
+                  label={moment(playingRadioData?.createdAt).fromNow()}
+                  fontSize={10}
+                  fontFamily={fonts.medium}
+                  color={isDark ? COLORS.gray48 : colors.textSecondary}
+                />
+              </View>
+
+              <View style={styles.row}>
+                <CustomText
+                  label={playingRadioData?.title || "Untitled"}
+                  fontFamily={fonts.medium}
+                  color={colors.text}
+                />
+              </View>
+            </View>
+
+            {/* <ImageFast source={Images.playerVolume} style={styles.radioIcon} /> */}
+
+            {isLoading ? (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator color={COLORS.buttonColor} size="small" />
+              </View>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleStop}
+                style={{ overflow: "hidden", borderRadius: 99 }}
               >
-                <Defs>
-                  <SvgLinearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
-                    <Stop offset="0" stopColor="#06632D" stopOpacity="0" />
-                    <Stop offset="1" stopColor="#06632D" stopOpacity="1" />
-                  </SvgLinearGradient>
-                </Defs>
-                <Path d={wavePathD} fill="url(#waveGrad)" />
-              </Svg>
-            </Animated.View>
-          )}
-        </View>
-        {playingRadioData?.userId?.profile?.avatar ? (
-          <Image
-            source={{
-              uri: playingRadioData?.userId?.profile?.avatar,
-            }}
-            style={styles.image}
-          />
-        ) : (
-          <View
-            style={{
-              height: 38,
-              width: 38,
-              borderRadius: 8,
-              backgroundColor:
-                playingRadioData?.userId?.profile?.profileColor ||
-                colors.primaryColor,
-            }}
-          />
-        )}
-
-        <View style={styles.infoSection}>
-          <View style={styles.row}>
-            <Image
-              source={Images.friendGray}
-              style={[
-                styles.smallIcon,
-                { tintColor: isDark ? colors.white : COLORS.black },
-              ]}
-            />
-            <CustomText
-              label={`${playingRadioData?.play?.length || 0} listener${
-                (playingRadioData?.play?.length || 0) !== 1 ? "s" : ""
-              }`}
-              fontSize={10}
-              fontFamily={fonts.medium}
-              color={isDark ? COLORS.gray48 : colors.textSecondary}
-            />
-            <View
-              style={[
-                styles.dot,
-                {
-                  backgroundColor: isDark
-                    ? COLORS.white16
-                    : "rgba(18, 18, 18, 0.16)",
-                },
-              ]}
-            />
-            <CustomText
-              label={moment(playingRadioData?.createdAt).fromNow()}
-              fontSize={10}
-              fontFamily={fonts.medium}
-              color={isDark ? COLORS.gray48 : colors.textSecondary}
-            />
+                <Blur blurType={isDark ? "dark" : "light"} />
+                <Image
+                  source={Images.playerStop}
+                  style={[
+                    styles.playIcon,
+                    { tintColor: isDark ? COLORS.white : COLORS.black },
+                  ]}
+                />
+              </TouchableOpacity>
+            )}
           </View>
-
-          <View style={styles.row}>
-            <CustomText
-              label={playingRadioData?.title || "Untitled"}
-              fontFamily={fonts.medium}
-              color={colors.text}
-            />
-          </View>
-        </View>
-
-        {/* <ImageFast source={Images.playerVolume} style={styles.radioIcon} /> */}
-
-        {isLoading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator color={COLORS.buttonColor} size="small" />
-          </View>
-        ) : (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleStop}
-            style={{ overflow: "hidden", borderRadius: 99 }}
-          >
-            <Blur blurType={isDark ? "dark" : "light"} />
-            <Image
-              source={Images.playerStop}
-              style={[
-                styles.playIcon,
-                { tintColor: isDark ? COLORS.white : COLORS.black },
-              ]}
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-    </Animated.View>
+        </Animated.View>
+      )}
+    </>
   );
 };
 
 export default PlayerCard;
 
 const styles = StyleSheet.create({
+  engine: { position: "absolute", width: 0, height: 0, opacity: 0 },
   playerContainer: {
     position: "absolute",
     width: "90%",

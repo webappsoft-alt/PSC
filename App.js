@@ -140,6 +140,7 @@ const AppContent = () => {
             ShortWithId: "short/:postId",
             ViewStream: "live/:meetingId",
             UserProfile: "user/:userId",
+            RadioDetail: "radio/:radioId",
             RequestsScreen: "request",
           },
         },

@@ -4,7 +4,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
 import Header from "../../../../components/Header";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenFlatList,
+} from "../../../../components/ScreenWrapper";
 import { put } from "../../../../services/ApiRequest";
 import { setUserData } from "../../../../store/reducer/usersSlice";
 import { COLORS } from "../../../../utils/COLORS";
@@ -141,7 +144,7 @@ const NotificationSetting = () => {
       headerUnScrollable={() => <Header title={"Notifications"} />}
       headerBlur
     >
-      <FlatList
+      <ScreenFlatList
         data={notificationSettings}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}

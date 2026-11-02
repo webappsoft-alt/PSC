@@ -1,0 +1,199 @@
+diff --git a/node_modules/@react-native-community/blur/ios/BlurView.h b/node_modules/@react-native-community/blur/ios/BlurView.h
+--- a/node_modules/@react-native-community/blur/ios/BlurView.h
++++ b/node_modules/@react-native-community/blur/ios/BlurView.h
+@@ -15,6 +15,9 @@
+ @property (nonatomic, copy, nullable) NSString *blurType;
+ @property (nonatomic, copy, nullable) NSNumber *blurAmount;
+ @property (nonatomic, copy, nullable) UIColor *reducedTransparencyFallbackColor;
++// PSC patch: progressive blur (gradient mask on the effect view)
++@property (nonatomic, copy, nullable) NSString *progressiveDirection;
++@property (nonatomic, copy, nullable) NSNumber *progressiveStart;
+ 
+ @property (nonatomic, strong, nullable) BlurEffectWithAmount *blurEffect;
+ @property (nonatomic, strong, nullable) UIVisualEffectView *blurEffectView;
+@@ -22,5 +25,6 @@
+ 
+ - (void)updateBlurEffect;
+ - (void)updateFallbackView;
++- (void)updateProgressiveMask;
+ - (BOOL)useReduceTransparencyFallback;
+ @end
+diff --git a/node_modules/@react-native-community/blur/ios/BlurView.mm b/node_modules/@react-native-community/blur/ios/BlurView.mm
+--- a/node_modules/@react-native-community/blur/ios/BlurView.mm
++++ b/node_modules/@react-native-community/blur/ios/BlurView.mm
+@@ -50,6 +50,8 @@
+ 
+     self.blurAmount = @10;
+     self.blurType = @"dark";
++    _progressiveDirection = @"none";
++    _progressiveStart = @0;
+     [self updateBlurEffect];
+     [self updateFallbackView];
+ 
+@@ -88,6 +90,15 @@
+     UIColor *color = RCTUIColorFromSharedColor(newViewProps.reducedTransparencyFallbackColor);
+     [self setReducedTransparencyFallbackColor:color];
+   }
++
++  if (oldViewProps.progressiveDirection != newViewProps.progressiveDirection) {
++    NSString *direction = [NSString stringWithUTF8String:toString(newViewProps.progressiveDirection).c_str()];
++    [self setProgressiveDirection:direction];
++  }
++
++  if (oldViewProps.progressiveStart != newViewProps.progressiveStart) {
++    [self setProgressiveStart:[NSNumber numberWithFloat:newViewProps.progressiveStart]];
++  }
+   
+   [super updateProps:props oldProps:oldProps];
+ }
+@@ -103,6 +114,101 @@
+   [super layoutSubviews];
+   self.blurEffectView.frame = self.bounds;
+   self.reducedTransparencyFallbackView.frame = self.bounds;
++  [self updateProgressiveMask];
++}
++
++- (void)setProgressiveDirection:(NSString *)progressiveDirection
++{
++  if (progressiveDirection && ![self.progressiveDirection isEqualToString:progressiveDirection]) {
++    _progressiveDirection = progressiveDirection;
++    [self updateProgressiveMask];
++  }
++}
++
++- (void)setProgressiveStart:(NSNumber *)progressiveStart
++{
++  if (progressiveStart && ![self.progressiveStart isEqualToNumber:progressiveStart]) {
++    _progressiveStart = progressiveStart;
++    [self updateProgressiveMask];
++  }
++}
++
++// PSC patch: a blur under a masked *parent* renders unblurred on iOS, but a
++// mask set on the UIVisualEffectView's own maskView is supported. The mask
++// keeps the full blur up to `progressiveStart` and then fades it out with an
++// ease-in-out curve towards the opposite edge.
++- (void)updateProgressiveMask
++{
++  NSString *direction = self.progressiveDirection;
++  if (direction == nil || [direction isEqualToString:@"none"]) {
++    if (self.blurEffectView.maskView != nil) {
++      self.blurEffectView.maskView = nil;
++    }
++    return;
++  }
++
++  CGRect bounds = self.bounds;
++  if (CGRectIsEmpty(bounds)) {
++    return;
++  }
++
++  UIView *mask = self.blurEffectView.maskView;
++  CAGradientLayer *gradient = nil;
++  if (mask != nil && [mask.layer.sublayers.firstObject isKindOfClass:[CAGradientLayer class]]) {
++    gradient = (CAGradientLayer *)mask.layer.sublayers.firstObject;
++  } else {
++    mask = [[UIView alloc] initWithFrame:bounds];
++    mask.backgroundColor = [UIColor clearColor];
++    gradient = [CAGradientLayer layer];
++    [mask.layer addSublayer:gradient];
++  }
++
++  CGFloat start = (CGFloat)[self.progressiveStart doubleValue];
++  if (start < 0) {
++    // negative = fade length in points (measured from the far edge), so the
++    // mask follows the view's height natively while it is being resized
++    CGFloat length = ([direction isEqualToString:@"left"] || [direction isEqualToString:@"right"])
++      ? bounds.size.width : bounds.size.height;
++    start = length > 0 ? 1 - MIN(-start, length) / length : 0;
++  }
++  start = MIN(MAX(start, 0), 1);
++
++  NSMutableArray *colors = [NSMutableArray array];
++  NSMutableArray *locations = [NSMutableArray array];
++  [colors addObject:(id)[UIColor colorWithWhite:0 alpha:1].CGColor];
++  [locations addObject:@0];
++  const int steps = 12;
++  for (int i = 0; i <= steps; i++) {
++    CGFloat u = (CGFloat)i / steps;
++    CGFloat eased = u < 0.5 ? 4 * u * u * u : 1 - pow(-2 * u + 2, 3) / 2;
++    [colors addObject:(id)[UIColor colorWithWhite:0 alpha:(1 - eased)].CGColor];
++    [locations addObject:@(start + (1 - start) * u)];
++  }
++
++  [CATransaction begin];
++  [CATransaction setDisableActions:YES];
++  mask.frame = bounds;
++  gradient.frame = mask.bounds;
++  gradient.colors = colors;
++  gradient.locations = locations;
++  if ([direction isEqualToString:@"bottom"]) {
++    gradient.startPoint = CGPointMake(0.5, 1);
++    gradient.endPoint = CGPointMake(0.5, 0);
++  } else if ([direction isEqualToString:@"left"]) {
++    gradient.startPoint = CGPointMake(0, 0.5);
++    gradient.endPoint = CGPointMake(1, 0.5);
++  } else if ([direction isEqualToString:@"right"]) {
++    gradient.startPoint = CGPointMake(1, 0.5);
++    gradient.endPoint = CGPointMake(0, 0.5);
++  } else {
++    gradient.startPoint = CGPointMake(0.5, 0);
++    gradient.endPoint = CGPointMake(0.5, 1);
++  }
++  [CATransaction commit];
++
++  if (self.blurEffectView.maskView != mask) {
++    self.blurEffectView.maskView = mask;
++  }
+ }
+ 
+ - (void)setBlurType:(NSString *)blurType
+diff --git a/node_modules/@react-native-community/blur/ios/BlurViewManager.mm b/node_modules/@react-native-community/blur/ios/BlurViewManager.mm
+--- a/node_modules/@react-native-community/blur/ios/BlurViewManager.mm
++++ b/node_modules/@react-native-community/blur/ios/BlurViewManager.mm
+@@ -13,5 +13,7 @@
+ RCT_EXPORT_VIEW_PROPERTY(blurType, NSString);
+ RCT_EXPORT_VIEW_PROPERTY(blurAmount, NSNumber);
+ RCT_EXPORT_VIEW_PROPERTY(reducedTransparencyFallbackColor, UIColor);
++RCT_EXPORT_VIEW_PROPERTY(progressiveDirection, NSString);
++RCT_EXPORT_VIEW_PROPERTY(progressiveStart, NSNumber);
+ 
+ @end
+diff --git a/node_modules/@react-native-community/blur/src/components/BlurView.ios.tsx b/node_modules/@react-native-community/blur/src/components/BlurView.ios.tsx
+--- a/node_modules/@react-native-community/blur/src/components/BlurView.ios.tsx
++++ b/node_modules/@react-native-community/blur/src/components/BlurView.ios.tsx
+@@ -29,6 +29,8 @@
+   blurType?: BlurType;
+   blurAmount?: number;
+   reducedTransparencyFallbackColor?: string;
++  progressiveDirection?: 'none' | 'top' | 'bottom' | 'left' | 'right';
++  progressiveStart?: number;
+ };
+ 
+ const BlurView = forwardRef<View, BlurViewProps>(
+diff --git a/node_modules/@react-native-community/blur/src/fabric/BlurViewNativeComponent.ts b/node_modules/@react-native-community/blur/src/fabric/BlurViewNativeComponent.ts
+--- a/node_modules/@react-native-community/blur/src/fabric/BlurViewNativeComponent.ts
++++ b/node_modules/@react-native-community/blur/src/fabric/BlurViewNativeComponent.ts
+@@ -3,6 +3,7 @@
+ import type {
+   WithDefault,
+   Int32,
++  Float,
+ } from 'react-native/Libraries/Types/CodegenTypes';
+ 
+ interface NativeProps extends ViewProps {
+@@ -32,6 +33,14 @@
+   >;
+   blurAmount?: WithDefault<Int32, 10>;
+   reducedTransparencyFallbackColor?: ColorValue;
++  // PSC patch: progressive blur — a gradient mask on the effect view itself
++  // (strong at this edge, fading out towards the opposite one)
++  progressiveDirection?: WithDefault<
++    'none' | 'top' | 'bottom' | 'left' | 'right',
++    'none'
++  >;
++  // 0…1: share of the view that keeps the full blur before it fades out
++  progressiveStart?: WithDefault<Float, 0>;
+ }
+ 
+ export default codegenNativeComponent<NativeProps>('BlurView', {

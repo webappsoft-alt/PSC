@@ -60,7 +60,7 @@ const Profile = () => {
   const [viewablePostId, setViewablePostId] = useState(null);
   const [loadedTabs, setLoadedTabs] = useState([]);
 
-  const { setIsTabBarVisible } = useTabBarVisibility();
+  const { setIsTabBarVisible, reportPageEdges } = useTabBarVisibility();
   const dispatch = useDispatch();
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastContentOffset = useRef(0);
@@ -355,14 +355,18 @@ const Profile = () => {
   return (
     <View style={{ flex: 1 }}>
       <ScreenWrapper
+        // bottom-nav blur only while content sits under it
+        onScrollEdgeChange={(edges) => reportPageEdges?.("Profile", edges)}
         paddingHorizontal={0.1}
         scrollEnabled
         onScroll={onScroll}
         scrollEventThrottle={16}
         translucent
         stickyHeaderIndices={[1]}
-        // banner header (own design), not the progressive-blur page header
-        headerBlur={false}
+        // the banner header floats and the profile scrolls under it (its
+        // own Figma background: banner, tier gradient, or #121212 64% + blur
+        // 32); the tabs stick right below it
+        headerBlur
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

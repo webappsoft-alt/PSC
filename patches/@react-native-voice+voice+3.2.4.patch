@@ -1,0 +1,46 @@
+diff --git a/node_modules/@react-native-voice/voice/ios/Voice/Voice.m b/node_modules/@react-native-voice/voice/ios/Voice/Voice.m
+--- a/node_modules/@react-native-voice/voice/ios/Voice/Voice.m
++++ b/node_modules/@react-native-voice/voice/ios/Voice/Voice.m
+@@ -23,6 +23,7 @@
+ @property (nonatomic) NSString* priorAudioCategory;
+ /** Volume level Metering*/
+ @property float averagePowerForChannel0;
++@property CFAbsoluteTime lastVolumeEventAt; // PSC: volume events throttled
+ @property float averagePowerForChannel1;
+ 
+ @end
+@@ -152,6 +153,17 @@
+     self.recognitionRequest = [[SFSpeechAudioBufferRecognitionRequest alloc] init];
+     // Configure request so that results are returned before audio recording is finished
+     self.recognitionRequest.shouldReportPartialResults = YES;
++    // PSC: live captions — dictation hint, and on-device recognition where
++    // the device supports it (no network round trip, partial results arrive
++    // as the words are spoken, no 1-minute server limit)
++    self.recognitionRequest.taskHint = SFSpeechRecognitionTaskHintDictation;
++#if !TARGET_OS_SIMULATOR
++    if (@available(iOS 13.0, *)) {
++        if (self.speechRecognizer.supportsOnDeviceRecognition) {
++            self.recognitionRequest.requiresOnDeviceRecognition = YES;
++        }
++    }
++#endif
+     
+     if (self.recognitionRequest == nil) {
+         [self sendResult:@{@"code": @"recognition_init"} :nil :nil :nil];
+@@ -247,8 +259,14 @@
+             }
+             // Normalizing the Volume Value on scale of (0-10)
+             self.averagePowerForChannel1 = [self _normalizedPowerLevelFromDecibels:self.averagePowerForChannel1]*10;
+-            NSNumber *value = [NSNumber numberWithFloat:self.averagePowerForChannel1];
+-            [self sendEventWithName:@"onSpeechVolumeChanged" body:@{@"value": value}];
++            // PSC: one bridge event per audio buffer (~47/s) floods the JS
++            // thread and delays the transcript — send at most every 100 ms
++            CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
++            if (now - self.lastVolumeEventAt >= 0.1) {
++                self.lastVolumeEventAt = now;
++                NSNumber *value = [NSNumber numberWithFloat:self.averagePowerForChannel1];
++                [self sendEventWithName:@"onSpeechVolumeChanged" body:@{@"value": value}];
++            }
+             
+             // Todo: write recording buffer to file (if user opts in)
+             if (self.recognitionRequest != nil) {

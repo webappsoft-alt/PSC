@@ -1,11 +1,11 @@
-import MaskedView from "@react-native-masked-view/masked-view";
-import LinearGradient from "react-native-linear-gradient";
 import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { BlurView } from "@react-native-community/blur";
 import { getPalette } from "@somesoap/react-native-image-palette";
 import React from "react";
 import { isColorDark } from "../utils/constants";
+
+const STRIPS = 8;
 
 export default function ProgressiveBlur({
   intensity = 80,
@@ -23,7 +23,6 @@ export default function ProgressiveBlur({
   const isVertical = direction === "top" || direction === "bottom";
   const size = isVertical ? { height } : { width };
 
-  const { colors, locations } = getEasedGradient(direction);
 
   const [detectedTint, setDetectedTint] = useState(null);
 
@@ -45,29 +44,64 @@ export default function ProgressiveBlur({
   const blurAmount = intensity;
   const blurType = detectedTint || (tint === "default" ? "light" : tint);
 
+  // iOS renders a UIVisualEffectView under a masked parent unblurred, so the
+  // progression is built from thin strips laid side by side from the strong
+  // edge ("top" = strongest at the top), each with a weaker blur and a lower
+  // opacity — no mask, no stacked tints, no hard edge. Capped: beyond ~32
+  // the blur only washes the content out.
+  const strength = Math.min(blurAmount, 32);
+  const layers = Array.from({ length: STRIPS }, (_, i) => {
+    const t = i / STRIPS;
+    return {
+      key: i,
+      start: `${t * 100}%`,
+      // 1% overlap hides the seams between strips
+      size: `${100 / STRIPS + 1}%`,
+      radius: Math.max(1, Math.round(strength * (1 - t))),
+      opacity: 1 - t,
+    };
+  });
+  const edgeKey =
+    direction === "bottom"
+      ? "bottom"
+      : direction === "left"
+        ? "left"
+        : direction === "right"
+          ? "right"
+          : "top";
+
   return (
     <View
       pointerEvents={pointerEvents}
       style={[styles.container, size, { borderRadius, marginTop }, style]}
     >
-      <MaskedView
-        style={StyleSheet.absoluteFill}
-        maskElement={
-          <LinearGradient
-            colors={colors}
-            locations={locations}
-            start={getGradientStart(direction)}
-            end={getGradientEnd(direction)}
-            style={StyleSheet.absoluteFill}
-          />
-        }
-      >
+      {Platform.OS === "ios" ? (
+        // gradient mask on the effect view itself (patched community blur)
         <BlurView
-          blurAmount={blurAmount}
+          pointerEvents="none"
+          blurAmount={strength}
           blurType={blurType}
+          progressiveDirection={edgeKey}
+          progressiveStart={0}
           style={StyleSheet.absoluteFill}
         />
-      </MaskedView>
+      ) : (
+        layers.map((layer) => (
+          <BlurView
+            key={layer.key}
+            pointerEvents="none"
+            blurAmount={layer.radius}
+            blurType={blurType}
+            style={[
+              styles.layer,
+              isVertical
+                ? { left: 0, right: 0, height: layer.size }
+                : { top: 0, bottom: 0, width: layer.size },
+              { [edgeKey]: layer.start, opacity: layer.opacity },
+            ]}
+          />
+        ))
+      )}
       {children && <View style={styles.childrenContainer}>{children}</View>}
     </View>
   );
@@ -140,6 +174,9 @@ function getGradientEnd(direction) {
 const styles = StyleSheet.create({
   container: {
     overflow: "hidden",
+  },
+  layer: {
+    position: "absolute",
   },
   childrenContainer: {
     flex: 1,

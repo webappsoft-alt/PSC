@@ -22,6 +22,7 @@ import { post } from "../../../services/ApiRequest";
 import { ToastMessage } from "../../../utils/ToastMessage";
 import { InfoLine, InputField, SelectField } from "../TvShow/molecules/ShowForm";
 
+import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
 /**
  * Figma Chat page "Submit-a-report" (2212:6145, 375×812), from Conversation
  * settings › "Report this user".
@@ -51,6 +52,8 @@ const ReportChat = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
+  // header blur only while content sits under it (client rule)
+  const edge = useScrollEdgeBlur();
   const { colors, isDark } = useTheme();
   const tint = (o) => (isDark ? `rgba(255, 255, 255, ${o})` : `rgba(18, 18, 18, ${o})`);
   const user = route?.params?.user || null;
@@ -91,7 +94,7 @@ const ReportChat = () => {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* ───────── header (floats; content scrolls under the progressive blur) ───────── */}
-      <FloatingBlurHeader onHeightChange={setHeaderH} includeStatusBar={false}>
+      <FloatingBlurHeader visible={edge.headerVisible} onHeightChange={setHeaderH} includeStatusBar={false}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.back, { backgroundColor: tint(0.08) }]}>
@@ -105,6 +108,7 @@ const ReportChat = () => {
 
       <View style={styles.screen}>
         <ScrollView
+          {...edge.scrollProps()}
           style={{ opacity: headerH == null ? 0 : 1 }}
           contentContainerStyle={[styles.content, { paddingTop: 12 + (headerH || 0), paddingBottom: 108 + Math.max(insets.bottom, 34) }]}
           scrollIndicatorInsets={{ top: headerH || 0 }}

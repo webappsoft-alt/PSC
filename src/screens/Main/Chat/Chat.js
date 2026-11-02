@@ -92,6 +92,8 @@ const Chat = ({
   onTabChange,
   onNewChat,
   onCreate, // Groups / Circles page: open Create a Group / Circle
+  // pager: ({ header, footer }) → the shared Inbox bottom bar blur
+  onScrollEdgeChange,
 }) => {
   const navigation = useNavigation();
   const isFocus = useIsFocused();
@@ -529,6 +531,7 @@ const Chat = ({
         </View>
       )}
       footerUnScrollable={() => (embedded ? null : <InboxBottomBar active="chat" />)}
+      onScrollEdgeChange={onScrollEdgeChange}
       scrollEnabled
     >
       <>

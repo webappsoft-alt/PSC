@@ -28,6 +28,14 @@ const EditModal = ({
   onHidePost,
   onHideUserPosts,
   user,
+  // false → owner sees only Delete (Radios / Audio Posts have no edit flow)
+  showEditActions = true,
+  deleteTitle = "Delete post",
+  reportTitle = "Report this post",
+  // false → no "Hide User's posts" row (not available for Radios)
+  showHideUser = true,
+  // optional: a real report action (posts keep hiding via onHidePost)
+  onReport,
 }) => {
   const { colors } = useTheme();
   const [selectedOption, setSelectedOption] = useState(null);
@@ -46,7 +54,8 @@ const EditModal = ({
         {
           text: "Confirm",
           onPress: () => {
-            onHidePost && onHidePost();
+            if (onReport) onReport();
+            else if (onHidePost) onHidePost();
             onClose();
           },
         },
@@ -86,24 +95,28 @@ const EditModal = ({
       <View style={styles.options}>
         {isOwner ? (
           <>
-            <SheetOptionRow
-              icon="edit"
-              iconFamily="MaterialSymbolsRoundedFilled"
-              title="Edit Post"
-              subtitle="Fine tune before publishing"
-              onPress={onEditPress}
-            />
-            <SheetOptionRow
-              icon="schedule"
-              title="Reschedule"
-              subtitle="Edit date & time"
-              onPress={onReschedulePress}
-            />
+            {showEditActions ? (
+              <>
+                <SheetOptionRow
+                  icon="edit"
+                  iconFamily="MaterialSymbolsRoundedFilled"
+                  title="Edit Post"
+                  subtitle="Fine tune before publishing"
+                  onPress={onEditPress}
+                />
+                <SheetOptionRow
+                  icon="schedule"
+                  title="Reschedule"
+                  subtitle="Edit date & time"
+                  onPress={onReschedulePress}
+                />
+              </>
+            ) : null}
             <SheetOptionRow
               icon="error"
               iconFamily="MaterialSymbolsRoundedFilled"
               danger
-              title="Delete post"
+              title={deleteTitle}
               subtitle="Cannot recover after deletion"
               onPress={onDeletePress}
             />
@@ -123,6 +136,7 @@ const EditModal = ({
                 onClose();
               }}
             />
+{showHideUser ? (
             <SheetOptionRow
               icon="visibility_off"
               iconFamily="MaterialSymbolsRoundedFilled"
@@ -136,11 +150,12 @@ const EditModal = ({
                 onClose();
               }}
             />
+            ) : null}
             <SheetOptionRow
               icon="error"
               iconFamily="MaterialSymbolsRoundedFilled"
               danger
-              title="Report this post"
+              title={reportTitle}
               subtitle="Reports are anonymous"
               onPress={handleReport}
             />

@@ -185,7 +185,9 @@ const FeedComposerRow = () => {
         <CircleButton
           name="mic"
           filled
-          onPress={() => navigation.navigate("CreateAudio")}
+          // the mic records an Audio Post (everyone); Radio uploads are
+          // Pro-only and live in the + menu
+          onPress={() => navigation.navigate("RecordAudioPost")}
         />
       </View>
     </View>

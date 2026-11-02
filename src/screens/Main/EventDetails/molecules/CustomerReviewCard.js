@@ -62,7 +62,9 @@ const CustomerReviewCard = ({
                 .map((img, index) => (
                   <Image key={index} source={img} style={styles.reviewImage} />
                 ))
-            : [1, 2, 3].map(() => <View style={styles.placeholderImage} />)}
+            : [1, 2, 3].map((n) => (
+                <View key={n} style={styles.placeholderImage} />
+              ))}
         </View>
 
         <View style={styles.footerRow}>

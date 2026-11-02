@@ -32,7 +32,11 @@ import Header from "../../../components/Header";
 import ImageFast from "../../../components/ImageFast";
 import Icons from "../../../components/Icons";
 import ProgressiveBlur from "../../../components/ProgressiveBlur";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenScrollView,
+  ScreenFooterSpacer,
+} from "../../../components/ScreenWrapper";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { useUpload } from "../../../contexts/UploadContext";
 import { post, put } from "../../../services/ApiRequest";
@@ -840,6 +844,7 @@ const PublishShort = ({ route }) => {
   return (
     <ScreenWrapper
       headerBlur
+      footerBlur
       headerUnScrollable={() => (
         <Header
           title={editMode ? "Edit Reel" : "Publish Reel"}
@@ -880,7 +885,7 @@ const PublishShort = ({ route }) => {
         </View>
       )}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScreenScrollView showsVerticalScrollIndicator={false}>
         {/* starts below the floating blurred header */}
         <ScreenHeaderSpacer />
         {uploadedImages?.length > 0 && (
@@ -1498,7 +1503,9 @@ const PublishShort = ({ route }) => {
           handleCapture={handleCapture}
           setImageModal={setImageModal}
         />
-      </ScrollView>
+        {/* content ends above the floating footer */}
+        <ScreenFooterSpacer />
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 };

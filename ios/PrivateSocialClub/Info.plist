@@ -62,6 +62,8 @@
 	<string>PrivateSocialClub app uses your location to provide accurate services and notifications related to your trips and vehicles.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>PrivateSocialClub app needs access to your location to provide location-based services, calculate distances, and help you find nearby places.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>PrivateSocialClub uses speech recognition to show the transcript of your audio post while you record.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>PrivateSocialClub app needs access to microphone for voice commands and audio features.</string>
 	<key>NSMotionUsageDescription</key>

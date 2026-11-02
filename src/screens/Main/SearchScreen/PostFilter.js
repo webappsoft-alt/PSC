@@ -10,6 +10,7 @@ import Header from "../../../components/Header";
 import ScreenWrapper, {
   ScreenHeaderInsetConsumer,
   ScreenHeaderSpacer,
+  ScreenFlatList,
 } from "../../../components/ScreenWrapper";
 import { del, get, post } from "../../../services/ApiRequest";
 import { COLORS } from "../../../utils/COLORS";
@@ -248,7 +249,7 @@ const PostFilter = ({ route }) => {
     >
       <ScreenHeaderInsetConsumer>
         {(headerInset) => (
-          <FlatList
+          <ScreenFlatList
             ref={scrollRef}
             data={posts}
             renderItem={renderItem}

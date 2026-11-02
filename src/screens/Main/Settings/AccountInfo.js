@@ -25,7 +25,11 @@ import ErrorComponent from "../../../components/ErrorComponent";
 import Header from "../../../components/Header";
 import Icons from "../../../components/Icons";
 import ImageFast from "../../../components/ImageFast";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenFlatList,
+  ScreenFooterSpacer,
+} from "../../../components/ScreenWrapper";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { put } from "../../../services/ApiRequest";
 import { setUserData } from "../../../store/reducer/usersSlice";
@@ -970,7 +974,9 @@ const AccountInfo = () => {
     };
 
     return (
-      <FlatList
+      <ScreenFlatList
+        // content ends above the floating footer
+        ListFooterComponent={<ScreenFooterSpacer />}
         data={formData}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
@@ -998,6 +1004,7 @@ const AccountInfo = () => {
         <ScreenWrapper
           headerUnScrollable={() => <Header title="PSC" />}
           headerBlur
+          footerBlur
           footerUnScrollable={() => (
             <View style={{ paddingHorizontal: 12 }}>
               <CustomButton

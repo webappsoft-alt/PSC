@@ -27,6 +27,7 @@ import ScreenWrapper from "../../../components/ScreenWrapper";
 import { useSocket } from "../../../components/SocketProvider";
 import UpdateUserLocation from "../../../components/UpdateUserLocation";
 import { useTabBarVisibility } from "../../../navigation/TabStack";
+import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
 import { del, get, post } from "../../../services/ApiRequest";
 import { selectStoryUploadStatus } from "../../../store/reducer/appSlice";
 import { setLocation } from "../../../store/reducer/usersSlice";
@@ -76,6 +77,9 @@ const areTopicListsEqual = (current = [], next = []) => {
 };
 
 
+// native-driven scroll offset (Animated.event useNativeDriver) needs an Animated list
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
+
 const Home = ({
   route,
   pagerProgress,
@@ -119,9 +123,21 @@ const Home = ({
   const feedLocation = useSelector((state) => state.users.location);
 
   const [feedType, setFeedType] = useState(route?.params?.feedType || "social");
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const { setIsTabBarVisible, setFeedRowVisible, feedRowAnim } =
-    useTabBarVisibility();
+  const {
+    setIsTabBarVisible,
+    setFeedRowVisible,
+    feedRowAnim,
+    reportPageEdges,
+    feedScrollY,
+  } = useTabBarVisibility();
+  // shared with the pager's Feed header: its blur follows this offset
+  // directly (JS-driven, same frame as the list)
+  const localScrollY = useRef(new Animated.Value(0)).current;
+  const scrollY = feedScrollY || localScrollY;
+  // feed header / bottom-nav blur only while posts sit under them
+  const edge = useScrollEdgeBlur({
+    onChange: (edges) => reportPageEdges?.("Home", edges),
+  });
   const lastContentOffset = useRef(0);
   const scrollRef = useRef(null);
   const hasFeedContentRef = useRef(false);
@@ -132,7 +148,12 @@ const Home = ({
 
   useEffect(() => {
     getLocation();
-    const listener = scrollY.addListener(({ value }) => {
+  }, [getLocation]);
+
+  // runs on the JS thread for every scroll event (the offset itself is
+  // tracked natively — see onScroll)
+  const handleScrollValue = useCallback(
+    (value) => {
       // adaptive tab bar: re-check the media under the bar (once per frame)
       evaluateNavTone();
       if (value < 0) return;
@@ -150,16 +171,10 @@ const Home = ({
         setIsTabBarVisible(shouldShow);
       }
 
-      // Pinterest-style: Feed/Shorts row collapses on scroll down
-      setFeedRowVisible?.(shouldShow);
-
       lastContentOffset.current = currentOffset;
-    });
-
-    return () => {
-      scrollY.removeListener(listener);
-    };
-  }, [getLocation, scrollY, setIsTabBarVisible, setFeedRowVisible]);
+    },
+    [setIsTabBarVisible],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -820,9 +835,12 @@ const Home = ({
   const onScroll = useMemo(
     () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-        useNativeDriver: false,
+        // native: the Feed/Shorts row + header blur follow the offset on the
+        // UI thread; the listener keeps the JS-side tab-bar logic
+        useNativeDriver: true,
+        listener: (e) => handleScrollValue(e.nativeEvent.contentOffset.y),
       }),
-    [scrollY],
+    [scrollY, handleScrollValue],
   );
 
   const socketRef = useRef(socket);
@@ -927,7 +945,7 @@ const Home = ({
           statusBarColor={colors.statusBarColor}
           headerFloating
         >
-          <FlatList
+          <AnimatedFlatList
             showsVerticalScrollIndicator={false}
             ref={scrollRef}
             // iOS otherwise adds the safe-area inset on top of paddingTop
@@ -939,8 +957,7 @@ const Home = ({
             ListHeaderComponent={renderListHeader}
             ListEmptyComponent={renderListEmpty}
             scrollEnabled={true}
-            onScroll={onScroll}
-            scrollEventThrottle={16}
+            {...edge.scrollProps({ onScroll, scrollEventThrottle: 16 })}
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
             refreshControl={

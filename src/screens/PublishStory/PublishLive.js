@@ -19,7 +19,11 @@ import CustomInput from "../../components/CustomInput";
 import CustomInputTextOnly from "../../components/CustomInputTextOnly";
 import CustomModalGooglePlaces from "../../components/CustomModalGooglePlaces";
 import Header from "../../components/Header";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenScrollView,
+  ScreenFooterSpacer,
+} from "../../components/ScreenWrapper";
 import Divider from "../../components/Divider";
 import ErrorComponent from "../../components/ErrorComponent";
 import Icons from "../../components/Icons";
@@ -263,6 +267,7 @@ const PublishLive = () => {
   return (
     <ScreenWrapper
       headerBlur
+      footerBlur
       headerUnScrollable={() => <Header title="Launch A Live" />}
       footerUnScrollable={() => (
         <View
@@ -282,7 +287,7 @@ const PublishLive = () => {
         </View>
       )}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScreenScrollView showsVerticalScrollIndicator={false}>
         {/* content starts below the floating blurred header */}
         <ScreenHeaderSpacer />
         {/* Title */}
@@ -599,7 +604,9 @@ const PublishLive = () => {
             }
           }}
         />
-      </ScrollView>
+        {/* content ends above the floating footer */}
+        <ScreenFooterSpacer />
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 };

@@ -15,7 +15,9 @@ import fonts from "../../../assets/fonts";
 import CustomModalGooglePlaces from "../../../components/CustomModalGooglePlaces";
 import CustomSwitch from "../../../components/CustomSwitch";
 import CustomText from "../../../components/CustomText";
-import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
+import HeaderProgressiveBlur, {
+  FooterProgressiveBlur,
+} from "../../../components/HeaderProgressiveBlur";
 import Icons from "../../../components/Icons";
 import ScreenWrapper from "../../../components/ScreenWrapper";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -35,6 +37,7 @@ import {
 } from "../../../utils/matchingFilters";
 import { GlassFill, capGap } from "./molecules/matchLayout";
 
+import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
 /**
  * Figma › Matching › "Filters" (375 × 1140): #262626 page, #121212 sections
  * stacked 2pt apart, fixed header (status bar + 56) and fixed CTA (12 / 56 /
@@ -234,6 +237,8 @@ const MatchingFilters = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
+  // header blur only while content sits under it (client rule)
+  const edge = useScrollEdgeBlur();
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
   const { userData } = useSelector((state) => state.users);
@@ -365,6 +370,7 @@ const MatchingFilters = () => {
       backgroundColor={PAGE_BG}
     >
       <ScrollView
+        {...edge.scrollProps()}
         scrollEnabled={scrollEnabled}
         style={{ backgroundColor: PAGE_BG }}
         contentContainerStyle={{
@@ -512,7 +518,7 @@ const MatchingFilters = () => {
       {/* Header: status bar + 56 (pad 8 / 12) */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         {/* Figma Header: progressive background blur, content scrolls under */}
-        <HeaderProgressiveBlur />
+        <HeaderProgressiveBlur visible={edge.headerVisible} />
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
@@ -564,8 +570,10 @@ const MatchingFilters = () => {
         </View>
       </View>
 
-      {/* CTA: pad 12 / 12 / home indicator */}
+      {/* CTA: pad 12 / 12 / home indicator; footer blur only while the
+          filters scroll under it (client rule) */}
       <View style={[styles.cta, { paddingBottom: ctaPadBottom }]}>
+        <FooterProgressiveBlur color={PAGE_BG} visible={edge.footerVisible} />
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={onDiscover}
@@ -742,7 +750,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: SECTION_BG,
     paddingTop: CTA_PAD_TOP,
     paddingHorizontal: PAD_H,
   },

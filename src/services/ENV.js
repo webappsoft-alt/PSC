@@ -1,9 +1,9 @@
 export const endPoints = {
-  // Production URLs
+  // // Production URLs
   BASE_URL: "https://psc.sola-group.ch/api/",
   SOCKET_BASE_URL: "https://psc.sola-group.ch/",
 
   // local URLs
-  // BASE_URL: "https://z458l1cp-8000.inc1.devtunnels.ms/api/",
-  // SOCKET_BASE_URL: "https://z458l1cp-8000.inc1.devtunnels.ms/",
+  // BASE_URL: "http://localhost:8000/api/",
+  // SOCKET_BASE_URL: "http://localhost:8000/",
 };

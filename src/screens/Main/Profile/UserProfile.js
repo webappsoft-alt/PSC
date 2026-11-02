@@ -414,8 +414,10 @@ const UserProfile = ({ route }) => {
         scrollEnabled
         translucent
         stickyHeaderIndices={[1]}
-        // banner header (own design), not the progressive-blur page header
-        headerBlur={false}
+        // the banner header floats and the profile scrolls under it (its
+        // own Figma background: banner, tier gradient, or #121212 64% + blur
+        // 32); the tabs stick right below it
+        headerBlur
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

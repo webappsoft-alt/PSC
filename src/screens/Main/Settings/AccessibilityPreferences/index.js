@@ -6,7 +6,10 @@ import { isProAccount } from "../../../../utils/political";
 import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
 import Header from "../../../../components/Header";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenFlatList,
+} from "../../../../components/ScreenWrapper";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import SettingsItems from "../molecules/SettingsItems";
 import { useSelector } from "react-redux";
@@ -93,7 +96,7 @@ const AccessibilityPreferences = () => {
       paddingHorizontal={0.1}
       headerBlur
     >
-      <FlatList
+      <ScreenFlatList
         ListHeaderComponent={
           <>
             <ScreenHeaderSpacer />

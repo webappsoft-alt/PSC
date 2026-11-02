@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import Header from "../../../../components/Header";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenFlatList,
+} from "../../../../components/ScreenWrapper";
 import TopTabWithBG from "../../../../components/TopTabWithBG";
 import { put } from "../../../../services/ApiRequest";
 import { setUserData } from "../../../../store/reducer/usersSlice";
@@ -429,7 +432,7 @@ const NotificationPreference = () => {
       paddingHorizontal={0.1}
       headerBlur
     >
-      <FlatList
+      <ScreenFlatList
         ListHeaderComponent={<ScreenHeaderSpacer />}
         data={accordionSections}
         renderItem={renderAccordion}

@@ -16,7 +16,11 @@ import CustomText from "../../../components/CustomText";
 import Divider from "../../../components/Divider";
 import ErrorComponent from "../../../components/ErrorComponent";
 import Header from "../../../components/Header";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenScrollView,
+  ScreenFooterSpacer,
+} from "../../../components/ScreenWrapper";
 import { COLORS } from "../../../utils/COLORS";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { COUNTRIES as COUNTRIES_DATA } from "../../../utils/COUNTRIES";
@@ -212,10 +216,11 @@ const CreateEvent = () => {
   return (
     <ScreenWrapper
       headerBlur
+      footerBlur
       headerUnScrollable={() => header}
       footerUnScrollable={() => footer}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScreenScrollView showsVerticalScrollIndicator={false}>
         {/* content starts below the floating blurred header */}
         <ScreenHeaderSpacer />
         <CustomText
@@ -466,7 +471,9 @@ const CreateEvent = () => {
             setSelectionVisible(false);
           }}
         />
-      </ScrollView>
+        {/* content ends above the floating footer */}
+        <ScreenFooterSpacer />
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 };

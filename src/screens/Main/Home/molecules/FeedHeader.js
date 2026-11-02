@@ -185,10 +185,13 @@ const FeedHeader = ({
   // chips slide up under row 1 (Pinterest-style); reverses on scroll up.
   // Opacity + translateY only, so it runs on the native driver — no layout
   // per frame, no jerk while the feed is scrolling/playing video.
+  // gone before it slides under row 1 (no "Feed Shorts" ghost over the
+  // location row while it travels)
   const row2Opacity = feedRowAnim
     ? feedRowAnim.interpolate({
-        inputRange: [0, 0.6, 1],
-        outputRange: [0, 0.15, 1],
+        inputRange: [0, 0.5, 1],
+        outputRange: [0, 0, 1],
+        extrapolate: "clamp",
       })
     : 1;
   const collapseY = feedRowAnim
@@ -409,17 +412,18 @@ const FeedHeader = ({
             },
           ]}
         >
+          {/* Figma: explore 16 · gap 4 · "For you" SemiBold 14, −4%,
+              Title Case — upright, unlike the topic chips */}
           <Icons
             family="MaterialSymbolsRoundedFilled"
             name="explore"
-            size={18}
+            size={16}
             color={tab === null ? "#121212" : COLORS.gray64}
           />
           <CustomText
             label="For You"
             fontSize={14}
-            fontFamily={fonts.BoldItalic}
-            fontStyle="italic"
+            fontFamily={fonts.semiBold}
             letterSpacing={-0.56}
             color={tab === null ? "#121212" : COLORS.gray64}
             marginLeft={4}
@@ -470,7 +474,6 @@ const FeedHeader = ({
             1px below the header, so the line sits in the header's last px);
             inside this wrapper so it slides up with the chips on collapse */}
       </ScrollView>
-        <View style={styles.bottomLine} />
       </Animated.View>
     </View>
   );

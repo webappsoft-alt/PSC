@@ -109,6 +109,8 @@ import ViewerWatchScreen from "../screens/Main/LiveScreens/ViewerWatchScreen.js"
 import PublishLive from "../screens/PublishStory/PublishLive.js";
 import ViewStreamScreen from "../screens/ViewStream/ViewStreamScreen.js";
 import CreateAudio from "../screens/Main/Audio/CreateAudio.js";
+import RecordAudioPost from "../screens/Main/Audio/RecordAudioPost.js";
+import RadioDetail from "../screens/Main/Audio/RadioDetail.js";
 import CreateEpisode from "../screens/Main/TvShow/CreateEpisode";
 import ShowDetail from "../screens/Main/TvShow/ShowDetail";
 import SelectShow from "../screens/Main/TvShow/SelectShow";
@@ -351,6 +353,13 @@ const MainStack = () => {
 
         {/* audio screen */}
         <Stack.Screen name="CreateAudio" component={CreateAudio} />
+        {/* Audio Post recorder + Radio / Audio Post detail (Figma AUDIO POST) */}
+        <Stack.Screen
+          name="RecordAudioPost"
+          component={RecordAudioPost}
+          options={{ gestureEnabled: false }}
+        />
+        <Stack.Screen name="RadioDetail" component={RadioDetail} />
         {/* Shows: Create An Episode + its pickers (Figma Shows page) */}
         <Stack.Screen name="CreateEpisode" component={CreateEpisode} />
         <Stack.Screen name="ShowDetail" component={ShowDetail} />

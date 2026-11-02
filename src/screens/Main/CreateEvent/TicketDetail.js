@@ -15,7 +15,11 @@ import Divider from "../../../components/Divider";
 import ErrorComponent from "../../../components/ErrorComponent";
 import Header from "../../../components/Header";
 import Icons from "../../../components/Icons";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  withScreenScroll,
+  ScreenFooterSpacer,
+} from "../../../components/ScreenWrapper";
 import { post } from "../../../services/ApiRequest";
 import { COLORS } from "../../../utils/COLORS";
 import { ToastMessage } from "../../../utils/ToastMessage";
@@ -25,6 +29,9 @@ import SelectionModal from "./molecules/SelectionModal";
 import SwitchOption from "./molecules/SwitchOption";
 import TimingDetails from "./molecules/TimingDetails";
 
+
+// reports its scroll so the floating header / footer blur over content
+const ScreenKeyboardScrollView = withScreenScroll(KeyboardAwareScrollView);
 const TicketDetail = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
@@ -221,6 +228,7 @@ const TicketDetail = () => {
   return (
     <ScreenWrapper
       headerBlur
+      footerBlur
       headerUnScrollable={() => (
         <>
           <Header title={"New event"} />
@@ -290,7 +298,7 @@ const TicketDetail = () => {
       )}
       paddingHorizontal={0.1}
     >
-      <KeyboardAwareScrollView enableResetScrollToCoords={false}>
+      <ScreenKeyboardScrollView enableResetScrollToCoords={false}>
         {/* content starts below the floating blurred header */}
         <ScreenHeaderSpacer />
         <View style={{ marginHorizontal: 12 }}>
@@ -569,7 +577,9 @@ const TicketDetail = () => {
             setModalVisible(false);
           }}
         />
-      </KeyboardAwareScrollView>
+        {/* content ends above the floating footer */}
+        <ScreenFooterSpacer />
+      </ScreenKeyboardScrollView>
     </ScreenWrapper>
   );
 };

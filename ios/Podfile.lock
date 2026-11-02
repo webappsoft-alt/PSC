@@ -2417,6 +2417,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - react-native-voice (3.2.4):
+    - React-Core
   - react-native-webrtc (0.0.24):
     - React-Core
     - WebRTC-SDK (= 125.6422.07)
@@ -3605,6 +3607,7 @@ DEPENDENCIES:
   - "react-native-slider (from `../node_modules/@react-native-community/slider`)"
   - react-native-track-player (from `../node_modules/react-native-track-player`)
   - react-native-video (from `../node_modules/react-native-video`)
+  - "react-native-voice (from `../node_modules/@react-native-voice/voice`)"
   - "react-native-webrtc (from `../node_modules/@videosdk.live/react-native-webrtc`)"
   - react-native-webview (from `../node_modules/react-native-webview`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
@@ -3827,6 +3830,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-track-player"
   react-native-video:
     :path: "../node_modules/react-native-video"
+  react-native-voice:
+    :path: "../node_modules/@react-native-voice/voice"
   react-native-webrtc:
     :path: "../node_modules/@videosdk.live/react-native-webrtc"
   react-native-webview:
@@ -4020,6 +4025,7 @@ SPEC CHECKSUMS:
   react-native-slider: 5a5be2166504021463b0acf01378659801dc12ec
   react-native-track-player: 24ecd55d64da8a6471ba96484b67bc9cee6fc629
   react-native-video: 29b9b5245e45ffb6810e57299d7c791dd2e37278
+  react-native-voice: f5e8eec2278451d0017eb6a30a6ccc726aca34e0
   react-native-webrtc: 2a4c62a5f1707a0f5ee29b11c4edd5267c73083b
   react-native-webview: caf358dd8f90aa15f010bfe474cd93d389a40e41
   React-NativeModulesApple: d061f458c3febdf0ac99b1b0faf23b7305974b25

@@ -23,6 +23,7 @@ import NewShowSheet from "./molecules/NewShowSheet";
 import { CircleButton, FormHeader, ListRow, Radio } from "./molecules/ShowForm";
 import { GlassFill, SHOWS } from "./molecules/showsLayout";
 
+import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
 /**
  * Figma Shows › "Select-Show" (7580:13351). Header (status bar + 12) / 12 /
  * 8 / 12, gap 12: back · "Search" (SemiBold 20) · 40 add circle (→ New
@@ -41,6 +42,8 @@ const EMPTY_DRAFT = {
 const SelectShow = ({ route }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  // header blur only while content sits under it (client rule)
+  const edge = useScrollEdgeBlur();
   const selectedId = route?.params?.selectedId;
 
   const [search, setSearch] = useState("");
@@ -166,6 +169,7 @@ const SelectShow = ({ route }) => {
   return (
     <View style={styles.page}>
       <ScrollView
+        {...edge.scrollProps()}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
           paddingTop: headerHeight + 1,
@@ -247,7 +251,7 @@ const SelectShow = ({ route }) => {
         </View>
       </ScrollView>
 
-      <FormHeader
+      <FormHeader blurVisible={edge.headerVisible}
         title="Search"
         topPad={12}
         titleGap={12}

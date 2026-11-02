@@ -82,6 +82,9 @@ import {
 } from "../utils/feedTopics";
 import CustomButton from "../components/CustomButton";
 import ProgressiveBlur from "../components/ProgressiveBlur";
+import HeaderProgressiveBlur, {
+  FooterProgressiveBlur,
+} from "../components/HeaderProgressiveBlur";
 import ViewerWatchScreen from "../screens/Main/LiveScreens/ViewerWatchScreen";
 
 const TAB_NAMES = [
@@ -254,6 +257,8 @@ const HomeWithCameraPager = ({ route, navigation }) => {
     pagerPositionNative,
     pagerOffsetNative,
     setChipFollow,
+    feedScrollY,
+    activePagerPage,
   } = useTabBarVisibility();
 
   const attachPagerRef = useCallback(
@@ -491,28 +496,90 @@ const HomeWithCameraPager = ({ route, navigation }) => {
   // Header visible on pages 1 (Home), 2 (Shorts)
   // Fades in from page 0→1, fades out from page 2→3
   const headerOpacity = pagerProgress.interpolate({
-    inputRange: [0, 0.8, 1, 2, 2.3],
+    inputRange: [0, 0.8, 0.98, 2, 2.3],
     outputRange: [0, 0, 1, 1, 0],
     extrapolate: "clamp",
   });
 
+  // NOTE: both ranges hold an exact 1 around the Feed page. A UIVisualEffectView
+  // loses its blur when any ancestor's alpha is even a hair under 1 (the pager
+  // reports 0.9999 / 1.0001 while settling), which made the content behind the
+  // header show sharp "sometimes".
+  // the header blur belongs to the Feed page (Shorts plays full-bleed video);
+  // it fades over the first half of a swipe so a slightly diagonal vertical
+  // scroll (pager nudged a few points) doesn't flicker it
   const bgOpacity = pagerProgress.interpolate({
-    inputRange: [1, 1.2, 2, 2.2, 3],
-    outputRange: themeMode === "light" ? [1, 1, 1, 0, 0] : [1, 0, 0, 0, 0],
+    inputRange: [0, 1.05, 1.5, 2, 3],
+    outputRange: [1, 1, 0, 0, 0],
     extrapolate: "clamp",
   });
+  const feedHeaderBlur = useMemo(
+    () =>
+      feedScrollY.interpolate({
+        inputRange: [0, 4],
+        outputRange: [0, 1],
+        extrapolate: "clamp",
+      }),
+    [feedScrollY],
+  );
 
-  const headerCollapseY = useMemo(
+  // which header blur is on (see render): a hard 0/1 step on the native row
+  // value, so neither blur is ever part-transparent
+  const feedBlurFull = useMemo(
     () =>
       feedRowAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [-FEED_HEADER_COLLAPSE, 0],
+        inputRange: [0, 0.499, 0.5, 1],
+        outputRange: [0, 0, 1, 1],
+        extrapolate: "clamp",
+      }),
+    [feedRowAnim],
+  );
+  const feedBlurShort = useMemo(
+    () =>
+      feedRowAnim.interpolate({
+        inputRange: [0, 0.499, 0.5, 1],
+        outputRange: [1, 1, 0, 0],
+        extrapolate: "clamp",
       }),
     [feedRowAnim],
   );
 
+  // touchable only on Feed / Shorts. activePagerPage is set right away by a
+  // bar tap (setPageWithoutAnimation doesn't always report onPageSelected on
+  // iOS, which left `currentPage` stale and the header's buttons dead)
+  const headerPage =
+    activePagerPage === currentPage ? currentPage : activePagerPage;
   const isHeaderVisible =
-    currentPage >= PAGER_HOME_INDEX && currentPage <= PAGER_SHORTS_INDEX;
+    headerPage >= PAGER_HOME_INDEX && headerPage <= PAGER_SHORTS_INDEX;
+  // A bottom-bar tap jumps the pager straight to a far page (Matching,
+  // Events…): the native pager passes the Feed/Shorts positions on the way,
+  // which used to flash the Feed header over the target page. The target is
+  // known up front (activePagerPage), so the header is off for any page
+  // beyond Shorts' neighbours.
+  const headerPageAllowed = activePagerPage <= PAGER_SHOWS_FROM_SHORTS_INDEX;
+  // The header opacity is native-driven: swapping that Animated style for a
+  // plain number leaves the native node in charge (the header stayed on
+  // every tab), so the page gate is an Animated value in the same chain.
+  const headerPageGate = useRef(
+    new Animated.Value(headerPageAllowed ? 1 : 0),
+  ).current;
+  useEffect(() => {
+    headerPageGate.setValue(headerPageAllowed ? 1 : 0);
+  }, [headerPageAllowed, headerPageGate]);
+  // the pager (re)mounts on its initial page — keep the shared active page in
+  // step with it (a pending bar-tap jump still wins, see setActivePagerPage)
+  useEffect(() => {
+    setActivePagerPage(HOME_PAGE_INDEX);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const headerContainerOpacity = useMemo(
+    () =>
+      Animated.multiply(
+        Animated.multiply(headerOpacity, headerAnim),
+        headerPageGate,
+      ),
+    [headerOpacity, headerAnim, headerPageGate],
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -523,54 +590,38 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           left: 0,
           right: 0,
           zIndex: 10,
-          opacity: Animated.multiply(headerOpacity, headerAnim),
+          opacity: headerContainerOpacity,
           paddingTop: insets.top,
           pointerEvents: "box-none",
         }}
         pointerEvents={isHeaderVisible ? "box-none" : "none"}
       >
-        {/* header background shrinks with the Feed/Shorts row collapse
-            (native-driven translate on its own view, separate from the
-            JS-driven page-swipe opacity) */}
+        {/* Figma Header: progressive background blur 16 → 0, a frosted
+            overlay — only while the feed sits under it. Deliberately NOT
+            transformed: a UIVisualEffectView that carries a gradient mask
+            loses its blur while any ancestor is being translated (that was
+            the "content behind the header shows sometimes" bug). */}
         <Animated.View
           pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFill,
-            { transform: [{ translateY: headerCollapseY }] },
-          ]}
+          style={[StyleSheet.absoluteFill, { opacity: bgOpacity }]}
         >
+          {/* two fixed-height blurs, swapped (never faded) half-way through
+              the Feed/Shorts row collapse: full header while the row shows,
+              ending at the chips once it's gone. A resized masked blur lags
+              (JS layout round-trip) and a part-transparent one drops its
+              blur, so each keeps a static frame and an opacity of 0 or 1. */}
+          <Animated.View
+            style={[StyleSheet.absoluteFill, { opacity: feedBlurFull }]}
+          >
+            <HeaderProgressiveBlur visible={feedHeaderBlur} />
+          </Animated.View>
           <Animated.View
             style={[
               StyleSheet.absoluteFill,
-              {
-                // Figma: the header is solid #121212 like every section —
-                // the dark BlurView tint lifted it to ~#191919, a visible
-                // step against the feed, so it is light-theme only
-                backgroundColor:
-                  themeMode === "dark" ? colors.background : "transparent",
-                opacity: bgOpacity,
-              },
+              { bottom: FEED_HEADER_COLLAPSE, opacity: feedBlurShort },
             ]}
           >
-            {themeMode === "light" && (
-              <BlurView
-                style={StyleSheet.absoluteFill}
-                blurType="light"
-                blurAmount={2}
-                reducedTransparencyFallbackColor="#FFFFFF35"
-              />
-            )}
-            {themeMode === "light" && (
-              <View
-                pointerEvents="none"
-                style={[
-                  StyleSheet.absoluteFill,
-                  {
-                    backgroundColor: "rgba(0, 0, 0, 0.32)",
-                  },
-                ]}
-              />
-            )}
+            <HeaderProgressiveBlur visible={feedHeaderBlur} />
           </Animated.View>
         </Animated.View>
         <FeedHeader
@@ -757,9 +808,13 @@ const CREATE_MENU_ITEMS = [
   { label: "Show", icon: "live_tv", filled: true, route: "CreateEpisode", pro: true },
   { label: "Go Live", icon: "fiber_manual_record", filled: true, route: "PublishLive" },
   { label: "Story", icon: "web_stories", filled: true, route: "CameraScreen" },
-  { label: "Radio", icon: "mic", filled: true, route: "CreateAudio" },
+  // Radio = long-format pre-recorded upload — Pro only (client); everyone
+  // records an Audio Post (a vocal opinion) instead
+  { label: "Radio", icon: "mic", filled: true, route: "CreateAudio", pro: true },
   { label: "Poll", icon: "ballot", filled: true, route: "CreatePost", params: { postType: "poll" } },
   { label: "Picture", icon: "photo_camera", filled: true, route: "CreatePost", params: { postType: "picture" } },
+  // Figma "New-Feed-Create": Audio Post between Picture and Post
+  { label: "Audio Post", icon: "mic", filled: true, route: "RecordAudioPost" },
   { label: "Post", icon: "edit", filled: true, route: "CreatePost" },
 ];
 // Figma "New-Feed-Create": 48 rows, gap 8 (56 apart), and 24 between the
@@ -797,7 +852,22 @@ const TabBarVisibilityContext = createContext({
   setFeedRowVisible: noop,
   isPlusVisible: true,
   setPlusVisible: noop,
+  navBlurAnim: new Animated.Value(0),
+  feedHeaderBlurAnim: new Animated.Value(0),
+  feedScrollY: null,
+  reportPageEdges: noop,
 });
+
+// pages that report whether content sits under the feed header / nav bar
+const EDGE_PAGE_BY_NAME = {
+  Home: PAGER_HOME_INDEX,
+  Shorts: PAGER_SHORTS_INDEX,
+  Matching: PAGER_MATCHING_INDEX,
+  Events: PAGER_EVENTS_INDEX,
+  Shows: PAGER_SHOWS_INDEX,
+  Profile: PAGER_PROFILE_INDEX,
+};
+const EDGE_FADE_MS = 180;
 
 export const useTabBarVisibility = () => useContext(TabBarVisibilityContext);
 
@@ -846,22 +916,25 @@ export const TabBarVisibilityProvider = ({ children }) => {
   const [requestedPagerPage, setRequestedPagerPage] = useState(null);
 
   // Figma Home-Feed: the Feed/Shorts row collapses on scroll (Pinterest-style)
-  const feedRowAnim = useRef(new Animated.Value(1)).current;
-  const feedRowVisibleRef = useRef(true);
-  const setFeedRowVisible = useCallback(
-    (visible) => {
-      if (feedRowVisibleRef.current === visible) return;
-      feedRowVisibleRef.current = visible;
-      Animated.timing(feedRowAnim, {
-        toValue: visible ? 1 : 0,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        // opacity/translate only (FeedHeader) → native thread, no jank
-        useNativeDriver: true,
-      }).start();
-    },
-    [feedRowAnim],
-  );
+  // Feed/Shorts row: collapses as the feed scrolls up, returns on scroll down.
+  // Entirely on the native thread (diffClamp of the feed's native-driven
+  // scroll offset) so it moves in step with the posts, no JS-thread stutter.
+  // 1 = shown, 0 = collapsed.
+  const feedScrollY = useRef(new Animated.Value(0)).current;
+  const feedRowAnim = useMemo(() => {
+    const offset = feedScrollY.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+      extrapolateLeft: "clamp",
+    });
+    return Animated.diffClamp(offset, 0, FEED_HEADER_COLLAPSE).interpolate({
+      inputRange: [0, FEED_HEADER_COLLAPSE],
+      outputRange: [1, 0],
+      extrapolate: "clamp",
+    });
+  }, [feedScrollY]);
+  // kept for callers that used to force the row; the scroll offset now owns it
+  const setFeedRowVisible = useCallback(() => {}, []);
 
   // Threads-style "+" button — hidden at the top of the feed, shows on scroll
   const [isPlusVisible, setIsPlusVisibleState] = useState(false);
@@ -885,6 +958,53 @@ export const TabBarVisibilityProvider = ({ children }) => {
       prevPage === page ? prevPage : page,
     );
   }, []);
+
+  // Client rule: the feed header and the bottom-nav container blur only while
+  // content sits under them. Each page reports its own state; the one on
+  // screen drives the shared header / nav blur.
+  const navBlurAnim = useRef(new Animated.Value(0)).current;
+  const feedHeaderBlurAnim = useRef(new Animated.Value(0)).current;
+  // Home feed's vertical offset (JS-driven Animated.event in Home): the Feed
+  // header blur is an interpolation of it — on as soon as posts slide under
+  // the header, off at the top — with no state to fall out of sync
+  const pageEdgesRef = useRef({});
+  const appliedEdgesRef = useRef({ header: false, footer: false });
+  const applyEdges = useCallback(
+    (edges) => {
+      const header = !!edges?.header;
+      const footer = !!edges?.footer;
+      if (appliedEdgesRef.current.header !== header) {
+        Animated.timing(feedHeaderBlurAnim, {
+          toValue: header ? 1 : 0,
+          duration: EDGE_FADE_MS,
+          useNativeDriver: true,
+        }).start();
+      }
+      if (appliedEdgesRef.current.footer !== footer) {
+        Animated.timing(navBlurAnim, {
+          toValue: footer ? 1 : 0,
+          duration: EDGE_FADE_MS,
+          useNativeDriver: true,
+        }).start();
+      }
+      appliedEdgesRef.current = { header, footer };
+    },
+    [feedHeaderBlurAnim, navBlurAnim],
+  );
+  const activePagerPageRef = useRef(PAGER_HOME_INDEX);
+  useEffect(() => {
+    activePagerPageRef.current = activePagerPage;
+    applyEdges(pageEdgesRef.current[activePagerPage]);
+  }, [activePagerPage, applyEdges]);
+  const reportPageEdges = useCallback(
+    (pageName, edges) => {
+      const page = EDGE_PAGE_BY_NAME[pageName];
+      if (page === undefined) return;
+      pageEdgesRef.current[page] = edges;
+      if (page === activePagerPageRef.current) applyEdges(edges);
+    },
+    [applyEdges],
+  );
 
   const clearRequestedPagerPage = useCallback(() => {
     setRequestedPagerPage((prevPage) => (prevPage === null ? prevPage : null));
@@ -968,8 +1088,16 @@ export const TabBarVisibilityProvider = ({ children }) => {
       setFeedRowVisible,
       isPlusVisible,
       setPlusVisible,
+      navBlurAnim,
+      feedHeaderBlurAnim,
+      reportPageEdges,
+      feedScrollY,
     }),
     [
+      feedScrollY,
+      navBlurAnim,
+      feedHeaderBlurAnim,
+      reportPageEdges,
       isTabBarVisible,
       setIsTabBarVisible,
       headerAnim,
@@ -1228,6 +1356,7 @@ const CustomTabBar = ({ state, navigation }) => {
     pagerOffsetNative,
     chipFollow,
     setChipFollow,
+    navBlurAnim,
   } = useTabBarVisibility();
   const [optimisticActivePage, setOptimisticActivePage] =
     useState(activePagerPage);
@@ -1952,48 +2081,30 @@ const CustomTabBar = ({ state, navigation }) => {
           },
         ]}
       >
-        {/* Figma nav container: progressive background blur (0 → 16),
-            from 32pt above the bar to the screen bottom, + #121212 0% → 100%.
+        {/* Figma nav container (Home-Feed 2214:3665): progressive background
+            blur (0 → 16), from 32pt above the bar to the screen bottom,
+            + #121212 0% → 64% — a frosted overlay, never a solid hide, and
+            only while the page's content sits under it (client rule).
             Under the iOS 26 glass the dark fill is left out and the blur uses
             the near-tint-free ultra-thin material: UIGlassEffect picks light
             / dark from the luminance of the pixels behind it, and a dark
             fill there kept it reading "dark" over light media. */}
-        <View
+        <Animated.View
           pointerEvents="none"
           style={[
             styles.navProgressive,
-            { height: NAV_PROGRESSIVE_HEIGHT + tabBarBottomOffset },
+            {
+              height: NAV_PROGRESSIVE_HEIGHT + tabBarBottomOffset,
+              opacity: navBlurAnim,
+            },
           ]}
         >
-          <ProgressiveBlur
-            pointerEvents="none"
-            direction="bottom"
-            tint={
-              NATIVE_GLASS
-                ? themeMode === "light"
-                  ? "ultraThinMaterialLight"
-                  : "ultraThinMaterialDark"
-                : themeMode === "light"
-                  ? "light"
-                  : "dark"
-            }
-            intensity={16}
-            height={NAV_PROGRESSIVE_HEIGHT + tabBarBottomOffset}
-            borderRadius={0}
-            style={StyleSheet.absoluteFill}
+          <FooterProgressiveBlur
+            // the container already holds the 32pt band above the bar
+            fade={32}
+            overhang={0}
           />
-          {!NATIVE_GLASS && (
-            <LinearGradient
-              pointerEvents="none"
-              colors={
-                themeMode === "light"
-                  ? ["rgba(255, 255, 255, 0)", "rgba(255, 255, 255, 1)"]
-                  : ["rgba(18, 18, 18, 0)", "rgba(18, 18, 18, 1)"]
-              }
-              style={StyleSheet.absoluteFill}
-            />
-          )}
-        </View>
+        </Animated.View>
         <BarShell
           style={[
             styles.tabContentContainer,

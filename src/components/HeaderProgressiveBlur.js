@@ -1,131 +1,223 @@
 import { BlurView } from "@react-native-community/blur";
-import MaskedView from "@react-native-masked-view/masked-view";
-import { memo, useCallback, useMemo, useState } from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { memo, useCallback, useState } from "react";
+import { Animated, Platform, StyleSheet, View } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../contexts/ThemeContext";
 
 /**
- * Header background for headers that float over scrolling content (client
- * rule: "the header has progressive blur everywhere").
+ * Figma "Header" / nav container background — a frosted overlay, never a
+ * solid hide (client rule): the content stays visible through it, blurred.
  *
- * At rest it is exactly the Figma header: the page colour (#121212 dark /
- * #FAFAFA light) — no visible band. Content that scrolls up dissolves into
- * it through a progressive edge at the header's bottom: background blur 16 → 0
- * (Figma Header › Background blur › Progressive, radius 16) together with a
- * page-colour fade, over the same 32pt progressive band the Figma bottom-nav
- * container uses (#121212 0% → 100%, mirrored here). Above that band the
- * header stays opaque, so titles, buttons and chips never sit on top of raw
- * content.
+ * Behind the header's own content the blur is full strength (Figma radius
+ * 16, plus a light #121212 tint so titles and chips stay readable); past the
+ * header's inner edge it eases out over a `fade` band (Figma: progressive
+ * blur 16 → 0) that hangs over the content.
  *
- * Fills its parent (absoluteFill); the parent must span the whole header,
- * status bar included.
+ * iOS renders a UIVisualEffectView under a masked parent unblurred (that was
+ * the "progressive blur is completely off" bug): on iOS the mask now sits on
+ * the effect view itself (patches/@react-native-community+blur — props
+ * progressiveDirection / progressiveStart); Android steps the band down in
+ * thin strips.
+ *
+ * Client rule: the blur is there only while content sits under the header /
+ * footer. Pass `visible` (an Animated 0 → 1 value from useScrollEdgeBlur);
+ * without it the blur is always on (headers over full-bleed media).
  */
 export const HEADER_BLUR_RADIUS = 16;
-export const HEADER_PROGRESSIVE_BAND = 32;
-const STEPS = 10;
-const smooth = (t) => t * t * (3 - 2 * t);
+// fade band past the header / footer edge (Figma nav container band: 32)
+export const EDGE_FADE = 24;
+// tint behind the header content: frosted, not a solid fill
+export const HEADER_FILL_ALPHA = 0.64;
+// strips the fade band is cut into
+const BAND_STRIPS = 8;
+// Figma Home-Feed nav container: #121212 0% → 64%
+export const FOOTER_FILL_ALPHA = 0.64;
 
-const toRgb = (color) => {
-  if (typeof color !== "string") return "18, 18, 18";
+const toRgb = (color, fallback) => {
+  if (typeof color !== "string") return fallback;
   const hex = color.replace("#", "");
   if (/^[0-9a-f]{6}$/i.test(hex)) {
     return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ");
   }
   const m = color.match(/rgba?\(([^)]+)\)/);
-  return m ? m[1].split(",").slice(0, 3).join(",") : "18, 18, 18";
+  return m ? m[1].split(",").slice(0, 3).join(",") : fallback;
 };
 
-const HeaderProgressiveBlur = ({ style, color }) => {
-  const { themeMode, colors } = useTheme();
-  const isLight = themeMode === "light";
-  const [height, setHeight] = useState(0);
-  const onLayout = useCallback((e) => {
-    const h = Math.round(e.nativeEvent.layout.height);
-    setHeight((prev) => (prev === h ? prev : h));
-  }, []);
+export const EdgeProgressiveBlur = memo(
+  ({
+    edge = "top",
+    visible,
+    color,
+    fillAlpha = HEADER_FILL_ALPHA,
+    // band (pt) over which the blur eases out at the inner edge
+    fade = EDGE_FADE,
+    // how far the band hangs past the parent (0 = the band is inside it)
+    overhang = fade,
+    style,
+  }) => {
+    const { themeMode, colors } = useTheme();
+    const isLight = themeMode === "light";
+    const [total, setTotal] = useState(0);
+    const onLayout = useCallback((e) => {
+      const h = Math.round(e.nativeEvent.layout.height);
+      setTotal((prev) => (prev === h ? prev : h));
+    }, []);
+    const rgb = toRgb(
+      color || colors?.background,
+      isLight ? "250, 250, 250" : "18, 18, 18",
+    );
+    const blurType =
+      Platform.OS === "ios"
+        ? isLight
+          ? "ultraThinMaterialLight"
+          : "ultraThinMaterialDark"
+        : isLight
+          ? "light"
+          : "dark";
+    const top = edge === "top";
+    const body = Math.max(0, total - fade);
+    // outer edge → inner edge: full blur behind the header content, then
+    // the band is cut into thin strips whose blur fades out step by step
+    // (radius and opacity), so there is no hard edge where it ends. The
+    // layers sit side by side (never stacked) so the material tint is even.
+    const strip = Math.max(1, Math.round(fade / BAND_STRIPS));
+    const bodyPx = Math.round(body);
+    const layers =
+      total > 0
+        ? [
+            {
+              key: "body",
+              start: 0,
+              height: bodyPx,
+              radius: HEADER_BLUR_RADIUS,
+              opacity: 1,
+            },
+            ...Array.from({ length: BAND_STRIPS }, (_, i) => {
+              const t = (i + 1) / (BAND_STRIPS + 1);
+              return {
+                key: `band${i}`,
+                // whole points, edge to edge: an overlap reads as a line
+                start: bodyPx + strip * i,
+                height: strip,
+                radius: Math.max(1, Math.round(HEADER_BLUR_RADIUS * (1 - t))),
+                opacity: 1 - t,
+              };
+            }),
+          ]
+        : [];
+    const fadeStart = total > 0 ? body / total : 1;
+    const tint = top
+      ? {
+          colors: [
+            `rgba(${rgb}, ${fillAlpha})`,
+            `rgba(${rgb}, ${fillAlpha})`,
+            `rgba(${rgb}, 0)`,
+          ],
+          locations: [0, fadeStart, 1],
+        }
+      : {
+          colors: [
+            `rgba(${rgb}, 0)`,
+            `rgba(${rgb}, ${fillAlpha})`,
+            `rgba(${rgb}, ${fillAlpha})`,
+          ],
+          locations: [0, 1 - fadeStart, 1],
+        };
 
-  const rgb = toRgb(color || colors?.background || (isLight ? "#FAFAFA" : "#121212"));
-  // where the progressive band starts (0 → 1 down the header)
-  const bandStart =
-    height > HEADER_PROGRESSIVE_BAND
-      ? (height - HEADER_PROGRESSIVE_BAND) / height
-      : 0;
-
-  const fade = useMemo(() => {
-    const colorsOut = [`rgba(${rgb}, 1)`];
-    const locations = [0];
-    for (let i = 0; i <= STEPS; i += 1) {
-      const u = i / STEPS;
-      colorsOut.push(`rgba(${rgb}, ${(1 - smooth(u)).toFixed(3)})`);
-      locations.push(bandStart + (1 - bandStart) * u);
-    }
-    return { colors: colorsOut, locations };
-  }, [rgb, bandStart]);
-
-  const tint =
-    Platform.OS === "ios"
-      ? isLight
-        ? "ultraThinMaterialLight"
-        : "ultraThinMaterialDark"
-      : isLight
-        ? "light"
-        : "dark";
-
-  return (
-    <View
-      pointerEvents="none"
-      onLayout={onLayout}
-      style={[StyleSheet.absoluteFill, style]}
-    >
-      {height > 0 ? (
-        <>
-          {/* Figma progressive background blur: full radius down to the
-              band, then 16 → 0 across it */}
-          <MaskedView
+    return (
+      <Animated.View
+        pointerEvents="none"
+        onLayout={onLayout}
+        style={[
+          styles.fill,
+          top ? { bottom: -overhang } : { top: -overhang },
+          visible != null ? { opacity: visible } : null,
+          style,
+        ]}
+      >
+        {Platform.OS === "ios" ? (
+          // iOS: one blur with a gradient mask on the effect view itself
+          // (patched @react-native-community/blur): full strength behind the
+          // header content, easing to 0 across the band — a true progressive
+          // edge, no seams
+          <BlurView
             pointerEvents="none"
             style={StyleSheet.absoluteFill}
-            maskElement={
-              <LinearGradient
-                colors={["#000", "#000", "rgba(0, 0, 0, 0)"]}
-                locations={[0, bandStart, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-            }
-          >
+            blurType={blurType}
+            blurAmount={HEADER_BLUR_RADIUS}
+            progressiveDirection={edge}
+            progressiveStart={total > 0 ? fadeStart : 0.6}
+            overlayColor="transparent"
+            reducedTransparencyFallbackColor={`rgba(${rgb}, 0.9)`}
+          />
+        ) : (
+          layers.map((layer) => (
             <BlurView
-              style={StyleSheet.absoluteFill}
-              blurType={tint}
-              blurAmount={HEADER_BLUR_RADIUS}
+              key={layer.key}
+              pointerEvents="none"
+              style={[
+                styles.layer,
+                top ? { top: layer.start } : { bottom: layer.start },
+                { height: layer.height, opacity: layer.opacity },
+              ]}
+              blurType={blurType}
+              blurAmount={layer.radius}
               overlayColor="transparent"
-              reducedTransparencyFallbackColor={`rgb(${rgb})`}
+              reducedTransparencyFallbackColor={`rgba(${rgb}, 0.9)`}
             />
-          </MaskedView>
+          ))
+        )}
+        {fillAlpha > 0 ? (
           <LinearGradient
             pointerEvents="none"
-            colors={fade.colors}
-            locations={fade.locations}
+            colors={tint.colors}
+            locations={tint.locations}
             style={StyleSheet.absoluteFill}
           />
-        </>
-      ) : (
-        // first frame, before the header is measured: plain page colour
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: `rgb(${rgb})` }]} />
-      )}
-    </View>
-  );
-};
+        ) : null}
+      </Animated.View>
+    );
+  },
+);
+
+/** Header background (Figma Header › progressive background blur). */
+const HeaderProgressiveBlur = ({ style, color, visible, fade, overhang }) => (
+  <EdgeProgressiveBlur
+    edge="top"
+    visible={visible}
+    color={color}
+    fade={fade}
+    overhang={overhang}
+    style={style}
+  />
+);
 
 export default memo(HeaderProgressiveBlur);
+
+/** Footer background (Figma nav container: blur 0 → 16 + #121212 0 → 64%). */
+export const FooterProgressiveBlur = memo(
+  ({ style, color, visible, fillAlpha, fade, overhang }) => (
+    <EdgeProgressiveBlur
+      edge="bottom"
+      visible={visible}
+      color={color}
+      fillAlpha={fillAlpha ?? FOOTER_FILL_ALPHA}
+      fade={fade}
+      overhang={overhang}
+      style={style}
+    />
+  ),
+);
 
 /**
  * For screens that don't use ScreenWrapper's header: floats `children` over
  * the content at y 0 (adds the status-bar inset unless `includeStatusBar` is
  * false because the header already handles it) with the progressive blur
  * behind, and reports its total height so the scroll content can start below
- * it (contentContainerStyle paddingTop / progressViewOffset).
+ * it (contentContainerStyle paddingTop / progressViewOffset). Pass `visible`
+ * from useScrollEdgeBlur so the blur only shows over scrolled content.
  */
 export const FloatingBlurHeader = ({
   children,
@@ -133,6 +225,7 @@ export const FloatingBlurHeader = ({
   includeStatusBar = true,
   style,
   color,
+  visible,
 }) => {
   const insets = useSafeAreaInsets();
   const onLayout = useCallback(
@@ -149,13 +242,25 @@ export const FloatingBlurHeader = ({
         style,
       ]}
     >
-      <HeaderProgressiveBlur color={color} />
+      <HeaderProgressiveBlur color={color} visible={visible} />
       {children}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  fill: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  layer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+  },
   floating: {
     position: "absolute",
     top: 0,

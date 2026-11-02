@@ -13,7 +13,10 @@ import CustomText from "../../../components/CustomText";
 import Icons from "../../../components/Icons";
 import { useSelector } from "react-redux";
 import { Images } from "../../../assets/images";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenFlatList,
+  ScreenHeaderSpacer,
+} from "../../../components/ScreenWrapper";
 import { useSocket } from "../../../components/SocketProvider";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { getMessages } from "../../../services/ChatService";
@@ -706,7 +709,7 @@ const InboxScreen = ({ route }) => {
           ))}
         </View>
       ) : (
-        <FlatList
+        <ScreenFlatList
           inverted
           ref={flatListRef}
           data={messages}

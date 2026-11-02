@@ -94,7 +94,12 @@ const PaymentCard = () => {
 
         <View style={styles.iconsGrid}>
           {paymentIcons.map((icon, index) => (
-            <Image source={icon} style={styles.icon} resizeMode="contain" />
+            <Image
+              key={index}
+              source={icon}
+              style={styles.icon}
+              resizeMode="contain"
+            />
           ))}
         </View>
 

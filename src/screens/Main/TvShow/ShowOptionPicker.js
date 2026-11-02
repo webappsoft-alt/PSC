@@ -13,6 +13,7 @@ import {
 import { FormHeader, ListRow, Radio } from "./molecules/ShowForm";
 import { SHOWS, baseline, capGap, capTop } from "./molecules/showsLayout";
 
+import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
 /**
  * Figma Shows › "Select-Category" (7580:13699) — "Age Rating": #262626 page,
  * header (status bar + 56), #121212 list 1pt below it. 64pt rows, pad 16:
@@ -39,6 +40,8 @@ const KINDS = {
 const ShowOptionPicker = ({ route }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  // header blur only while content sits under it (client rule)
+  const edge = useScrollEdgeBlur();
   const kind = KINDS[route?.params?.kind] || KINDS.ageRating;
   const selected = route?.params?.value;
 
@@ -50,6 +53,7 @@ const ShowOptionPicker = ({ route }) => {
   return (
     <View style={styles.page}>
       <ScrollView
+        {...edge.scrollProps()}
         contentContainerStyle={{
           paddingTop: insets.top + 56 + 1,
           paddingBottom: insets.bottom + 24,
@@ -89,7 +93,7 @@ const ShowOptionPicker = ({ route }) => {
           ))}
         </View>
       </ScrollView>
-      <FormHeader title={kind.title} onBack={() => navigation.goBack()} />
+      <FormHeader blurVisible={edge.headerVisible} title={kind.title} onBack={() => navigation.goBack()} />
     </View>
   );
 };

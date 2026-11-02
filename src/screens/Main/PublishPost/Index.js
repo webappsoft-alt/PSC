@@ -31,10 +31,15 @@ import Header from "../../../components/Header";
 import Icons from "../../../components/Icons";
 import ImageFast from "../../../components/ImageFast";
 import ProgressiveBlur from "../../../components/ProgressiveBlur";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenScrollView,
+  ScreenFooterSpacer,
+} from "../../../components/ScreenWrapper";
 import UploadImageCustom from "../../../components/UploadImageCustom";
 import { useUpload } from "../../../contexts/UploadContext";
 import { post, put } from "../../../services/ApiRequest";
+import { publishAudioPost } from "../../../services/radioApi";
 import { COLORS } from "../../../utils/COLORS";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { uploadAndGetUrl, uploadFileGetUrl } from "../../../utils/constants";
@@ -42,11 +47,15 @@ import { ToastMessage } from "../../../utils/ToastMessage";
 import PeopleSelection from "./molecules/PeopleSelection";
 
 // Validation function
-const validateForm = (values) => {
+const validateForm = (values, { isAudioPost = false } = {}) => {
   const errors = {};
 
-  // Description
-  if (!values.description || values.description.trim() === "") {
+  // Description (an Audio Post's recording is the content — text optional)
+  if (isAudioPost) {
+    if (values.description?.length > 250) {
+      errors.description = "Description cannot exceed 250 characters";
+    }
+  } else if (!values.description || values.description.trim() === "") {
     errors.description = "Description is required";
   } else if (values.description.length > 250) {
     errors.description = "Description cannot exceed 250 characters";
@@ -57,8 +66,8 @@ const validateForm = (values) => {
     errors.size = "Image size is required";
   }
 
-  // Images
-  if (!values.images || values.images.length === 0) {
+  // Images (optional cover for an Audio Post)
+  if (!isAudioPost && (!values.images || values.images.length === 0)) {
     errors.images = "At least one image is required";
   }
 
@@ -77,8 +86,10 @@ const validateForm = (values) => {
     errors.contentRating = "Content visibility is required";
   }
 
-  // Location
-  if (!values.location) {
+  // Location (optional for an Audio Post)
+  if (isAudioPost && !values.location) {
+    // nothing to check
+  } else if (!values.location) {
     errors.location = "Location is required";
   } else if (
     !values.location.address ||
@@ -170,6 +181,9 @@ const CreatePost = ({ route }) => {
   const editMode = route?.params?.editMode || false;
   const existingPost = route?.params?.postData || null;
   const parentPostId = route?.params?.parentPostId || null;
+  // Audio Post recorder → "Continue": the edited draft (a Radio, kind "audio")
+  const audioPost = route?.params?.audioPost || null;
+  const isAudioPost = !!audioPost?._id;
 
   // Helper function to transform API data for edit mode
   const transformPostDataForEdit = (postData) => {
@@ -362,7 +376,7 @@ const CreatePost = ({ route }) => {
         tosConfirmation,
       };
 
-      const validationErrors = validateForm(formValues);
+      const validationErrors = validateForm(formValues, { isAudioPost });
 
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
@@ -378,7 +392,10 @@ const CreatePost = ({ route }) => {
         setIsSubmitting(true);
       } else {
         // Create mode - instant navigation
-        startUpload("post", "Uploading your post...");
+        startUpload(
+          "post",
+          isAudioPost ? "Publishing your audio post..." : "Uploading your post...",
+        );
         navigation.reset({
           index: 0,
           routes: [{ name: "TabStack" }],
@@ -475,7 +492,34 @@ const CreatePost = ({ route }) => {
           // console.log("formm---data", payload);
 
           // Make API call
-          if (editMode && (existingPost?._id || existingPost?.id)) {
+          if (isAudioPost) {
+            // Audio Post: publish the recorder's draft with these details
+            const { size: _size, parentPostId: _parent, ...audioPayload } =
+              payload;
+            if (!location) delete audioPayload.location;
+            for (const key of ["startDate", "endDate"]) {
+              if (audioPayload[key]) {
+                audioPayload[key] = {
+                  date: audioPayload[key].date || "",
+                  time: audioPayload[key].time || "",
+                };
+              }
+            }
+            audioPayload.description = descriptionArray.filter(
+              (d) => d && d.trim() !== "",
+            );
+            const response = await publishAudioPost(
+              audioPost._id,
+              audioPayload,
+            );
+            if (response?.data?.success) {
+              completeUpload("Audio post published");
+            } else {
+              failUpload(
+                response?.data?.message || "Failed to publish audio post",
+              );
+            }
+          } else if (editMode && (existingPost?._id || existingPost?.id)) {
             // Edit mode - update existing post
             const response = await put(
               `posts/${existingPost._id || existingPost.id}`,
@@ -843,9 +887,12 @@ const CreatePost = ({ route }) => {
   return (
     <ScreenWrapper
       headerBlur
+      footerBlur
       headerUnScrollable={() => (
         <Header
-          title={editMode ? "Edit Post" : "Publish A Post"}
+          title={
+            editMode ? "Edit Post" : audioPost ? "Create Audio Post" : "Publish A Post"
+          }
           rightIcon={
             <Image source={Images.thread} style={{ height: 40, width: 40 }} />
           }
@@ -883,7 +930,7 @@ const CreatePost = ({ route }) => {
         </View>
       )}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScreenScrollView showsVerticalScrollIndicator={false}>
         {/* starts below the floating blurred header */}
         <ScreenHeaderSpacer />
         {/* <CustomText
@@ -1651,7 +1698,9 @@ const CreatePost = ({ route }) => {
           handleCapture={handleCapture}
           setImageModal={setImageModal}
         />
-      </ScrollView>
+        {/* content ends above the floating footer */}
+        <ScreenFooterSpacer />
+      </ScreenScrollView>
     </ScreenWrapper>
   );
 };

@@ -42,13 +42,15 @@ export const FormHeader = ({
   // 16 back → title gap; Select-Show pad 56 (+ 12) and 12
   topPad = 8,
   titleGap = 16,
+  // useScrollEdgeBlur().headerVisible of the screen's list
+  blurVisible,
 }) => {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top + topPad }]}>
       {/* Figma Header: progressive blur 16 → 0 + #121212 1%; the form
           scrolls under it */}
-      <HeaderProgressiveBlur />
+      <HeaderProgressiveBlur visible={blurVisible} />
       <View style={styles.headerRow}>
         <View style={[styles.headerLeft, { gap: titleGap }]}>
           {onBack ? <CircleButton icon="chevron_left" onPress={onBack} /> : null}

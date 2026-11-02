@@ -4,6 +4,7 @@ import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icons from "../../../../components/Icons";
+import { FooterProgressiveBlur } from "../../../../components/HeaderProgressiveBlur";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
 /**
@@ -37,7 +38,10 @@ const Glass = ({ style, children }) => (
 const KEYS = ["chat", "groups", "circles"];
 const ICONS = { chat: "person", groups: "groups", circles: "campaign" };
 
-const InboxBottomBar = ({ active = "chat", progress, onSelect }) => {
+// `blurVisible`: Animated 0 → 1 from the page under the bar — the Figma
+// footer blur shows only while content sits under it. Without it the bar has
+// no background of its own (ScreenWrapper's floating footer draws the blur).
+const InboxBottomBar = ({ active = "chat", progress, onSelect, blurVisible }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -92,11 +96,12 @@ const InboxBottomBar = ({ active = "chat", progress, onSelect }) => {
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: bottom }]}>
-      <LinearGradient
-        pointerEvents="none"
-        colors={[`${colors.background}00`, colors.background]}
-        style={StyleSheet.absoluteFill}
-      />
+      {blurVisible ? (
+        <FooterProgressiveBlur
+          color={colors.background}
+          visible={blurVisible}
+        />
+      ) : null}
       <Glass>
         <TouchableOpacity
           activeOpacity={0.7}

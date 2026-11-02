@@ -1,7 +1,10 @@
 import { FlatList, StyleSheet, View } from "react-native";
 import CustomText from "../../../components/CustomText";
 import Header from "../../../components/Header";
-import ScreenWrapper, { ScreenHeaderSpacer } from "../../../components/ScreenWrapper";
+import ScreenWrapper, {
+  ScreenHeaderSpacer,
+  ScreenFlatList,
+} from "../../../components/ScreenWrapper";
 import { COLORS } from "../../../utils/COLORS";
 import SettingsItems from "./molecules/SettingsItems";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -42,7 +45,7 @@ const YourAccount = () => {
       paddingHorizontal={0.1}
       headerBlur
     >
-      <FlatList
+      <ScreenFlatList
         ListHeaderComponent={
           <>
             <ScreenHeaderSpacer />

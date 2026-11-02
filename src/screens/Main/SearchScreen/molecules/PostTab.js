@@ -15,6 +15,7 @@ import CustomText from "../../../../components/CustomText";
 import {
   ScreenHeaderSpacer,
   useScreenHeaderInset,
+  ScreenScrollView,
 } from "../../../../components/ScreenWrapper";
 import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
@@ -119,7 +120,7 @@ const PostTab = ({ isActive }) => {
   }`;
 
   return (
-    <ScrollView
+    <ScreenScrollView
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -312,7 +313,7 @@ const PostTab = ({ isActive }) => {
           </View>
         )}
       </View>
-    </ScrollView>
+    </ScreenScrollView>
   );
 };
 

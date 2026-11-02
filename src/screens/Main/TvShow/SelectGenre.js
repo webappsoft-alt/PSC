@@ -26,6 +26,7 @@ import { ToastMessage } from "../../../utils/ToastMessage";
 import { CircleButton, Radio } from "./molecules/ShowForm";
 import { GlassFill, SHOWS } from "./molecules/showsLayout";
 
+import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
 /**
  * Figma Shows › "Select-Genre" (7580:13229). Header #121212, pad (status bar
  * + 12) / 12 / 8 / 12, gap 8: search pill (40, r100, white 4%, pad 10,
@@ -156,6 +157,8 @@ export const TopicPicker = ({
   onClose,
 }) => {
   const insets = useSafeAreaInsets();
+  // header blur only while content sits under it (client rule)
+  const edge = useScrollEdgeBlur();
   const [picked, setPicked] = useState(initial);
   const [order, setOrder] = useState(() => {
     const saved = initialOrder;
@@ -231,6 +234,7 @@ export const TopicPicker = ({
   return (
     <View style={styles.page}>
       <ScrollView
+        {...edge.scrollProps()}
         scrollEnabled={!dragging}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
@@ -271,7 +275,7 @@ export const TopicPicker = ({
 
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         {/* Figma Header: progressive blur 16 → 0; the list scrolls under it */}
-        <HeaderProgressiveBlur />
+        <HeaderProgressiveBlur visible={edge.headerVisible} />
         <View style={styles.searchRow}>
           <View style={styles.search}>
             <GlassFill fill={SHOWS.white04} />

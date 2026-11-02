@@ -1,6 +1,6 @@
 import { BlurView } from "@react-native-community/blur";
 import { useNavigation } from "@react-navigation/native";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   StyleSheet,
@@ -45,6 +45,36 @@ const InboxPager = () => {
   const scrollX = useRef(new Animated.Value(0)).current;
   const [page, setPage] = useState(0);
   const [directTab, setDirectTab] = useState("chats");
+
+  // bottom bar blur only while the visible page's list sits under it
+  const barBlur = useRef(new Animated.Value(0)).current;
+  const pageEdges = useRef({});
+  const barBlurOn = useRef(false);
+  const applyBarBlur = useCallback(
+    (on) => {
+      if (barBlurOn.current === on) return;
+      barBlurOn.current = on;
+      Animated.timing(barBlur, {
+        toValue: on ? 1 : 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+    },
+    [barBlur],
+  );
+  const pageRef = useRef(0);
+  pageRef.current = page;
+  useEffect(() => {
+    applyBarBlur(!!pageEdges.current[page]?.footer);
+  }, [page, applyBarBlur]);
+  const edgeHandlers = useMemo(
+    () =>
+      [0, 1, 2].map((index) => (edges) => {
+        pageEdges.current[index] = edges;
+        if (pageRef.current === index) applyBarBlur(!!edges?.footer);
+      }),
+    [applyBarBlur],
+  );
 
   // 0 → 1 on 1, 1 → Groups, 2 → Circles (fractional while swiping)
   const progress = useMemo(
@@ -140,13 +170,13 @@ const InboxPager = () => {
         contentContainerStyle={styles.content}
       >
         <View style={{ width, height: "100%" }}>
-          <Chat embedded kind="direct" tab={directTab} onTabChange={setDirectTab} onNewChat={newChat} />
+          <Chat embedded kind="direct" tab={directTab} onTabChange={setDirectTab} onNewChat={newChat} onScrollEdgeChange={edgeHandlers[0]} />
         </View>
         <View style={{ width, height: "100%" }}>
-          <Chat embedded kind="group" onTabChange={openDirectTab} onNewChat={newChat} onCreate={() => openCreate("group")} />
+          <Chat embedded kind="group" onTabChange={openDirectTab} onNewChat={newChat} onCreate={() => openCreate("group")} onScrollEdgeChange={edgeHandlers[1]} />
         </View>
         <View style={{ width, height: "100%" }}>
-          <Chat embedded kind="circle" onTabChange={openDirectTab} onNewChat={newChat} onCreate={() => openCreate("circle")} />
+          <Chat embedded kind="circle" onTabChange={openDirectTab} onNewChat={newChat} onCreate={() => openCreate("circle")} onScrollEdgeChange={edgeHandlers[2]} />
         </View>
       </Animated.ScrollView>
 
@@ -174,7 +204,7 @@ const InboxPager = () => {
         </TouchableOpacity>
       </View>
 
-      <InboxBottomBar progress={progress} onSelect={goTo} />
+      <InboxBottomBar progress={progress} onSelect={goTo} blurVisible={barBlur} />
 
       <GroupFormSheet
         visible={!!formType}

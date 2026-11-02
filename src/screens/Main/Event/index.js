@@ -18,6 +18,7 @@ import Icons from "../../../components/Icons";
 import ScreenWrapper, {
   ScreenHeaderInsetConsumer,
   ScreenHeaderSpacer,
+  ScreenFlatList,
 } from "../../../components/ScreenWrapper";
 import SearchInput from "../../../components/SearchInput";
 import TopTab from "../../../components/TopTab";
@@ -182,7 +183,7 @@ const Event = () => {
     getEvents(tab, newFilters, true);
   };
 
-  const { setIsTabBarVisible } = useTabBarVisibility();
+  const { setIsTabBarVisible, reportPageEdges } = useTabBarVisibility();
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastContentOffset = useRef(0);
 
@@ -213,6 +214,8 @@ const Event = () => {
 
   return (
     <ScreenWrapper
+        // bottom-nav blur only while content sits under it
+        onScrollEdgeChange={(edges) => reportPageEdges?.("Events", edges)}
       paddingHorizontal={0.1}
       paddingBottom={0.1}
       translucent
@@ -347,7 +350,7 @@ const Event = () => {
     >
       <ScreenHeaderInsetConsumer>
         {(headerInset) => (
-      <FlatList
+      <ScreenFlatList
         data={loading ? [1, 2, 3, 4, 5] : events || []}
         // list starts below the floating blurred header, scrolls under it
         ListHeaderComponent={<ScreenHeaderSpacer />}

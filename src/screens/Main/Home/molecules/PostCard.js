@@ -1060,9 +1060,10 @@ const PostCard = ({
                   !isDetail && { height: 32 },
                 ]}
               >
-                {/* Left Section */}
+                {/* Left Section — the header row already insets 8
+                    (Figma card pad 8); styles.row's own 8 doubled it */}
                 <TouchableOpacity
-                  style={styles.row}
+                  style={[styles.row, styles.noInset]}
                   activeOpacity={0.6}
                   onPress={() => setShowCreatorSummary(true)}
                 >
@@ -1100,7 +1101,8 @@ const PostCard = ({
                         fontFamily={fonts.medium}
                       />
                       {/* shield (verified / unverified) + Premium / Premium+ star */}
-                      <UserBadge user={item?.author} size={16} style={styles.verifiedIcon} />
+                      {/* Figma: 14 badge, 2 after the name */}
+                      <UserBadge user={item?.author} size={14} style={styles.verifiedIcon} />
                     </View>
                     {/* Figma: username Regular 14 / −2% @48% */}
                     <CustomText
@@ -1116,6 +1118,7 @@ const PostCard = ({
                 <View
                   style={[
                     styles.row,
+                    styles.noInset,
                     {
                       width: showFollowButton && "28%",
                       justifyContent: showFollowButton && "flex-end",
@@ -2701,15 +2704,21 @@ const createStyles = (colors, themeMode) =>
       width: 24,
       borderRadius: 99,
     },
+    noInset: { paddingHorizontal: 0 },
+    // Figma: name cap 3 below the 32 row's top, username cap 18 below it.
+    // Two 1.4 line boxes (19.6) put them 19.6 apart → pull the username up
+    // 1.6 and drop the column 0.86 (×2, it is centred in the row)
     userInfo: {
       marginLeft: 8,
+      marginTop: 1.72,
     },
     nameRow: {
       flexDirection: "row",
       alignItems: "center",
+      marginBottom: -1.6,
     },
     verifiedIcon: {
-      marginLeft: 4,
+      marginLeft: 2,
     },
     moreButton: {
       height: 32,

@@ -11,6 +11,7 @@ import { updateConversationSettings } from "../../../services/ChatService";
 import { InfoLine } from "../TvShow/molecules/ShowForm";
 import { ToastMessage } from "../../../utils/ToastMessage";
 
+import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
 /**
  * Figma Chat page "Theme" (2212:6208): header pad 72/16/12/16 (#121212 @64%
  * + blur) — 20 chevron · "Theme" Medium 18 −0.5 centred. Content pad 14/12,
@@ -29,6 +30,8 @@ const ChatTheme = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
+  // header blur only while content sits under it (client rule)
+  const edge = useScrollEdgeBlur();
   const { colors, isDark } = useTheme();
   const tint = (o) => (isDark ? `rgba(255, 255, 255, ${o})` : `rgba(18, 18, 18, ${o})`);
   const settingsId = route?.params?.settingsId;
@@ -58,7 +61,7 @@ const ChatTheme = () => {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* header floats; content scrolls under the progressive blur */}
-      <FloatingBlurHeader onHeightChange={setHeaderH} includeStatusBar={false}>
+      <FloatingBlurHeader visible={edge.headerVisible} onHeightChange={setHeaderH} includeStatusBar={false}>
       <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} hitSlop={12}>
@@ -86,6 +89,8 @@ const ChatTheme = () => {
       </FloatingBlurHeader>
 
       <ScrollView
+
+        {...edge.scrollProps()}
         style={{ opacity: headerH == null ? 0 : 1 }}
         contentContainerStyle={[styles.content, { paddingTop: headerH || 0, paddingBottom: insets.bottom + 14 }]}
         scrollIndicatorInsets={{ top: headerH || 0 }}

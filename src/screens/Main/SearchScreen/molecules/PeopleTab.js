@@ -13,6 +13,7 @@ import CustomText from "../../../../components/CustomText";
 import {
   ScreenHeaderSpacer,
   useScreenHeaderInset,
+  ScreenFlatList,
 } from "../../../../components/ScreenWrapper";
 import TopTab from "../../../../components/TopTab";
 
@@ -189,7 +190,7 @@ const PeopleTab = ({
 
   return (
     <View style={{ flex: 1 }}>
-      <FlatList
+      <ScreenFlatList
         data={loading ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : users}
         refreshControl={
           <RefreshControl

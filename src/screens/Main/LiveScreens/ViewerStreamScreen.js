@@ -1283,7 +1283,8 @@ const MeetingView = ({
       }
       liveEndedNavigateTimerRef.current = setTimeout(() => {
         liveEndedNavigateTimerRef.current = null;
-        navigation.replace("LiveEndedScreen", {
+        // registered as "LiveEnded" in MainStack
+        navigation.replace("LiveEnded", {
           durationSeconds: String(durationSeconds),
           totalViewers: String(totalViewers),
         });
