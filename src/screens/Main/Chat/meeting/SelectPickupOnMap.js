@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../../assets/fonts";
 import CustomButton from "../../../../components/CustomButton";
 import CustomText from "../../../../components/CustomText";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { reverseGeocode } from "../../../../utils/LocationUtils";
@@ -101,9 +102,13 @@ const SelectPickupOnMap = () => {
         </FieldBox>
         <View style={styles.actions}>
           <View style={styles.buttons}>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.back, { backgroundColor: tint(0.04) }]}>
-              <Icons family="MaterialSymbolsRounded" name="chevron_left" size={24} color={colors.text} />
-            </TouchableOpacity>
+            <GlassBackButton
+              onPress={() => navigation.goBack()}
+              fill={tint(0.04)}
+              size={48}
+              color={colors.text}
+              fullOpacity
+            />
             <View style={{ flex: 1 }}>
               <CustomButton title="Confirm Address" height={48} fontSize={16} onPress={confirm} />
             </View>
@@ -183,13 +188,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  back: {
-    width: 48,
-    height: 48,
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
   },
   tos: {
     flexDirection: "row",

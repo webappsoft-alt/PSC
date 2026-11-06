@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import ScreenWrapper, { ScreenHeaderInsetConsumer } from "../../../components/ScreenWrapper";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -249,9 +250,7 @@ const CreateGroupInvite = ({ route }) => {
           </View>
         )}
         <View style={styles.buttons}>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: tint(0.04) }]}>
-            <Icons family="MaterialSymbolsRounded" name="chevron_left" size={27} color={tint(0.64)} />
-          </TouchableOpacity>
+          <GlassBackButton onPress={() => navigation.goBack()} fill={tint(0.04)} size={48} iconSize={27} />
           <View style={{ flex: 1 }}>
             <CustomButton title="Continue" height={48} loading={saving} disabled={saving || picked.length < MIN_INVITES} onPress={submit} />
           </View>
@@ -359,12 +358,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  backBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

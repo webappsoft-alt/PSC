@@ -26,6 +26,7 @@ import fonts from "../../../assets/fonts";
 import { Images } from "../../../assets/images";
 import Blur from "../../../components/Blur";
 import CustomText from "../../../components/CustomText";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import ImageFast from "../../../components/ImageFast";
 import ScreenWrapper from "../../../components/ScreenWrapper";
@@ -807,17 +808,14 @@ const DetailPage = () => {
         <View style={styles.rowBetween}>
           {/* Left Section */}
           <View style={styles.row}>
-            <TouchableOpacity
+            <GlassBackButton
               onPress={() => navigation.goBack()}
+              fill={colors.surfaceAlt}
+              iconSize={26}
+              color={colors.text}
+              fullOpacity
               style={styles.backButton}
-            >
-              <Icons
-                family="MaterialSymbolsRounded"
-                name="chevron_left"
-                size={26}
-                color={colors.text}
-              />
-            </TouchableOpacity>
+            />
             {/* Figma: 32 ring (2px profile colour) → 24px avatar at 4,4 */}
             <View
               style={{
@@ -1467,13 +1465,6 @@ const createStyles = (colors, isDark) =>
       justifyContent: "center",
     },
     backButton: {
-      borderRadius: 99,
-      backgroundColor: colors.surfaceAlt,
-      height: 40,
-      width: 40,
-      alignItems: "center",
-      justifyContent: "center",
       marginRight: 12,
-      overflow: "hidden",
     },
   });

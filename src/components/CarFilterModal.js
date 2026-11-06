@@ -29,6 +29,7 @@ import CustomModal from "./CustomModal";
 import CustomText from "./CustomText";
 import Divider from "./Divider";
 import CustomSwitch from "./CustomSwitch";
+import GlassBackButton from "./GlassBackButton";
 import Icons from "./Icons";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -278,18 +279,14 @@ const FilterModal = ({
               { paddingTop: insests.top, paddingHorizontal: 12 },
             ]}
           >
-            <TouchableOpacity
+            <GlassBackButton
               onPress={onDisable}
-              activeOpacity={0.6}
+              fill={colors.white04}
+              iconSize={26}
+              color={colors.text}
+              fullOpacity
               style={styles.backIcon}
-            >
-              <Icons
-                name="keyboard-arrow-left"
-                family="MaterialIcons"
-                size={26}
-                color={colors.text}
-              />
-            </TouchableOpacity>
+            />
 
             <CustomText
               label={title}
@@ -393,11 +390,12 @@ const FilterModal = ({
           {multiSelect && (
             <View style={styles.buttonContainer}>
               <CustomButton
-                title={`Confirm ${
-                  localSelectedItems.length > 0
-                    ? `(${localSelectedItems.length})`
-                    : ""
-                }`}
+                title={
+                  // single-select: just "Confirm" (the count is always 1)
+                  singleSelect || localSelectedItems.length === 0
+                    ? "Confirm"
+                    : `Confirm (${localSelectedItems.length})`
+                }
                 onPress={handleConfirm}
               />
             </View>
@@ -423,13 +421,7 @@ const createStyles = (colors, isDark) => StyleSheet.create({
   },
 
   backIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    justifyContent: "center",
-    alignItems: "center",
     marginRight: 16,
-    backgroundColor: colors.white04,
   },
 
   row: {

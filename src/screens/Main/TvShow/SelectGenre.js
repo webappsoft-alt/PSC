@@ -19,11 +19,12 @@ import fonts from "../../../assets/fonts";
 import CustomText from "../../../components/CustomText";
 import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
 import Icons from "../../../components/Icons";
+import GlassBackButton from "../../../components/GlassBackButton";
 import TopicLottie from "../../../components/TopicLottie";
 import { PSC_TOPICS } from "../../../utils/feedTopics";
 import { emitShowPick } from "../../../utils/showPicks";
 import { ToastMessage } from "../../../utils/ToastMessage";
-import { CircleButton, Radio } from "./molecules/ShowForm";
+import { Radio } from "./molecules/ShowForm";
 import { GlassFill, SHOWS } from "./molecules/showsLayout";
 
 import useScrollEdgeBlur from "../../../hooks/useScrollEdgeBlur";
@@ -310,7 +311,14 @@ export const TopicPicker = ({
             ) : null}
           </View>
           {/* picks are already synced to the form — close just leaves */}
-          <CircleButton icon="close" size={20} onPress={onClose} />
+          <GlassBackButton
+            icon="close"
+            iconSize={20}
+            fill={SHOWS.white04}
+            color={SHOWS.white}
+            accessibilityLabel="Close"
+            onPress={onClose}
+          />
         </View>
         {showChips ? (
           <View style={styles.chips}>

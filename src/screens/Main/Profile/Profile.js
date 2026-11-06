@@ -33,11 +33,17 @@ import BannerModal from "./molecules/BannerModal";
 import DelImagesModal from "./molecules/DelImagesModal";
 import FinalizeProfile from "./molecules/FinalizeProfile";
 import MediaGrid from "./molecules/MediaGrid";
+import CareerTab from "./molecules/CareerTab";
 import ProfileCard, { getProfileCardLayout } from "./molecules/ProfileCard";
 import ProfileHeader from "./molecules/ProfileHeader";
 import { getProfile } from "../../../utils/constants";
 import { accentA, getProfileAccent } from "../../../utils/profileTier";
 import { post } from "../../../services/ApiRequest";
+
+// Figma Profile tabs: Posts · Career · Reposts · Mentions · Media · Replies ·
+// Liked · Saved (Career = the Jobs module's experience / education / skills)
+const CAREER_TAB = 1;
+const MEDIA_TAB = 4;
 
 const Profile = () => {
   const isFocus = useIsFocused();
@@ -130,14 +136,20 @@ const Profile = () => {
       let queryParams = "type=post";
       let endpoint = `posts/user/${userData?._id}`;
 
-      if (tab === 1) queryParams = "reposts=true";
-      else if (tab === 2) queryParams = "mentions=true";
-      else if (tab === 4) queryParams = "comments=true";
-      else if (tab === 5) queryParams = "likes=true";
-      else if (tab === 6) {
+      // Career (CAREER_TAB) has its own data — nothing to fetch here
+      if (tab === CAREER_TAB) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      if (tab === 2) queryParams = "reposts=true";
+      else if (tab === 3) queryParams = "mentions=true";
+      else if (tab === 5) queryParams = "comments=true";
+      else if (tab === 6) queryParams = "likes=true";
+      else if (tab === 7) {
         endpoint = "saved";
         queryParams = "page=1&limit=10";
-      } else if (tab === 3) {
+      } else if (tab === MEDIA_TAB) {
         endpoint = "posts/media";
         queryParams = "page=1&limit=20";
       }
@@ -146,7 +158,7 @@ const Profile = () => {
 
       if (response?.data?.success) {
         let resultData = response.data.data;
-        if (tab === 3) {
+        if (tab === MEDIA_TAB) {
           // Transform media response for MediaGrid
           resultData = resultData.map((item, index) => ({
             ...item,
@@ -267,7 +279,7 @@ const Profile = () => {
   const confirmDeletePosts = async () => {
     try {
       setIsDeleting(true);
-      if (tab === 3) {
+      if (tab === MEDIA_TAB) {
         // Group by postId for media deletion
         const groupedDeletes = selectedPostsForDel.reduce((acc, current) => {
           const existing = acc.find((item) => item.postId === current.postId);
@@ -425,6 +437,7 @@ const Profile = () => {
             setTab={setTab}
             tabNames={[
               "Posts",
+              "Career",
               "Reposts",
               "Mentions",
               "Media",
@@ -473,7 +486,9 @@ const Profile = () => {
 
         <FinalizeProfile />
 
-        {tab === 3 ? (
+        {tab === CAREER_TAB ? (
+          <CareerTab userId={userData?._id} isOwner viewerId={userData?._id} />
+        ) : tab === MEDIA_TAB ? (
           <MediaGrid
             mediaData={posts}
             onDeletePress={handleDeleteSelectedPosts}
@@ -519,7 +534,7 @@ const Profile = () => {
       </ScreenWrapper>
 
       {/* Fixed Delete Button - Outside ScreenWrapper */}
-      {tab === 3 && isMediaEditMode && mediaSelectedCount > 0 && (
+      {tab === MEDIA_TAB && isMediaEditMode && mediaSelectedCount > 0 && (
         <TouchableOpacity
           style={[
             styles.fixedDeleteButton,

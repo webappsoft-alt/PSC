@@ -10,6 +10,7 @@ import LoginRequiredModal from "../components/LoginRequiredModal";
 import PlayerCard from "../screens/Main/Home/molecules/PlayerCard";
 
 import FollowNotification from "../components/FollowNotification";
+import PollAlert from "../components/Poll/PollAlert";
 import { useSocket } from "../components/SocketProvider";
 import CaptureSelfi from "../screens/Auth/ProScreens/CaptureSelfi.js";
 import ImageCamera from "../screens/Auth/ProScreens/ImageCamera.js";
@@ -55,6 +56,19 @@ import Notification from "../screens/Main/Notification/index.js";
 import AddPicture from "../screens/Main/Profile/molecules/AddPicture.js";
 import QrScreen from "../screens/Main/Profile/QrScreen.js";
 import PoliticalInformation from "../screens/Main/Profile/PoliticalInformation";
+// Jobs module (Figma Matching › Add-An-Experience / Select-* / My-Job-Offers)
+import AddExperience from "../screens/Main/Career/AddExperience";
+import AddEducation from "../screens/Main/Career/AddEducation";
+import EditSkills from "../screens/Main/Career/EditSkills";
+import SelectCompany from "../screens/Main/Career/SelectCompany";
+import SelectJobTitle from "../screens/Main/Career/SelectJobTitle";
+import SelectEmploymentType from "../screens/Main/Career/SelectEmploymentType";
+import MyJobOffers from "../screens/Main/Jobs/MyJobOffers";
+import CreateJob from "../screens/Main/Jobs/CreateJob";
+import JobSalaryRange from "../screens/Main/Jobs/SalaryRange";
+import JobDetail from "../screens/Main/Jobs/JobDetail";
+import JobOffer from "../screens/Main/Jobs/JobOffer";
+import JobCandidate from "../screens/Main/Jobs/JobCandidate";
 import RequestsScreen from "../screens/Main/Profile/RequestsScreen.js";
 import UserProfile from "../screens/Main/Profile/UserProfile";
 import CreatePost from "../screens/Main/PublishPost/Index";
@@ -113,6 +127,8 @@ import RecordAudioPost from "../screens/Main/Audio/RecordAudioPost.js";
 import RadioDetail from "../screens/Main/Audio/RadioDetail.js";
 import CreateEpisode from "../screens/Main/TvShow/CreateEpisode";
 import ShowDetail from "../screens/Main/TvShow/ShowDetail";
+import ElectionDetail from "../screens/Main/Election/ElectionDetail";
+import TopicDetail from "../screens/Main/Topic/TopicDetail";
 import SelectShow from "../screens/Main/TvShow/SelectShow";
 import SelectGenre from "../screens/Main/TvShow/SelectGenre";
 import ShowOptionPicker from "../screens/Main/TvShow/ShowOptionPicker";
@@ -122,6 +138,7 @@ const Stack = createNativeStackNavigator();
 const MainStack = () => {
   const { socket } = useSocket();
   const followNotificationRef = useRef(null);
+  const pollAlertRef = useRef(null);
   const dispatch = useDispatch();
   const navigation = useNavigation();
 
@@ -182,8 +199,13 @@ const MainStack = () => {
       followNotificationRef.current?.show(data);
     });
 
+    // someone you follow published a poll → vote from the alert
+    const onNewPoll = (data) => pollAlertRef.current?.show(data);
+    socket.on("new_poll", onNewPoll);
+
     return () => {
       socket.off("follow");
+      socket.off("new_poll", onNewPoll);
     };
   }, [socket]);
 
@@ -348,6 +370,19 @@ const MainStack = () => {
           name="PoliticalInformation"
           component={PoliticalInformation}
         />
+        {/* Jobs module */}
+        <Stack.Screen name="AddExperience" component={AddExperience} />
+        <Stack.Screen name="AddEducation" component={AddEducation} />
+        <Stack.Screen name="EditSkills" component={EditSkills} />
+        <Stack.Screen name="SelectCompany" component={SelectCompany} />
+        <Stack.Screen name="SelectJobTitle" component={SelectJobTitle} />
+        <Stack.Screen name="SelectEmploymentType" component={SelectEmploymentType} />
+        <Stack.Screen name="MyJobOffers" component={MyJobOffers} />
+        <Stack.Screen name="CreateJob" component={CreateJob} />
+        <Stack.Screen name="JobSalaryRange" component={JobSalaryRange} />
+        <Stack.Screen name="JobDetail" component={JobDetail} />
+        <Stack.Screen name="JobOffer" component={JobOffer} />
+        <Stack.Screen name="JobCandidate" component={JobCandidate} />
         <Stack.Screen name="PostFilter" component={PostFilter} />
         <Stack.Screen name="RequestsScreen" component={RequestsScreen} />
 
@@ -363,6 +398,10 @@ const MainStack = () => {
         {/* Shows: Create An Episode + its pickers (Figma Shows page) */}
         <Stack.Screen name="CreateEpisode" component={CreateEpisode} />
         <Stack.Screen name="ShowDetail" component={ShowDetail} />
+        {/* PSC special-edition election poll (Figma Poll-Detail-Page) */}
+        <Stack.Screen name="ElectionDetail" component={ElectionDetail} />
+        {/* PSC topic hub (Figma Matching › Job-Listing 8005:8412) */}
+        <Stack.Screen name="TopicDetail" component={TopicDetail} />
         <Stack.Screen name="SelectShow" component={SelectShow} />
         <Stack.Screen name="SelectGenre" component={SelectGenre} />
         <Stack.Screen name="ShowOptionPicker" component={ShowOptionPicker} />
@@ -422,6 +461,7 @@ const MainStack = () => {
       {}
       <PlayerCard />
       <FollowNotification ref={followNotificationRef} />
+      <PollAlert ref={pollAlertRef} />
       <LoginRequiredModal isVisible={showLoginModal} />
     </>
   );

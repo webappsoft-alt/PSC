@@ -50,6 +50,7 @@ import Blur from "./Blur";
 import BottomSheetComponent from "./BottomSheetComponent";
 import CustomText from "./CustomText";
 import GiftModal from "./GiftModal";
+import GlassBackButton from "./GlassBackButton";
 import Icons from "./Icons";
 import ImageFast from "./ImageFast";
 import QuestionModal from "./QuestionModal";
@@ -2321,18 +2322,13 @@ const MeetingView = ({
               }
               style={styles.headerLeft}
             >
-              <TouchableOpacity
-                style={styles.headerCircle}
+              <GlassBackButton
                 onPress={leaveMeeting}
-              >
-                <Blur />
-                <Icons
-                  family="Ionicons"
-                  name="chevron-back"
-                  size={16}
-                  color={COLORS.white}
-                />
-              </TouchableOpacity>
+                iconSize={16}
+                color={COLORS.white}
+                fullOpacity
+                style={styles.headerCircle}
+              />
 
               {authorMeta.avatar ? (
                 <View style={styles.avatarRing}>

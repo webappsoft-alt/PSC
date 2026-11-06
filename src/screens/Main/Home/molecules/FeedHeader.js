@@ -112,6 +112,18 @@ const Dot = ({ top = 2, right = 2 }) => (
   />
 );
 
+// Figma: "Los Angeles, CA" — city + short region (shared with the Jobs tab)
+export const feedLocationLabel = (location) => {
+  const region =
+    US_STATE_ABBR[location?.state] ||
+    (location?.countryCode === "US"
+      ? location?.state
+      : location?.countryCode || location?.state || location?.country);
+  return location?.city
+    ? `${location.city}${region ? `, ${region}` : ""}`
+    : "Set location";
+};
+
 const FeedHeader = ({
   isShort,
   isLive,
@@ -130,15 +142,7 @@ const FeedHeader = ({
   const { notificationDot } = useSelector((state) => state.notification);
   const location = useSelector((state) => state.users.location);
 
-  // Figma: "Los Angeles, CA" — city + short region
-  const region =
-    US_STATE_ABBR[location?.state] ||
-    (location?.countryCode === "US"
-      ? location?.state
-      : location?.countryCode || location?.state || location?.country);
-  const locationLabel = location?.city
-    ? `${location.city}${region ? `, ${region}` : ""}`
-    : "Set location";
+  const locationLabel = feedLocationLabel(location);
 
   // Feed / Shorts color cross-fade while swiping pages
   const feedColor = pagerProgress

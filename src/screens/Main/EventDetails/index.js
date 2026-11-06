@@ -2,26 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   FlatList,
-  Image,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from "react-native";
 import EventDetailSkeleton from "./molecules/EventDetailSkeleton";
 
 import { COLORS } from "../../../utils/COLORS";
 
-import { BlurView } from "@react-native-community/blur";
 import { useRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
-import { Images } from "../../../assets/images";
 import ArtistDetailCard from "../../../components/ArtistDetailCard";
 import CustomText from "../../../components/CustomText";
 import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
 import ProgressiveBlur from "../../../components/ProgressiveBlur";
 import LinearGradient from "react-native-linear-gradient";
 import Divider from "../../../components/Divider";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import { get, post } from "../../../services/ApiRequest";
 import { ToastMessage } from "../../../utils/ToastMessage";
@@ -434,31 +431,11 @@ const EventDetail = ({ navigation }) => {
         </Animated.View>
         <View style={styles.flexRow}>
           <View style={[styles.flexRow, { flex: 1, marginRight: 50 }]}>
-            <TouchableOpacity
+            <GlassBackButton
               onPress={() => navigation.goBack()}
-              activeOpacity={0.6}
-              style={styles.iconButtonWrapper}
-            >
-              <BlurView
-                style={styles.iconButtonBlur}
-                blurType={isDark ? "light" : "xlight"}
-                blurAmount={16}
-                reducedTransparencyFallbackColor={"#12121252"}
-              >
-                <Image
-                  style={[
-                    styles.icon,
-                    {
-                      height: 24,
-                      width: 24,
-                      resizeMode: "contain",
-                      tintColor: colors.text,
-                    },
-                  ]}
-                  source={Images.back}
-                />
-              </BlurView>
-            </TouchableOpacity>
+              color={colors.text}
+              fullOpacity
+            />
             <CustomText
               label={detail?.venueName || "Toscana"}
               fontFamily={fonts.semiBold}

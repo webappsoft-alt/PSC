@@ -11,11 +11,11 @@ import FastImage from "react-native-fast-image";
 import LinearGradient from "react-native-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
-import Blur from "../../../components/Blur";
 import { FloatingBlurHeader } from "../../../components/HeaderProgressiveBlur";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
 import FloatingSheet from "../../../components/FloatingSheet";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { post } from "../../../services/ApiRequest";
@@ -97,10 +97,7 @@ const ReportChat = () => {
       <FloatingBlurHeader visible={edge.headerVisible} onHeightChange={setHeaderH} includeStatusBar={false}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.back, { backgroundColor: tint(0.08) }]}>
-            <Blur blurType={isDark ? "dark" : "xlight"} borderRadius={100} />
-            <Icons family="MaterialSymbolsRounded" name="chevron_left" size={20} color={tint(0.64)} />
-          </TouchableOpacity>
+          <GlassBackButton onPress={() => navigation.goBack()} fill={tint(0.08)} iconSize={20} />
           <CustomText label="Submit Report" fontSize={24} fontFamily={fonts.semiBold} letterSpacing={-0.12} color={colors.text} containerStyle={styles.shrink} />
         </View>
       </View>
@@ -181,9 +178,14 @@ const ReportChat = () => {
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 34) }]}>
         <LinearGradient pointerEvents="none" colors={[`${colors.background}00`, colors.background]} style={StyleSheet.absoluteFill} />
         <View style={styles.buttons}>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.footerBack, { backgroundColor: tint(0.08) }]}>
-            <Icons family="MaterialSymbolsRounded" name="chevron_left" size={27} color={colors.text} />
-          </TouchableOpacity>
+          <GlassBackButton
+            onPress={() => navigation.goBack()}
+            fill={tint(0.08)}
+            size={48}
+            iconSize={27}
+            color={colors.text}
+            fullOpacity
+          />
           <View style={styles.shrink}>
             <CustomButton title="Submit Report" height={48} fontSize={18} loading={sending} disabled={!canSubmit} onPress={submit} />
           </View>
@@ -246,14 +248,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   content: {
     padding: 12,
     gap: 16,
@@ -306,13 +300,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  footerBack: {
-    width: 48,
-    height: 48,
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
   },
   reasonRow: {
     minHeight: 56,

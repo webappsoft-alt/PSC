@@ -16,23 +16,33 @@ import { useTheme } from "../contexts/ThemeContext";
  * blur 16 → 0) that hangs over the content.
  *
  * iOS renders a UIVisualEffectView under a masked parent unblurred (that was
- * the "progressive blur is completely off" bug): on iOS the mask now sits on
- * the effect view itself (patches/@react-native-community+blur — props
- * progressiveDirection / progressiveStart); Android steps the band down in
- * thin strips.
+ * the "progressive blur is completely off" bug): on iOS the mask sits on the
+ * effect view itself (patches/@react-native-community+blur — props
+ * progressiveDirection / progressiveStart). A single masked blur only fades
+ * a fully-blurred copy over the sharp content — a smeared double image at
+ * the edge (client: "scattered") — so the patched BlurView stacks five blurs
+ * whose radii add up to blurAmount and drop out one by one across the band:
+ * the blur radius itself ramps to 0. Android steps the band down in thin
+ * strips.
  *
  * Client rule: the blur is there only while content sits under the header /
  * footer. Pass `visible` (an Animated 0 → 1 value from useScrollEdgeBlur);
  * without it the blur is always on (headers over full-bleed media).
  */
 export const HEADER_BLUR_RADIUS = 16;
-// fade band past the header / footer edge (Figma nav container band: 32)
-export const EDGE_FADE = 24;
+// fade band past the header / footer inner edge. Client (Nov 2026): "same
+// progressive blur as iOS" — the blur ramps out over a band that hangs into
+// the content (iOS folder / nav bars), no hard edge at the header or bar
+// (Figma nav container band: 32).
+export const EDGE_FADE = 32;
 // tint behind the header content: frosted, not a solid fill
 export const HEADER_FILL_ALPHA = 0.64;
 // strips the fade band is cut into
 const BAND_STRIPS = 8;
-// Figma Home-Feed nav container: #121212 0% → 64%
+// screen footers (buttons over content): #121212 0% → 64% over the band.
+// The tab-bar nav container (TabStack) follows Figma Home-Feed 7981:4119
+// instead: one linear #121212 0% → 100% over its whole band (tintMode
+// "linear", fillAlpha 1).
 export const FOOTER_FILL_ALPHA = 0.64;
 
 const toRgb = (color, fallback) => {
@@ -55,6 +65,10 @@ export const EdgeProgressiveBlur = memo(
     fade = EDGE_FADE,
     // how far the band hangs past the parent (0 = the band is inside it)
     overhang = fade,
+    // "band": tint flat behind the content, fading out over the band
+    // (header); "linear": one gradient 0 → fillAlpha across the whole
+    // height (Figma nav container)
+    tintMode = "band",
     style,
   }) => {
     const { themeMode, colors } = useTheme();
@@ -68,14 +82,12 @@ export const EdgeProgressiveBlur = memo(
       color || colors?.background,
       isLight ? "250, 250, 250" : "18, 18, 18",
     );
-    const blurType =
-      Platform.OS === "ios"
-        ? isLight
-          ? "ultraThinMaterialLight"
-          : "ultraThinMaterialDark"
-        : isLight
-          ? "light"
-          : "dark";
+    // iOS: a plain, tint-free blur (patched BlurView `tintFree`) — every
+    // native material washes a dark page grey, which showed as a visible
+    // haze band under the header / above the bar even over flat #121212.
+    // Figma's background blur has no tint of its own; the tint below is the
+    // Figma fill.
+    const blurType = isLight ? "light" : "dark";
     const top = edge === "top";
     const body = Math.max(0, total - fade);
     // outer edge → inner edge: full blur behind the header content, then
@@ -108,7 +120,11 @@ export const EdgeProgressiveBlur = memo(
           ]
         : [];
     const fadeStart = total > 0 ? body / total : 1;
-    const tint = top
+    const tint = tintMode === "linear"
+      ? top
+        ? { colors: [`rgba(${rgb}, ${fillAlpha})`, `rgba(${rgb}, 0)`], locations: [0, 1] }
+        : { colors: [`rgba(${rgb}, 0)`, `rgba(${rgb}, ${fillAlpha})`], locations: [0, 1] }
+      : top
       ? {
           colors: [
             `rgba(${rgb}, ${fillAlpha})`,
@@ -146,6 +162,7 @@ export const EdgeProgressiveBlur = memo(
             pointerEvents="none"
             style={StyleSheet.absoluteFill}
             blurType={blurType}
+            tintFree
             blurAmount={HEADER_BLUR_RADIUS}
             progressiveDirection={edge}
             progressiveStart={total > 0 ? fadeStart : 0.6}
@@ -196,9 +213,12 @@ const HeaderProgressiveBlur = ({ style, color, visible, fade, overhang }) => (
 
 export default memo(HeaderProgressiveBlur);
 
-/** Footer background (Figma nav container: blur 0 → 16 + #121212 0 → 64%). */
+/**
+ * Footer background: the blur ramps 0 → 16 across the `fade` band above the
+ * bar (Figma nav container: 32) and is full under it; tint per `tintMode`.
+ */
 export const FooterProgressiveBlur = memo(
-  ({ style, color, visible, fillAlpha, fade, overhang }) => (
+  ({ style, color, visible, fillAlpha, fade, overhang, tintMode }) => (
     <EdgeProgressiveBlur
       edge="bottom"
       visible={visible}
@@ -206,6 +226,7 @@ export const FooterProgressiveBlur = memo(
       fillAlpha={fillAlpha ?? FOOTER_FILL_ALPHA}
       fade={fade}
       overhang={overhang}
+      tintMode={tintMode}
       style={style}
     />
   ),

@@ -1,7 +1,7 @@
 import CameraErrorMessage from "../../../components/CamerErrorMessage";
 import CaptureButton from "../../../components/CaptureButton";
 import CustomText from "../../../components/CustomText";
-import Icons from "../../../components/Icons";
+import GlassBackButton from "../../../components/GlassBackButton";
 import ScreenWrapper from "../../../components/ScreenWrapper";
 import SelfiPreview from "../../../components/SelfiPreview";
 import { COLORS } from "../../../utils/COLORS";
@@ -19,7 +19,7 @@ import {
   useCameraPermission,
 } from "react-native-vision-camera";
 import { useCallback, useRef, useState } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, Ellipse, Mask, Rect } from "react-native-svg";
 
@@ -131,18 +131,14 @@ const CaptureSelfi = () => {
   return (
     <ScreenWrapper paddingHorizontal={0.1}>
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity
-          activeOpacity={0.6}
+        <GlassBackButton
           onPress={handleBack}
+          fill="#FFFFFF29"
+          iconSize={26}
+          color={COLORS.white}
+          fullOpacity
           style={styles.backIcon}
-        >
-          <Icons
-            size={26}
-            color={COLORS.white}
-            family="MaterialIcons"
-            name={"keyboard-arrow-left"}
-          />
-        </TouchableOpacity>
+        />
         <CustomText
           fontSize={20}
           label={"Back"}
@@ -230,12 +226,6 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   backIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: "#FFFFFF29",
-    borderRadius: 100,
-    justifyContent: "center",
-    alignItems: "center",
     marginRight: 16,
   },
   overlayContainer: {

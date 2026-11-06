@@ -25,6 +25,7 @@ import { BlurView } from "@react-native-community/blur";
 import { useUploadProgress } from "../contexts/UploadProgressContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { useSocket } from "./SocketProvider";
+import GlassBackButton from "./GlassBackButton";
 import Icons from "./Icons";
 import CustomModal from "./CustomModal";
 import CustomText from "./CustomText";
@@ -438,15 +439,13 @@ const CountdownOverlay = ({
       {/* Top bar */}
       <View style={[cdStyles.topBar, { paddingTop: safeAreaTopInset + 10 }]}>
         <View style={cdStyles.topLeft}>
-          <TouchableOpacity style={cdStyles.circleBtn} onPress={onBack}>
-            <Blur />
-            <Icons
-              family="Ionicons"
-              name="chevron-back"
-              size={20}
-              color={isDark ? COLORS.white : colors.text}
-            />
-          </TouchableOpacity>
+          <GlassBackButton
+            onPress={onBack}
+            iconSize={20}
+            color={isDark ? COLORS.white : colors.text}
+            fullOpacity
+            style={cdStyles.circleBtn}
+          />
           <Text style={[cdStyles.backText, { color: isDark ? COLORS.white : colors.text }]}>Back</Text>
         </View>
 
@@ -457,15 +456,14 @@ const CountdownOverlay = ({
           </View>
         </View>
 
-        <TouchableOpacity style={cdStyles.circleBtn} onPress={onBack}>
-          <Blur />
-          <Icons
-            family="Ionicons"
-            name="close"
-            size={24}
-            color={isDark ? COLORS.white : colors.text}
-          />
-        </TouchableOpacity>
+        <GlassBackButton
+          onPress={onBack}
+          icon="close"
+          color={isDark ? COLORS.white : colors.text}
+          fullOpacity
+          accessibilityLabel="Close"
+          style={cdStyles.circleBtn}
+        />
       </View>
 
       {/* Right-side controls */}
@@ -1548,26 +1546,23 @@ const MeetingView = ({
             {/* ── Top bar: Back (left) + Close (right) ── */}
             <View style={styles.liveTopBar}>
               <View style={styles.liveTopLeft}>
-                <TouchableOpacity style={styles.circleBtn} onPress={handleBack}>
-                  <Blur />
-                  <Icons
-                    family="Ionicons"
-                    name="chevron-back"
-                    size={20}
-                    color={isDark ? COLORS.white : colors.text}
-                  />
-                </TouchableOpacity>
+                <GlassBackButton
+                  onPress={handleBack}
+                  iconSize={20}
+                  color={isDark ? COLORS.white : colors.text}
+                  fullOpacity
+                  style={styles.circleBtn}
+                />
                 <Text style={[styles.backLabel, { color: isDark ? COLORS.white : colors.text }]}>Back</Text>
               </View>
-              <TouchableOpacity style={styles.circleBtn} onPress={handleBack}>
-                <Blur />
-                <Icons
-                  family="Ionicons"
-                  name="close"
-                  size={24}
-                  color={isDark ? COLORS.white : colors.text}
-                />
-              </TouchableOpacity>
+              <GlassBackButton
+                onPress={handleBack}
+                icon="close"
+                color={isDark ? COLORS.white : colors.text}
+                fullOpacity
+                accessibilityLabel="Close"
+                style={styles.circleBtn}
+              />
             </View>
 
             {/* ── Stats row: viewers (left) + timer (right) ── */}

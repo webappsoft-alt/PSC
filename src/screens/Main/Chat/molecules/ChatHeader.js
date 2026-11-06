@@ -4,6 +4,7 @@ import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../../assets/fonts";
 import CustomText from "../../../../components/CustomText";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import CallOptionsSheet from "./CallOptionsSheet";
@@ -30,9 +31,13 @@ const ChatHeader = ({ title, subtitle, company, online, onSettingsPress, onVoice
   return (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
       {/* background: ScreenWrapper `headerBlur` draws the Figma progressive blur behind this header */}
-      <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.circle, { backgroundColor: tint(0.08) }]}>
-        <Icons family="MaterialSymbolsRounded" name="chevron_left" size={20} color={isDark ? "#F8F9FB" : colors.text} />
-      </TouchableOpacity>
+      <GlassBackButton
+        onPress={() => navigation.goBack()}
+        fill={tint(0.08)}
+        iconSize={20}
+        color={isDark ? "#F8F9FB" : colors.text}
+        fullOpacity
+      />
 
       <TouchableOpacity activeOpacity={0.7} onPress={onSettingsPress} disabled={!onSettingsPress} style={styles.texts}>
         <View style={styles.nameRow}>

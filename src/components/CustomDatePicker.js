@@ -10,6 +10,7 @@ import fonts from "../assets/fonts";
 import { Images } from "../assets/images";
 import { PNGIcons } from "../assets/images/icons";
 import { COLORS } from "../utils/COLORS";
+import Icons from "./Icons";
 import { useTheme } from "../contexts/ThemeContext";
 
 const CustomDatePicker = ({
@@ -27,6 +28,9 @@ const CustomDatePicker = ({
   marginBottom,
   height,
   isIcon = false,
+  // Figma Publish-A-Poll field: label, then a 16pt Material icon + value
+  // (Medium 16), no trailing calendar button — { name, color, filled }
+  leadingIcon,
 }) => {
   const [isModal, setModal] = useState(false);
   const [showSuccessColor, setShowSuccessColor] = useState(false);
@@ -73,7 +77,67 @@ const CustomDatePicker = ({
           },
         ]}
       >
-        <View style={isIcon ? styles.contentContainer : null}>
+        {leadingIcon ? (
+          // Figma 7572:11673 (date): label 8 → 8 → row 16, centred (32 in
+          // the 56 box ⇒ top 12); 7572:11681 (hour): label 8 → 10 → row 16,
+          // top-aligned at the 12 padding (34 tall; centred it would sit at
+          // 11, so a 2 top margin puts it at 12). The Figma heights (label 8,
+          // row 16) come from negative margins on the texts — a fixed height
+          // smaller than the 1.4 line box clips the glyphs on iOS.
+          <View
+            style={[
+              { gap: type == "date" ? 8 : 10 },
+              type != "date" && { marginTop: 2 },
+            ]}
+          >
+            {withLabel && (
+              <CustomText
+                label={withLabel}
+                textTransform="uppercase"
+                color={error ? "#EE1045" : colors.textSecondary}
+                fontFamily={fonts.medium}
+                fontSize={12}
+                numberOfLines={1}
+                marginTop={(8 - 12 * 1.4) / 2}
+                marginBottom={(8 - 12 * 1.4) / 2}
+              />
+            )}
+            <View style={[styles.dateRow, { gap: 4 }]}>
+              <Icons
+                family={
+                  leadingIcon.filled
+                    ? "MaterialSymbolsRoundedFilled"
+                    : "MaterialSymbolsRounded"
+                }
+                name={leadingIcon.name}
+                size={16}
+                color={leadingIcon.color || colors.text}
+              />
+              <CustomText
+                label={
+                  value && moment(value).isValid()
+                    ? moment(value).format(
+                        type == "date" ? "MMMM D, YYYY" : "h:mm A",
+                      )
+                    : placeholder
+                }
+                fontSize={16}
+                fontFamily={fonts.medium}
+                numberOfLines={1}
+                color={value ? colors.text : colors.iconMuted}
+                marginTop={(16 - 16 * 1.4) / 2}
+                marginBottom={(16 - 16 * 1.4) / 2}
+                containerStyle={{ flexShrink: 1 }}
+              />
+            </View>
+          </View>
+        ) : null}
+        <View
+          style={[
+            isIcon ? styles.contentContainer : null,
+            leadingIcon && { display: "none" },
+          ]}
+        >
           {withLabel && (
             <CustomText
               label={withLabel}
@@ -122,7 +186,7 @@ const CustomDatePicker = ({
           </View>
         </View>
 
-        {isIcon && (
+        {isIcon && !leadingIcon && (
           <TouchableOpacity style={styles.calendarButton}>
             <Image source={Images.dateIcon} style={{ height: 32, width: 32 }} />
           </TouchableOpacity>

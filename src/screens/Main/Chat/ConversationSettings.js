@@ -19,6 +19,7 @@ import Blur from "../../../components/Blur";
 import CustomSwitch from "../../../components/CustomSwitch";
 import CustomText from "../../../components/CustomText";
 import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import MediaBottomBlur from "../../../components/MediaBottomBlur";
 import ProgressiveBlur from "../../../components/ProgressiveBlur";
@@ -544,18 +545,12 @@ const ConversationSettings = ({ route }) => {
         <HeaderProgressiveBlur />
       </Animated.View>
       <View style={styles.titleRow}>
-        <TouchableOpacity
-          activeOpacity={0.7}
+        <GlassBackButton
           onPress={() => navigation.goBack()}
-          style={styles.back}
-        >
-          <Icons
-            family="MaterialSymbolsRounded"
-            name="chevron_left"
-            size={22}
-            color="rgba(255, 255, 255, 0.64)"
-          />
-        </TouchableOpacity>
+          fill="rgba(255, 255, 255, 0.08)"
+          iconSize={22}
+          color="#FFFFFF"
+        />
         <CustomText
           label={name}
           fontSize={24}
@@ -1021,15 +1016,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     height: 40,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
   },
   shrink: { flexShrink: 1 },
   // Figma row 16 tall (icon); the Medium 14 RN box is 19.6 → −1.8 each side

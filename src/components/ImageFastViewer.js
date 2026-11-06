@@ -18,6 +18,7 @@ import { ToastMessage } from "../utils/ToastMessage";
 import { BlurView } from "@react-native-community/blur";
 import { Images } from "../assets/images";
 import fonts from "../assets/fonts";
+import GlassBackButton from "./GlassBackButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
@@ -116,18 +117,13 @@ const ImageFastViewer = ({
           },
         ]}
       >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.backButton}
+        <GlassBackButton
           onPress={() => setIsViewModal(false)}
-        >
-          <BlurView
-            blurType="light"
-            blurAmount={16}
-            style={styles.blurBackground}
-          />
-          <Image source={Images.back} style={styles.backIcon} />
-        </TouchableOpacity>
+          size={44}
+          iconSize={28}
+          color="#FFFFFF"
+          fullOpacity
+        />
 
         <CustomText
           style={styles.headerTitle}
@@ -277,17 +273,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  backIcon: {
-    width: 28,
-    height: 28,
-    tintColor: "#fff",
-  },
   headerTitle: {
     color: "#000",
-  },
-  blurBackground: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 22,
   },
 
   // Center Content

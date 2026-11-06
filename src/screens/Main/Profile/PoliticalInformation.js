@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
 import Blur from "../../../components/Blur";
 import CustomText from "../../../components/CustomText";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import { useTheme } from "../../../contexts/ThemeContext";
 import {
@@ -195,14 +196,11 @@ const PoliticalInformation = ({ route }) => {
         end={{ x: 0.5, y: 1 }}
         style={[styles.header, { paddingTop: insets.top + 8, height: headerHeight }]}
       >
-        <TouchableOpacity
-          activeOpacity={0.6}
+        <GlassBackButton
           onPress={() => navigation.goBack()}
-          style={[styles.circle, { backgroundColor: colors.surface }]}
-        >
-          <Blur blurType={isDark ? "dark" : "xlight"} borderRadius={100} />
-          <Icons family={MS} name="chevron_left" size={24} color="rgba(255, 255, 255, 0.64)" />
-        </TouchableOpacity>
+          fill={colors.surface}
+          color="#FFFFFF"
+        />
         <CustomText
           label={orientation.label}
           fontSize={20}

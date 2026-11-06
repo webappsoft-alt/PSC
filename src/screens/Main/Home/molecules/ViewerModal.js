@@ -13,7 +13,7 @@ import { Images } from "../../../../assets/images";
 import CustomModal from "../../../../components/CustomModal";
 import CustomText from "../../../../components/CustomText";
 import Divider from "../../../../components/Divider";
-import Icons from "../../../../components/Icons";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import ImageFast from "../../../../components/ImageFast";
 import { get } from "../../../../services/ApiRequest";
 import { COLORS } from "../../../../utils/COLORS";
@@ -134,23 +134,14 @@ const ViewerModal = ({ isVisible, onDisable, viewersCount, postId }) => {
                 { paddingTop: insets.top, paddingHorizontal: 12 },
               ]}
             >
-              <TouchableOpacity
+              <GlassBackButton
                 onPress={onDisable}
-                activeOpacity={0.6}
-                style={[
-                  styles.backIcon,
-                  {
-                    backgroundColor: "rgba(255, 255, 255, 0.04)",
-                  },
-                ]}
-              >
-                <Icons
-                  name="keyboard-arrow-left"
-                  family="MaterialIcons"
-                  size={26}
-                  color={COLORS.white}
-                />
-              </TouchableOpacity>
+                fill="rgba(255, 255, 255, 0.04)"
+                iconSize={26}
+                color={COLORS.white}
+                fullOpacity
+                style={styles.backIcon}
+              />
 
               <View>
                 <CustomText
@@ -207,11 +198,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    justifyContent: "center",
-    alignItems: "center",
     marginRight: 16,
   },
   row: {

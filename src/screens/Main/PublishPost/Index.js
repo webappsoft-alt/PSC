@@ -45,10 +45,90 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { uploadAndGetUrl, uploadFileGetUrl } from "../../../utils/constants";
 import { ToastMessage } from "../../../utils/ToastMessage";
 import PeopleSelection from "./molecules/PeopleSelection";
+import useDictation from "../../../hooks/useDictation";
+import PollOptionsEditor, {
+  POLL_MIN_OPTIONS,
+  POLL_MAX_OPTIONS,
+  newPollOption,
+} from "./molecules/PollOptionsEditor";
+
+// Figma footer: "Today 2:00 PM" · "Wed, 14 June 2026"
+// Poll opening instant from the form's STARTING DATE + HOUR; null when no
+// start date is set (= publish now)
+const pollStartsAt = (startDate, startTime) => {
+  if (!startDate) return null;
+  const d = new Date(startDate);
+  if (Number.isNaN(d.getTime())) return null;
+  if (startTime) {
+    const t = new Date(startTime);
+    d.setHours(t.getHours(), t.getMinutes(), 0, 0);
+  } else {
+    d.setHours(0, 0, 0, 0);
+  }
+  return d;
+};
+
+// A start within a minute of now publishes right away (the API treats a
+// publishAt within 30 s of now as "now"; later → status "scheduled")
+const POLL_SCHEDULE_GRACE_MS = 60 * 1000;
+const isPollScheduled = (startsAt) =>
+  !!startsAt && startsAt.getTime() > Date.now() + POLL_SCHEDULE_GRACE_MS;
+
+// Client (Nov 2026): a new poll starts today at the current hour and ends
+// 72 hours later (the user can change both)
+const POLL_DEFAULT_DURATION_MS = 72 * 60 * 60 * 1000;
+const pollDefaultDates = () => {
+  const start = new Date();
+  start.setMinutes(0, 0, 0);
+  const end = new Date(start.getTime() + POLL_DEFAULT_DURATION_MS);
+  return { start, end };
+};
+
+// Poll closing instant from the form's ENDING DATE + HOUR (device local time,
+// "Date & time according to your location"); null when no end date is set.
+const pollEndsAt = (endDate, endTime) => {
+  if (!endDate) return null;
+  const d = new Date(endDate);
+  if (Number.isNaN(d.getTime())) return null;
+  if (endTime) {
+    const t = new Date(endTime);
+    d.setHours(t.getHours(), t.getMinutes(), 0, 0);
+  } else {
+    d.setHours(23, 59, 0, 0);
+  }
+  return d;
+};
 
 // Validation function
-const validateForm = (values, { isAudioPost = false } = {}) => {
+const validateForm = (
+  values,
+  { isAudioPost = false, isPoll = false } = {},
+) => {
   const errors = {};
+
+  // Poll: 2–20 different, non-empty options and a future closing time
+  if (isPoll) {
+    const texts = (values.pollOptions || [])
+      .map((o) => o.text.trim())
+      .filter(Boolean);
+    const unique = new Set(texts.map((t) => t.toLowerCase()));
+    if (texts.length < POLL_MIN_OPTIONS) {
+      errors.pollOptions = `Add at least ${POLL_MIN_OPTIONS} options.`;
+    } else if (unique.size !== texts.length) {
+      errors.pollOptions = "Each option must be different.";
+    } else if (texts.length > POLL_MAX_OPTIONS) {
+      errors.pollOptions = `Up to ${POLL_MAX_OPTIONS} options.`;
+    }
+    const endsAt = pollEndsAt(values.endDate, values.endTime);
+    const startsAt = pollStartsAt(values.startDate, values.startTime);
+    const scheduled = isPollScheduled(startsAt);
+    const opensAt = scheduled ? startsAt.getTime() : Date.now();
+    if (endsAt && endsAt.getTime() <= opensAt) {
+      errors.endDate = scheduled
+        ? "The poll must end after its starting date."
+        : "The poll's ending date must be in the future.";
+    }
+  }
 
   // Description (an Audio Post's recording is the content — text optional)
   if (isAudioPost) {
@@ -66,18 +146,22 @@ const validateForm = (values, { isAudioPost = false } = {}) => {
     errors.size = "Image size is required";
   }
 
-  // Images (optional cover for an Audio Post)
-  if (!isAudioPost && (!values.images || values.images.length === 0)) {
+  // Images (optional cover for an Audio Post, optional on a poll)
+  if (
+    !isAudioPost &&
+    !isPoll &&
+    (!values.images || values.images.length === 0)
+  ) {
     errors.images = "At least one image is required";
   }
 
-  // Topic
-  if (!values.topic) {
+  // Topic (not part of a poll)
+  if (!isPoll && !values.topic) {
     errors.topic = "Topic is required";
   }
 
-  // Age Rating
-  if (!values.ageRating) {
+  // Age Rating (not part of a poll)
+  if (!isPoll && !values.ageRating) {
     errors.ageRating = "Age rating is required";
   }
 
@@ -86,8 +170,8 @@ const validateForm = (values, { isAudioPost = false } = {}) => {
     errors.contentRating = "Content visibility is required";
   }
 
-  // Location (optional for an Audio Post)
-  if (isAudioPost && !values.location) {
+  // Location (optional for an Audio Post, not part of a poll)
+  if ((isAudioPost || isPoll) && !values.location) {
     // nothing to check
   } else if (!values.location) {
     errors.location = "Location is required";
@@ -147,6 +231,58 @@ const permissionFields = [
   { key: "canSave", label: "CAN SAVE?" },
 ];
 
+// Publish-A-Poll (Figma) toggle labels
+const pollPermissionFields = [
+  { key: "canUpvote", label: "CAN UPVOTE?" },
+  { key: "canComment", label: "CAN COMMENT?" },
+  { key: "canRepost", label: "CAN REPOST?" },
+  { key: "canShare", label: "CAN SHARE?" },
+  { key: "canSave", label: "CAN SAVE?" },
+];
+
+// Figma "Bar-de-recherche" toggle row (7572:11721): 56 tall, radius 12,
+// white 4%, 12 padding · label Medium 12 @64% uppercase → 10 → Yes/No
+// Medium 16; the text column is top-aligned (label cap 12 below the top).
+// RN 1.4 line boxes: 0.353 em above a cap, 0.35 em below the baseline.
+const FIELD_TEXT_TOP = 12 - 0.353 * 12;
+const FIELD_VALUE_GAP = 10 - 0.35 * 12 - 0.353 * 16;
+const FieldToggleRow = ({ label, value, setValue }) => {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{
+        height: 56,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        backgroundColor: colors.surfaceAlt,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <View
+        style={{ flex: 1, alignSelf: "flex-start", marginTop: FIELD_TEXT_TOP }}
+      >
+        <CustomText
+          label={label}
+          fontSize={12}
+          fontFamily={fonts.medium}
+          color={colors.textSecondary}
+          numberOfLines={1}
+        />
+        <CustomText
+          label={value ? "Yes" : "No"}
+          fontSize={16}
+          fontFamily={fonts.medium}
+          color={colors.text}
+          marginTop={FIELD_VALUE_GAP}
+        />
+      </View>
+      <CustomSwitch value={value} setValue={setValue} />
+    </View>
+  );
+};
+
 // Available To options for FilterModal
 const availableToOptions = [
   { name: "Public" },
@@ -184,6 +320,9 @@ const CreatePost = ({ route }) => {
   // Audio Post recorder → "Continue": the edited draft (a Radio, kind "audio")
   const audioPost = route?.params?.audioPost || null;
   const isAudioPost = !!audioPost?._id;
+  // + menu → Poll (Figma Publish-A-Poll): the post form plus the options list
+  const isPoll =
+    route?.params?.postType === "poll" && !editMode && !isAudioPost;
 
   // Helper function to transform API data for edit mode
   const transformPostDataForEdit = (postData) => {
@@ -322,14 +461,20 @@ const CreatePost = ({ route }) => {
       (route?.params?.mentionUser?._id ? [route.params.mentionUser] : []),
   );
   const [sponsors, setSponsors] = useState(transformedPost?.sponsors || []);
+  // a new poll opens with its default starting / ending date + hour
+  const [pollDefaults] = useState(() => (isPoll ? pollDefaultDates() : null));
   const [startDate, setStartDate] = useState(
-    transformedPost?.startDate || null,
+    transformedPost?.startDate || pollDefaults?.start || null,
   );
   const [startTime, setStartTime] = useState(
-    transformedPost?.startTime || null,
+    transformedPost?.startTime || pollDefaults?.start || null,
   );
-  const [endDate, setEndDate] = useState(transformedPost?.endDate || null);
-  const [endTime, setEndTime] = useState(transformedPost?.endTime || null);
+  const [endDate, setEndDate] = useState(
+    transformedPost?.endDate || pollDefaults?.end || null,
+  );
+  const [endTime, setEndTime] = useState(
+    transformedPost?.endTime || pollDefaults?.end || null,
+  );
   const [availableTo, setAvailableTo] = useState(
     transformedPost?.availableTo || ["Public"],
   );
@@ -350,6 +495,22 @@ const CreatePost = ({ route }) => {
   );
 
   const [mutedVideos, setMutedVideos] = useState({});
+  // WHAT'S HAPPENING mic: speak → live text (Audio Post recognition)
+  const descriptionRef = useRef(description);
+  descriptionRef.current = description;
+  const dictation = useDictation({
+    getBaseText: () => descriptionRef.current,
+    onText: setDescription,
+  });
+  useEffect(() => {
+    if (!isFocused && dictation.listening) dictation.stop();
+  }, [isFocused, dictation]);
+  const [pollOptions, setPollOptions] = useState(() => [
+    newPollOption(),
+    newPollOption(),
+  ]);
+  const [containsAI, setContainsAI] = useState(false);
+
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -360,6 +521,7 @@ const CreatePost = ({ route }) => {
 
   // Handle form submission
   const handleSubmit = async () => {
+    if (dictation.listening) dictation.stop();
     try {
       // Validate form
       const formValues = {
@@ -374,14 +536,27 @@ const CreatePost = ({ route }) => {
         availableTo,
         permissions,
         tosConfirmation,
+        pollOptions,
+        startDate,
+        startTime,
+        endDate,
+        endTime,
       };
 
-      const validationErrors = validateForm(formValues, { isAudioPost });
+      const validationErrors = validateForm(formValues, {
+        isAudioPost,
+        isPoll,
+      });
 
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
         console.log("Form Errors:", validationErrors);
-        ToastMessage("Please fill all required fields", "error");
+        ToastMessage(
+          (isPoll &&
+            (validationErrors.pollOptions || validationErrors.endDate)) ||
+            "Please fill all required fields",
+          "error",
+        );
         return;
       }
 
@@ -394,7 +569,11 @@ const CreatePost = ({ route }) => {
         // Create mode - instant navigation
         startUpload(
           "post",
-          isAudioPost ? "Publishing your audio post..." : "Uploading your post...",
+          isAudioPost
+            ? "Publishing your audio post..."
+            : isPoll
+            ? "Publishing your poll..."
+            : "Uploading your post...",
         );
         navigation.reset({
           index: 0,
@@ -475,18 +654,45 @@ const CreatePost = ({ route }) => {
             ...(parentPostId && { parentPostId }),
           };
 
+          if (isPoll) {
+            // fields a poll doesn't ask for (the API rejects an empty
+            // location's "" city / country / address)
+            if (!Number.isFinite(payload.ageRating)) payload.ageRating = 14;
+            if (!location?.address) delete payload.location;
+            payload.containsAI = containsAI;
+            // STARTING DATE + HOUR in the future → scheduled; a start at
+            // (or before) now publishes right away
+            const startsAt = pollStartsAt(startDate, startTime);
+            if (isPollScheduled(startsAt)) {
+              payload.publishAt = startsAt.toISOString();
+            }
+            const endsAt = pollEndsAt(endDate, endTime);
+            payload.poll = {
+              options: pollOptions
+                .filter((o) => o.text.trim())
+                .map((o) => ({
+                  text: o.text.trim(),
+                  // "@user" tagged option → their photo in the poll
+                  ...(o.mention?._id ? { mention: o.mention._id } : {}),
+                })),
+              endsAt: endsAt ? endsAt.toISOString() : null,
+            };
+          }
+
           // Add startDate and endDate only if they exist (optional)
           if (startDate || startTime) {
+            // the API accepts "" for a missing part, not null
             payload.startDate = {
-              date: formatDate(startDate),
-              time: formatTime(startTime),
+              date: formatDate(startDate) || "",
+              time: formatTime(startTime) || "",
             };
           }
 
           if (endDate || endTime) {
+            // the API accepts "" for a missing part, not null
             payload.endDate = {
-              date: formatDate(endDate),
-              time: formatTime(endTime),
+              date: formatDate(endDate) || "",
+              time: formatTime(endTime) || "",
             };
           }
           // console.log("formm---data", payload);
@@ -544,7 +750,13 @@ const CreatePost = ({ route }) => {
             console.log("Create Response:", response);
 
             if (response?.data?.success) {
-              completeUpload("Post created successfully");
+              completeUpload(
+                isPoll
+                  ? payload.publishAt
+                    ? "Poll scheduled"
+                    : "Poll published"
+                  : "Post created successfully",
+              );
             } else {
               const errorMessage =
                 response?.data?.message ||
@@ -898,7 +1110,24 @@ const CreatePost = ({ route }) => {
           }
         />
       )}
-      footerUnScrollable={() => (
+      footerUnScrollable={() =>
+        isPoll ? (
+          // Figma Publish-A-Poll footer (7572:11759): Publish (48 tall, FILL);
+          // the draft and schedule buttons are removed (client, Nov 2026 —
+          // the starting date / hour fields schedule the poll)
+          <View style={styles.pollFooter}>
+            <CustomButton
+              title={"Publish"}
+              color={COLORS.primaryColor}
+              height={48}
+              fontSize={18}
+              fontFamily={fonts.medium}
+              onPress={handleSubmit}
+              loading={isSubmitting || imgLoading}
+              disabled={isSubmitting || imgLoading}
+            />
+          </View>
+        ) : (
         <View
           style={{
             paddingHorizontal: 12,
@@ -928,7 +1157,8 @@ const CreatePost = ({ route }) => {
               }}
             /> */}
         </View>
-      )}
+        )
+      }
     >
       <ScreenScrollView showsVerticalScrollIndicator={false}>
         {/* starts below the floating blurred header */}
@@ -958,13 +1188,19 @@ const CreatePost = ({ route }) => {
               <CustomInput
                 multiline
                 withLabel={"WHAT'S HAPPENING"}
-                height={220}
+                // Figma Publish-A-Poll box: 308 tall, text Medium 14
+                height={isPoll ? 308 : 220}
+                inputTextStyle={
+                  isPoll ? { fontSize: 14, fontFamily: fonts.medium } : null
+                }
                 value={description}
                 onChangeText={setDescription}
                 placeholder="What's on your mind?"
                 error={errors.description}
                 publishPost
                 enableMentionHighlight
+                onMicPress={dictation.toggle}
+                micActive={dictation.listening}
               />
 
               <ErrorComponent
@@ -1358,191 +1594,284 @@ const CreatePost = ({ route }) => {
           />
         )}
 
-        <View style={[styles.row, { marginTop: 16 }]}>
-          <View style={{ width: "80%" }}>
-            <CustomText
-              fontSize={12}
-              label={"MAKE IT CONTINOUS"}
-              fontFamily={fonts.medium}
-              color={colors.textSecondary}
+        {/* Publish-A-Poll (Figma): media → options → dates; the regular
+            post's continuity / topic / age / hashtags / location /
+            collaborators / sponsors fields are not part of a poll */}
+        {isPoll ? (
+          <>
+            <Divider
+              marginVertical={16}
+              thickness={1}
+              color={colors.white04}
             />
-            <CustomText
-              label={makeItContinuous ? "Yes" : "No"}
-              fontSize={16}
-              color={colors.text}
+            <PollOptionsEditor
+              options={pollOptions}
+              onChange={(next) => {
+                setPollOptions(next);
+                if (errors.pollOptions) {
+                  setErrors((prev) => ({ ...prev, pollOptions: undefined }));
+                }
+              }}
+              error={errors.pollOptions}
+            />
+          </>
+        ) : (
+          <>
+          <View style={[styles.row, { marginTop: 16 }]}>
+            <View style={{ width: "80%" }}>
+              <CustomText
+                fontSize={12}
+                label={"MAKE IT CONTINOUS"}
+                fontFamily={fonts.medium}
+                color={colors.textSecondary}
+              />
+              <CustomText
+                label={makeItContinuous ? "Yes" : "No"}
+                fontSize={16}
+                color={colors.text}
+              />
+            </View>
+            <CustomSwitch
+              value={makeItContinuous}
+              setValue={setMakeItContinuous}
             />
           </View>
-          <CustomSwitch
-            value={makeItContinuous}
-            setValue={setMakeItContinuous}
+          <ErrorComponent
+            errorTitle={"One single collage that links all media together."}
+            marginTop={6}
           />
-        </View>
-        <ErrorComponent
-          errorTitle={"One single collage that links all media together."}
-          marginTop={6}
-        />
-        <Divider marginVertical={18} color={colors.white04} thickness={1} />
+          <Divider marginVertical={18} color={colors.white04} thickness={1} />
 
-        <CustomInputTextOnly
-          onPress={() => setIsFilterModalVisible(true)}
-          withLabel={"Topic"}
-          placeholder={topic?.name || "Select Topic"}
-          value={topic?.name}
-          Isicon
-          error={errors.topic}
-        />
-        <CustomInputTextOnly
-          onPress={() => setIsAgeLimitModalVisible(true)}
-          withLabel={"AGE RATING"}
-          placeholder="Select Age Rating"
-          value={ageRating}
-          Isicon
-          error={errors.ageRating}
-        />
+          <CustomInputTextOnly
+            onPress={() => setIsFilterModalVisible(true)}
+            withLabel={"Topic"}
+            placeholder={topic?.name || "Select Topic"}
+            value={topic?.name}
+            Isicon
+            error={errors.topic}
+          />
+          <CustomInputTextOnly
+            onPress={() => setIsAgeLimitModalVisible(true)}
+            withLabel={"AGE RATING"}
+            placeholder="Select Age Rating"
+            value={ageRating}
+            Isicon
+            error={errors.ageRating}
+          />
 
-        {/* Hashtags Section */}
+          {/* Hashtags Section */}
 
-        {/* Hashtag Input with Add Button */}
-        <View style={styles.hashtagInputContainer}>
-          <View style={styles.hashtagInput}>
-            <CustomInput
-              value={currentHashtag}
-              onChangeText={setCurrentHashtag}
-              placeholder="Add hashtag"
-              onSubmitEditing={handleAddHashtag}
-              withLabel={"Hashtags"}
-              returnKeyType="Enter"
-            />
+          {/* Hashtag Input with Add Button */}
+          <View style={styles.hashtagInputContainer}>
+            <View style={styles.hashtagInput}>
+              <CustomInput
+                value={currentHashtag}
+                onChangeText={setCurrentHashtag}
+                placeholder="Add hashtag"
+                onSubmitEditing={handleAddHashtag}
+                withLabel={"Hashtags"}
+                returnKeyType="Enter"
+              />
+            </View>
           </View>
-        </View>
 
-        {/* Display Added Hashtags */}
-        {hashtags.length > 0 && (
-          <View style={styles.hashtagsContainer}>
-            {hashtags.map((tag, index) => (
-              <View key={`hashtag-${index}`} style={styles.hashtagChip}>
-                <CustomText
-                  label={`#${tag}`}
-                  color={colors.text}
-                  fontSize={14}
-                  fontFamily={fonts.medium}
-                />
-                <TouchableOpacity
-                  onPress={() => handleRemoveHashtag(index)}
-                  style={styles.removeHashtagButton}
-                >
-                  <Image source={Images.crossGray} style={styles.closeIcon} />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
+          {/* Display Added Hashtags */}
+          {hashtags.length > 0 && (
+            <View style={styles.hashtagsContainer}>
+              {hashtags.map((tag, index) => (
+                <View key={`hashtag-${index}`} style={styles.hashtagChip}>
+                  <CustomText
+                    label={`#${tag}`}
+                    color={colors.text}
+                    fontSize={14}
+                    fontFamily={fonts.medium}
+                  />
+                  <TouchableOpacity
+                    onPress={() => handleRemoveHashtag(index)}
+                    style={styles.removeHashtagButton}
+                  >
+                    <Image source={Images.crossGray} style={styles.closeIcon} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <CustomInputTextOnly
+            onPress={() => setIsAddStepModal(true)}
+            withLabel={"Location"}
+            placeholder="Select Location"
+            Isicon
+            value={location?.address || ""}
+            islocation
+            iconSrc={Images.LocationArrow}
+            error={errors.location}
+          />
+
+          <CustomInputTextOnly
+            collabNames={collaborators.map((u) => u.firstName)}
+            placeholder={"Click to select the Collaborators"}
+            icColabe
+            Isicon
+            withLabel={"In COLLABORATION With"}
+            onPress={() => {
+              setSelectionType("collaborators");
+              setSelectionVisible(true);
+            }}
+          />
+          <ErrorComponent
+            errorTitle={"Person working together on the same project or content."}
+          />
+          <CustomInputTextOnly
+            collabNames={sponsors.map((u) => u.firstName)}
+            icColabe
+            placeholder={"Click to select the Sponsors"}
+            marginTop={8}
+            Isicon
+            withLabel={"SPONSORED BY"}
+            onPress={() => {
+              setSelectionType("sponsors");
+              setSelectionVisible(true);
+            }}
+          />
+          <ErrorComponent
+            errorTitle={
+              "Organization supporting financially or with resources in exchange for promotion."
+            }
+          />
+          </>
         )}
-
-        <CustomInputTextOnly
-          onPress={() => setIsAddStepModal(true)}
-          withLabel={"Location"}
-          placeholder="Select Location"
-          Isicon
-          value={location?.address || ""}
-          islocation
-          iconSrc={Images.LocationArrow}
-          error={errors.location}
-        />
-
-        <CustomInputTextOnly
-          collabNames={collaborators.map((u) => u.firstName)}
-          placeholder={"Click to select the Collaborators"}
-          icColabe
-          Isicon
-          withLabel={"In COLLABORATION With"}
-          onPress={() => {
-            setSelectionType("collaborators");
-            setSelectionVisible(true);
-          }}
-        />
-        <ErrorComponent
-          errorTitle={"Person working together on the same project or content."}
-        />
-        <CustomInputTextOnly
-          collabNames={sponsors.map((u) => u.firstName)}
-          icColabe
-          placeholder={"Click to select the Sponsors"}
-          marginTop={8}
-          Isicon
-          withLabel={"SPONSORED BY"}
-          onPress={() => {
-            setSelectionType("sponsors");
-            setSelectionVisible(true);
-          }}
-        />
-        <ErrorComponent
-          errorTitle={
-            "Organization supporting financially or with resources in exchange for promotion."
-          }
-        />
         <Divider marginVertical={16} color={colors.white04} thickness={1} />
 
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <CustomDatePicker
-            withLabel={"STARTING ON"}
-            value={startDate}
-            setValue={(date) => setStartDate(date)}
-            placeholder="Select Date"
-            type="date"
-            isIcon={true}
-            width={"49%"}
-          />
-          <CustomDatePicker
-            withLabel={"STARTING TIME"}
-            value={startTime}
-            setValue={(time) => setStartTime(time)}
-            placeholder="Select Time"
-            type="time"
-            isIcon={true}
-            width={"49%"}
-          />
-        </View>
+        {isPoll ? (
+          // Figma Publish-A-Poll: 2 × 2 fields (gap 8), gold calendar /
+          // white clock icons, "July 7, 2025" · "10:00 AM"
+          <View style={{ gap: 8 }}>
+            <View style={styles.pollDateRow}>
+              <View style={styles.flex1}>
+                <CustomDatePicker
+                  withLabel={"STARTING DATE"}
+                  value={startDate}
+                  setValue={(date) => setStartDate(date)}
+                  placeholder="Select Date"
+                  type="date"
+                  leadingIcon={{
+                    name: "event",
+                    filled: true,
+                    color: COLORS.buttonColor,
+                  }}
+                />
+              </View>
+              <View style={styles.flex1}>
+                <CustomDatePicker
+                  withLabel={"HOUR"}
+                  value={startTime}
+                  setValue={(time) => setStartTime(time)}
+                  placeholder="Select Time"
+                  type="time"
+                  leadingIcon={{ name: "schedule" }}
+                />
+              </View>
+            </View>
+            <View style={styles.pollDateRow}>
+              <View style={styles.flex1}>
+                <CustomDatePicker
+                  withLabel={"ENDING DATE"}
+                  value={endDate}
+                  setValue={(date) => setEndDate(date)}
+                  placeholder="Select Date"
+                  type="date"
+                  minDate={startDate || new Date()}
+                  leadingIcon={{
+                    name: "event",
+                    filled: true,
+                    color: COLORS.buttonColor,
+                  }}
+                />
+              </View>
+              <View style={styles.flex1}>
+                <CustomDatePicker
+                  withLabel={"HOUR"}
+                  value={endTime}
+                  setValue={(time) => setEndTime(time)}
+                  placeholder="Select Time"
+                  type="time"
+                  leadingIcon={{ name: "schedule" }}
+                />
+              </View>
+            </View>
+            <ErrorComponent
+              errorTitle={"Date & time according to your location."}
+              // Figma 7572:11706: row 12, cap 2 below its top; the 12pt line
+              // box puts the cap 0.353 × 12 below the RN row top
+              marginTop={2 - 0.353 * 12}
+            />
+          </View>
+        ) : (
+          <>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <CustomDatePicker
+              withLabel={"STARTING ON"}
+              value={startDate}
+              setValue={(date) => setStartDate(date)}
+              placeholder="Select Date"
+              type="date"
+              isIcon={true}
+              width={"49%"}
+            />
+            <CustomDatePicker
+              withLabel={"STARTING TIME"}
+              value={startTime}
+              setValue={(time) => setStartTime(time)}
+              placeholder="Select Time"
+              type="time"
+              isIcon={true}
+              width={"49%"}
+            />
+          </View>
 
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginTop: 8,
-          }}
-        >
-          <CustomDatePicker
-            withLabel={"ENDING ON"}
-            value={endDate}
-            setValue={(date) => setEndDate(date)}
-            placeholder="Select Date"
-            type="date"
-            isIcon={true}
-            width={"49%"}
-            // maxDate={null}
-            minDate={startDate}
-          />
-          <CustomDatePicker
-            withLabel={"ENDING TIME"}
-            value={endTime}
-            setValue={(time) => setEndTime(time)}
-            placeholder="Select Time"
-            type="time"
-            isIcon={true}
-            width={"49%"}
-          />
-        </View>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 8,
+            }}
+          >
+            <CustomDatePicker
+              withLabel={"ENDING ON"}
+              value={endDate}
+              setValue={(date) => setEndDate(date)}
+              placeholder="Select Date"
+              type="date"
+              isIcon={true}
+              width={"49%"}
+              // maxDate={null}
+              minDate={startDate}
+            />
+            <CustomDatePicker
+              withLabel={"ENDING TIME"}
+              value={endTime}
+              setValue={(time) => setEndTime(time)}
+              placeholder="Select Time"
+              type="time"
+              isIcon={true}
+              width={"49%"}
+            />
+          </View>
 
-        <ErrorComponent
-          marginTop={8}
-          errorTitle={"Date & time according to your location."}
-        />
+          <ErrorComponent
+            marginTop={8}
+            errorTitle={"Date & time according to your location."}
+          />
+          </>
+        )}
         {errors.startDate || errors.endDate ? (
           <ErrorComponent
             errorTitle={errors.startDate || errors.endDate}
@@ -1563,52 +1892,85 @@ const CreatePost = ({ route }) => {
         />
         {errors.availableTo && <ErrorComponent error={errors.availableTo} />}
 
-        {permissionFields.map((field, idx) => (
-          <View
-            style={[styles.row, idx > 0 && { marginTop: 8 }]}
-            key={field.key}
-          >
+        {isPoll ? (
+          // Figma Publish-A-Poll: boxed toggle rows, 8 apart
+          <View style={{ gap: 8 }}>
+            <FieldToggleRow
+              label={"DOES IT CONTAIN AI?"}
+              value={containsAI}
+              setValue={setContainsAI}
+            />
+            {pollPermissionFields.map((field) => (
+              <FieldToggleRow
+                key={field.key}
+                label={field.label}
+                value={permissions[field.key]}
+                setValue={(value) =>
+                  setPermissions((prev) => ({ ...prev, [field.key]: value }))
+                }
+              />
+            ))}
+          </View>
+        ) : (
+          <>
+          {permissionFields.map((field, idx) => (
+            <View
+              style={[styles.row, idx > 0 && { marginTop: 8 }]}
+              key={field.key}
+            >
+              <View style={{ width: "80%" }}>
+                <CustomText
+                  fontSize={12}
+                  label={field.label}
+                  lineHeight={16 * 1.4}
+                  fontFamily={fonts.medium}
+                  color={colors.textSecondary}
+                />
+                <CustomText
+                  label={permissions[field.key] ? "Yes" : "No"}
+                  fontSize={16}
+                  lineHeight={12 * 1.4}
+                />
+              </View>
+              <CustomSwitch
+                value={permissions[field.key]}
+                setValue={(value) =>
+                  setPermissions((prev) => ({ ...prev, [field.key]: value }))
+                }
+              />
+            </View>
+          ))}
+          </>
+        )}
+
+        <Divider marginVertical={16} thickness={1} color={colors.white04} />
+
+        {isPoll ? (
+          <View style={{ marginBottom: 40 }}>
+            <FieldToggleRow
+              label={"I HEREBY CONFIRM THE POST IS WITHIN TOS"}
+              value={tosConfirmation}
+              setValue={setTosConfirmation}
+            />
+          </View>
+        ) : (
+          <View style={[styles.row, { marginBottom: 40 }]}>
             <View style={{ width: "80%" }}>
               <CustomText
                 fontSize={12}
-                label={field.label}
-                lineHeight={16 * 1.4}
+                label={"I HEREBY CONFIRM THE POST IS WITHIN TOS"}
                 fontFamily={fonts.medium}
                 color={colors.textSecondary}
               />
               <CustomText
-                label={permissions[field.key] ? "Yes" : "No"}
+                label={tosConfirmation ? "Yes" : "No"}
                 fontSize={16}
-                lineHeight={12 * 1.4}
+                color={colors.text}
               />
             </View>
-            <CustomSwitch
-              value={permissions[field.key]}
-              setValue={(value) =>
-                setPermissions((prev) => ({ ...prev, [field.key]: value }))
-              }
-            />
+            <CustomSwitch value={tosConfirmation} setValue={setTosConfirmation} />
           </View>
-        ))}
-
-        <Divider marginVertical={16} thickness={1} color={colors.white04} />
-
-        <View style={[styles.row, { marginBottom: 40 }]}>
-          <View style={{ width: "80%" }}>
-            <CustomText
-              fontSize={12}
-              label={"I HEREBY CONFIRM THE POST IS WITHIN TOS"}
-              fontFamily={fonts.medium}
-              color={colors.textSecondary}
-            />
-            <CustomText
-              label={tosConfirmation ? "Yes" : "No"}
-              fontSize={16}
-              color={colors.text}
-            />
-          </View>
-          <CustomSwitch value={tosConfirmation} setValue={setTosConfirmation} />
-        </View>
+        )}
         {errors.tosConfirmation && (
           <ErrorComponent
             errorTitle={errors.tosConfirmation}
@@ -1664,10 +2026,13 @@ const CreatePost = ({ route }) => {
           title="Available To"
           subtitle="Select who can access"
           filters={availableToOptions}
+          // one audience at a time (radio + Confirm)
           multiSelect={true}
-          selectedItems={availableTo}
+          singleSelect={true}
+          selectedItems={availableTo.slice(0, 1)}
           onConfirm={(selectedItems) => {
-            setAvailableTo(selectedItems);
+            // tapping the chosen row again clears it — keep the current one
+            if (selectedItems?.length) setAvailableTo(selectedItems.slice(0, 1));
           }}
         />
 
@@ -1709,6 +2074,19 @@ export default CreatePost;
 
 const createStyles = (colors, isDark) =>
   StyleSheet.create({
+    pollFooter: {
+      paddingHorizontal: 12,
+      paddingTop: 8,
+      marginBottom: 20,
+      gap: 8,
+    },
+    pollDateRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    flex1: {
+      flex: 1,
+    },
     imageContainer: {
       borderWidth: 4,
       borderColor: colors.white04,

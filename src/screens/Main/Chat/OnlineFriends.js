@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import ImageFast from "../../../components/ImageFast";
 import ScreenWrapper from "../../../components/ScreenWrapper";
@@ -225,19 +226,8 @@ const OnlineFriends = ({ embedded = false }) => {
         >
           <View style={styles.headerRow}>
           {/* New chat picker (Inbox "+"): same back button as the app Header */}
-          <TouchableOpacity
-            activeOpacity={0.6}
-            onPress={() => navigation.goBack()}
-            // Figma Inbox-1-on-1: 40 circle white 4%, chevron_left 24 @64%
-            style={[styles.back, { backgroundColor: tint(0.04) }]}
-          >
-            <Icons
-              name="chevron_left"
-              family="MaterialSymbolsRounded"
-              size={24}
-              color={tint(0.64)}
-            />
-          </TouchableOpacity>
+          {/* Figma Inbox-1-on-1: 40 circle white 4%, chevron_left 24 @64% */}
+          <GlassBackButton onPress={() => navigation.goBack()} fill={tint(0.04)} />
           <View style={[styles.searchBar, { backgroundColor: tint(0.04) }]}>
             <Icons
               family="MaterialSymbolsRounded"
@@ -349,14 +339,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
   },
   searchBar: {
     flex: 1,

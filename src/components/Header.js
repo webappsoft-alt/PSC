@@ -7,8 +7,8 @@ import Icons from "./Icons";
 import fonts from "../assets/fonts";
 import { PNGIcons } from "../assets/images/icons";
 import { COLORS } from "../utils/COLORS";
-import Blur from "./Blur";
 import { useTheme } from "../contexts/ThemeContext";
+import GlassBackButton from "./GlassBackButton";
 
 const Header = ({
   title,
@@ -34,7 +34,7 @@ const Header = ({
   textTransform,
 }) => {
   const navigation = useNavigation();
-  const { colors, themeMode } = useTheme();
+  const { colors } = useTheme();
 
   const canGoBack = () => {
     try {
@@ -69,30 +69,15 @@ const Header = ({
     >
       <View style={styles.row}>
         {hideBackArrow ? null : (
-          <TouchableOpacity
-            activeOpacity={0.6}
+          <GlassBackButton
+            onPress={onBackPress ? onBackPress : handleGoBack}
+            fill={iconBackgroundColor}
+            color={textColor}
             style={[
               styles.backIcon,
-              {
-                backgroundColor: iconBackgroundColor || colors.surfaceAlt,
-                borderWidth,
-                borderColor: borderColor || colors.surfaceAlt,
-                overflow: "hidden",
-              },
+              borderWidth ? { borderWidth, borderColor: borderColor || colors.surfaceAlt } : null,
             ]}
-            onPress={onBackPress ? onBackPress : handleGoBack}
-          >
-            <Blur blurType={themeMode === "dark" ? "dark" : "xlight"} />
-            <Icons
-              // name="keyboard-arrow-left"
-              // family="MaterialIcons"
-              // size={26}
-              family="MaterialSymbolsRounded"
-              name="chevron_left"
-              size={22}
-              color={textColor || colors.iconMuted}
-            />
-          </TouchableOpacity>
+          />
         )}
         {isImage && (
           <Image
@@ -190,11 +175,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   backIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    justifyContent: "center",
-    alignItems: "center",
     marginRight: 16,
   },
   row: {

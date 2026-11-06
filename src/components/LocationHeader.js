@@ -1,6 +1,6 @@
 import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import Icons from "./Icons";
+import GlassBackButton from "./GlassBackButton";
 import { PNGIcons } from "../assets/images/icons";
 import CustomText from "./CustomText";
 import fonts from "../assets/fonts";
@@ -10,18 +10,15 @@ const LocationHeader = ({ isVisible }) => {
   const navigation = useNavigation();
   return (
     <View style={styles.mainContainer}>
-      <TouchableOpacity
+      <GlassBackButton
         onPress={() => navigation.goBack()}
-        activeOpacity={0.6}
+        fill={COLORS.white}
+        size={48}
+        iconSize={26}
+        color={COLORS.darkPurple}
+        fullOpacity
         style={styles.backIcon}
-      >
-        <Icons
-          name="keyboard-arrow-left"
-          family="MaterialIcons"
-          size={26}
-          color={COLORS.darkPurple}
-        />
-      </TouchableOpacity>
+      />
       <TouchableOpacity
         onPress={isVisible}
         activeOpacity={0.8}
@@ -71,12 +68,6 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   backIcon: {
-    width: 48,
-    height: 48,
-    backgroundColor: COLORS.white,
-    borderRadius: 100,
-    justifyContent: "center",
-    alignItems: "center",
     marginRight: 10,
   },
   titleContainer: {

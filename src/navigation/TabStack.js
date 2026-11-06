@@ -57,6 +57,7 @@ import ImageFast from "../components/ImageFast";
 import BandMateMatching from "../screens/Main/BandMateMatching";
 import CameraScreen from "../screens/Main/CameraScreen";
 import Event from "../screens/Main/Event";
+import JobMarketplace from "../screens/Main/Jobs/JobMarketplace";
 import Home from "../screens/Main/Home/Index";
 import Profile from "../screens/Main/Profile/Profile";
 import Shows from "../screens/Main/TvShow/Shows";
@@ -170,31 +171,36 @@ const HOME_PAGE_INDEX = 1;
 // 2: Shorts
 // 3: ShowsFromShorts  ← new: Shows opened from Shorts (no tab bar, with header)
 // 4: Matching
-// 5: Events
-// 6: Shows (tab)
-// 7: Profile
+// 5: Jobs (job marketplace — client: 6th tab between people and stadium)
+// 6: Events
+// 7: Shows (tab)
+// 8: Profile
 
 const PAGER_HOME_INDEX = 1;
 const PAGER_SHORTS_INDEX = 2;
 const PAGER_SHOWS_FROM_SHORTS_INDEX = 3;
 const PAGER_MATCHING_INDEX = 4;
-const PAGER_EVENTS_INDEX = 5;
-const PAGER_SHOWS_INDEX = 6;
-const PAGER_PROFILE_INDEX = 7;
+const PAGER_JOBS_INDEX = 5;
+const PAGER_EVENTS_INDEX = 6;
+const PAGER_SHOWS_INDEX = 7;
+const PAGER_PROFILE_INDEX = 8;
 
 // Maps tab route name -> pager index
 const TAB_TO_PAGER = {
   Home: PAGER_HOME_INDEX,
   Matching: PAGER_MATCHING_INDEX,
+  Jobs: PAGER_JOBS_INDEX,
   Events: PAGER_EVENTS_INDEX,
   Shows: PAGER_SHOWS_INDEX,
   Profile: PAGER_PROFILE_INDEX,
 };
 
-// Material Symbols Rounded (filled) — Figma bottom nav
+// Material Symbols Rounded (filled) — Figma bottom nav (+ client: briefcase
+// "job marketplace" tab between people and stadium)
 const TAB_ICON_BY_ROUTE = {
   Home: "home",
   Matching: "group",
+  Jobs: "work",
   Events: "stadium",
   Shows: "live_tv",
 };
@@ -206,17 +212,24 @@ const TAB_ICON_BY_ROUTE = {
 const NAV_BAR_HEIGHT = 60;
 const NAV_BAR_PAD = 4;
 const NAV_TAB_HEIGHT = NAV_BAR_HEIGHT - NAV_BAR_PAD * 2;
-const NAV_BAR_INSET = 20;
+// Figma Social Feed › Job-Listing nav (six tabs): bar 351 wide (12 from each
+// edge), 64 × 52 slots with a −8 gap
+const TAB_ROUTE_ORDER = ["Home", "Matching", "Jobs", "Events", "Shows", "Profile"];
+const SIX_TABS = TAB_ROUTE_ORDER.length > 5;
+const NAV_BAR_INSET = SIX_TABS ? 12 : 20;
 // Figma (Feed Posts › New-Feed-Filter nav): each tab is a 72 × 52 slot with
 // a -8 gap, so the #080808 r100 chip is 72 wide and the tab centres sit
 // (bar − pad·2 − 72) / 4 apart
-const NAV_CHIP_WIDTH = 72;
+const NAV_CHIP_WIDTH = SIX_TABS ? 64 : 72;
 // Figma "Plus" (Home-Feed, fixed): 60 circle, #1E1E1E 64% + background
 // blur, 1px white 8% inside stroke, `add` 28 white 64%, right 12 / bottom 20
 const FAB_SIZE = 60;
 // Figma nav container (375 × 112): progressive background blur 0 → 16 and a
 // #121212 0% → 100% linear fill, top → bottom; pad 32 above the 60 bar,
 // 20 below (= the bar's bottom offset, added at render)
+// Figma nav container: a 32pt band above the bar where the blur ramps in
+// (client, Nov 2026: "same progressive blur as iOS" — no hard edge at the
+// bar top)
 const NAV_PROGRESSIVE_HEIGHT = 32 + NAV_BAR_HEIGHT;
 // Distance from the screen bottom to the top of the nav bar, from the bar's
 // real geometry: container 70 + offset tall, bar drawn 20 below its top
@@ -239,7 +252,6 @@ const TAB_ICON_ACTIVE = "#FFFFFF";
 const TAB_ICON_INACTIVE = "rgba(255, 255, 255, 0.48)";
 const GLASS_LABEL = NATIVE_GLASS ? PlatformColor("labelColor") : null;
 const NAV_TAB_SPRING = { damping: 20, stiffness: 320, mass: 0.55 };
-const TAB_ROUTE_ORDER = ["Home", "Matching", "Events", "Shows", "Profile"];
 
 const HomeWithCameraPager = ({ route, navigation }) => {
   const pagerRef = useRef(null);
@@ -440,6 +452,8 @@ const HomeWithCameraPager = ({ route, navigation }) => {
         // Live opened from Shorts — show tab bar, hide header
         setIsTabBarVisible(true);
       } else if (pageIndex === PAGER_MATCHING_INDEX) {
+        setIsTabBarVisible(true);
+      } else if (pageIndex === PAGER_JOBS_INDEX) {
         setIsTabBarVisible(true);
       } else if (pageIndex === PAGER_EVENTS_INDEX) {
         setIsTabBarVisible(true);
@@ -728,10 +742,25 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           />
         </PagerPage>
 
-        {/* Page 5 - Events */}
+        {/* Page 5 - Jobs (job marketplace) */}
+        <PagerPage
+          key="jobs"
+          index={5}
+          bleedTop
+          pageScroll={pageScroll}
+          pagerChrome={pagerChrome}
+          pagerDrag={pagerDrag}
+        >
+          <JobMarketplace
+            isFocusedPage={currentPage === PAGER_JOBS_INDEX && isFocused}
+            onLocationPress={() => setLocationModalVisible(true)}
+          />
+        </PagerPage>
+
+        {/* Page 6 - Events */}
         <PagerPage
           key="events"
-          index={5}
+          index={6}
           pageScroll={pageScroll}
           pagerChrome={pagerChrome}
           pagerDrag={pagerDrag}
@@ -741,11 +770,11 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           />
         </PagerPage>
 
-        {/* Page 6 - Shows (tab bar visible). Full-bleed: the Figma
+        {/* Page 7 - Shows (tab bar visible). Full-bleed: the Figma
             Show-Feed header gradient starts behind the status bar. */}
         <PagerPage
           key="shows-tab"
-          index={6}
+          index={7}
           bleedTop
           pageScroll={pageScroll}
           pagerChrome={pagerChrome}
@@ -758,12 +787,12 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           />
         </PagerPage>
 
-        {/* Page 7 - Profile */}
+        {/* Page 8 - Profile */}
         {/* Full-bleed: the Profile header's tier gradient starts at the
             top of the screen, behind the status bar (Figma 375×104) */}
         <PagerPage
           key="profile"
-          index={7}
+          index={8}
           bleedTop
           pageScroll={pageScroll}
           pagerChrome={pagerChrome}
@@ -815,6 +844,9 @@ const CREATE_MENU_ITEMS = [
   { label: "Picture", icon: "photo_camera", filled: true, route: "CreatePost", params: { postType: "picture" } },
   // Figma "New-Feed-Create": Audio Post between Picture and Post
   { label: "Audio Post", icon: "mic", filled: true, route: "RecordAudioPost" },
+  // Jobs module: My Job Offers (Figma Jobs Pro Management) — lists the
+  // poster's offers and has the "Create +" button to publish a new one
+  { label: "Job Offer", icon: "work", filled: true, route: "MyJobOffers" },
   { label: "Post", icon: "edit", filled: true, route: "CreatePost" },
 ];
 // Figma "New-Feed-Create": 48 rows, gap 8 (56 apart), and 24 between the
@@ -863,6 +895,7 @@ const EDGE_PAGE_BY_NAME = {
   Home: PAGER_HOME_INDEX,
   Shorts: PAGER_SHORTS_INDEX,
   Matching: PAGER_MATCHING_INDEX,
+  Jobs: PAGER_JOBS_INDEX,
   Events: PAGER_EVENTS_INDEX,
   Shows: PAGER_SHOWS_INDEX,
   Profile: PAGER_PROFILE_INDEX,
@@ -1187,6 +1220,7 @@ const PagerTabBarItem = memo(
         }
       } else if (
         routeName === "Matching" ||
+        routeName === "Jobs" ||
         routeName === "Events" ||
         routeName === "Shows" ||
         routeName === "Profile"
@@ -1784,7 +1818,7 @@ const CustomTabBar = ({ state, navigation }) => {
   const pagerTab = useMemo(
     () =>
       Animated.add(pagerPositionNative, pagerOffsetNative).interpolate({
-        inputRange: [0, 3, 7],
+        inputRange: [0, 3, PAGER_PROFILE_INDEX],
         outputRange: [0, 0, TAB_ROUTE_ORDER.length - 1],
         extrapolate: "clamp",
       }),
@@ -2081,10 +2115,11 @@ const CustomTabBar = ({ state, navigation }) => {
           },
         ]}
       >
-        {/* Figma nav container (Home-Feed 2214:3665): progressive background
-            blur (0 → 16), from 32pt above the bar to the screen bottom,
-            + #121212 0% → 64% — a frosted overlay, never a solid hide, and
-            only while the page's content sits under it (client rule).
+        {/* Figma nav container (Home-Feed 7981:4119): progressive background
+            blur (0 → 16 across the 32pt band above the bar, full under it)
+            + one linear #121212 0% (band top) → 100% (screen bottom)
+            — a frosted overlay over the content, and only while the page's
+            content sits under it (client rule).
             Under the iOS 26 glass the dark fill is left out and the blur uses
             the near-tint-free ultra-thin material: UIGlassEffect picks light
             / dark from the luminance of the pixels behind it, and a dark
@@ -2094,7 +2129,9 @@ const CustomTabBar = ({ state, navigation }) => {
           style={[
             styles.navProgressive,
             {
-              height: NAV_PROGRESSIVE_HEIGHT + tabBarBottomOffset,
+              // bar top = 50 + offset above the screen bottom (container
+              // 70 + offset, bar drawn 20 below its top): end the blur there
+              height: NAV_PROGRESSIVE_HEIGHT + tabBarBottomOffset - 10,
               opacity: navBlurAnim,
             },
           ]}
@@ -2103,6 +2140,8 @@ const CustomTabBar = ({ state, navigation }) => {
             // the container already holds the 32pt band above the bar
             fade={32}
             overhang={0}
+            tintMode="linear"
+            fillAlpha={1}
           />
         </Animated.View>
         <BarShell
@@ -2422,6 +2461,7 @@ const TabStackContent = () => {
         }}
       />
       <Tab.Screen name="Matching" component={BandMateMatching} />
+      <Tab.Screen name="Jobs" component={JobMarketplace} />
       <Tab.Screen name="Events" component={Event} />
       <Tab.Screen name="Shows" component={Shows} />
       <Tab.Screen name="Profile" component={Profile} />

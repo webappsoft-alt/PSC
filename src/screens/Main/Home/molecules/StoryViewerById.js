@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
 import Blur from "../../../../components/Blur";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import CustomButton from "../../../../components/CustomButton";
 import CustomText from "../../../../components/CustomText";
 import ImageFast from "../../../../components/ImageFast";
@@ -888,13 +889,11 @@ const StoryViewerById = ({ route, navigation }) => {
           <View style={[styles.overlayContainer, { top: insets.top }]}>
             <View style={styles.headerRow}>
               <View style={styles.leftHeader}>
-                <TouchableOpacity
-                  style={styles.backButton}
+                <GlassBackButton
                   onPress={() => navigation.goBack()}
-                >
-                  <Blur />
-                  <Image source={Images.back} style={styles.backIcon} />
-                </TouchableOpacity>
+                  color="#FFFFFF"
+                  fullOpacity
+                />
 
                 <TouchableOpacity
                   style={styles.userInfo}
@@ -1012,14 +1011,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 99,
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
-  },
   userInfo: {
     flexDirection: "row",
     alignItems: "center",
@@ -1068,10 +1059,6 @@ const styles = StyleSheet.create({
     height: 22,
     resizeMode: "contain",
     tintColor: COLORS.white,
-  },
-  backIcon: {
-    height: 24,
-    width: 24,
   },
   emojiStripContainer: {
     marginBottom: 20,

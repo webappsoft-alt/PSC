@@ -38,7 +38,10 @@ const MediaBottomBlur = ({
   width,
   mediaHeight,
   height = MEDIA_BLUR_BAND,
-  blurRadius = 12,
+  // Figma "Background blur" 16 — Figma's radius is twice the Gaussian sigma
+  // (Figma 16 = CSS backdrop-filter blur(8px)); the 3× export shows a mild
+  // blur with the belt / text still readable, so sigma 8 here
+  blurRadius = 8,
   borderBottomLeftRadius = 8,
   borderBottomRightRadius = 8,
   edge = "bottom",
@@ -62,7 +65,23 @@ const MediaBottomBlur = ({
   );
 
   let blurred = null;
-  if (!isVideo && uri) {
+  if (Platform.OS === "ios") {
+    // patched BlurView: tint-free (keeps the media's colours) and progressive
+    // — five stacked blurs whose radius ramps from 0 at the inner edge to
+    // `blurRadius` at the outer edge, the Figma "progressive background
+    // blur". No masked copy of the media, so no smeared double image.
+    blurred = (
+      <BlurView
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        blurType="dark"
+        tintFree
+        blurAmount={blurRadius}
+        progressiveDirection={top ? "top" : "bottom"}
+        progressiveStart={0}
+      />
+    );
+  } else if (!isVideo && uri) {
     blurred = (
       <MaskedView style={StyleSheet.absoluteFill} maskElement={mask}>
         <Image

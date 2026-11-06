@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../../assets/fonts";
 import CustomText from "../../../../components/CustomText";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import ImageFast from "../../../../components/ImageFast";
 import UserBadge from "../../../../components/UserBadge";
 import {
@@ -88,10 +89,7 @@ const AudioHeader = ({
   return (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
       <View style={styles.topRow}>
-        <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.back}>
-          <GlassFill fill={AUDIO.white04} />
-          <Glyph family={MS} name="chevron_left" size={24} color={AUDIO.white64} />
-        </TouchableOpacity>
+        <GlassBackButton onPress={onBack} fill={AUDIO.white04} color={AUDIO.white} />
 
         {variant === "publishing" ? (
           <Pressable onPress={onSwitchAccount} style={styles.identityWrap}>
@@ -211,13 +209,6 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   topRow: { height: 40, flexDirection: "row", alignItems: "center", gap: 12 },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   identityWrap: { flex: 1, height: 32, flexDirection: "row", alignItems: "center" },
   spaceBetween: { justifyContent: "space-between" },
   identity: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },

@@ -660,7 +660,9 @@ const Home = ({
       result.push({
         type: "post",
         data: post,
-        isChange: Math.random() > 0.7,
+        // real poll posts render their own options (item.poll); the old
+        // random dummy voting block is gone
+        isChange: false,
         isVideo: Math.random() > 0.8,
       });
       postsAdded++;

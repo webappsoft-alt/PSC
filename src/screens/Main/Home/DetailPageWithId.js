@@ -22,6 +22,7 @@ import { Images } from "../../../assets/images";
 import Blur from "../../../components/Blur";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import ImageFast from "../../../components/ImageFast";
 import ScreenWrapper from "../../../components/ScreenWrapper";
@@ -816,7 +817,7 @@ const DetailPageWithId = ({ route }) => {
           <View style={styles.rowBetween}>
             {/* Left Section */}
             <View style={styles.row}>
-              <TouchableOpacity
+              <GlassBackButton
                 onPress={() =>
                   navigation.canGoBack()
                     ? navigation.goBack()
@@ -825,13 +826,11 @@ const DetailPageWithId = ({ route }) => {
                         routes: [{ name: "MainStack" }],
                       })
                 }
+                fill={colors.surfaceAlt}
+                color={colors.text}
+                fullOpacity
                 style={styles.backButton}
-              >
-                <Image
-                  source={Images.back}
-                  style={{ height: 24, width: 24, tintColor: colors.text }}
-                />
-              </TouchableOpacity>
+              />
               <View
                 style={{
                   padding: 4,
@@ -1437,12 +1436,6 @@ const createStyles = (colors, isDark) => StyleSheet.create({
     marginLeft: 8,
   },
   backButton: {
-    borderRadius: 99,
-    backgroundColor: colors.surfaceAlt,
-    height: 40,
-    width: 40,
-    alignItems: "center",
-    justifyContent: "center",
     marginRight: 12,
   },
 });

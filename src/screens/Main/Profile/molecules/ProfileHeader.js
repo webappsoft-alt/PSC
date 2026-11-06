@@ -16,6 +16,7 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import fonts from "../../../../assets/fonts";
 import Blur from "../../../../components/Blur";
 import CustomText from "../../../../components/CustomText";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { COLORS } from "../../../../utils/COLORS";
@@ -219,14 +220,13 @@ const ProfileHeader = ({
       <View style={styles.row}>
         <View style={styles.nameRow}>
           {isBack && (
-            <TouchableOpacity
-              activeOpacity={0.6}
+            <GlassBackButton
               onPress={handleBack}
-              style={[styles.backButton, { backgroundColor: colors.surfaceAlt }]}
-            >
-              <Blur blurType={isDark ? "dark" : "xlight"} borderRadius={100} />
-              <Icons family={MS} name="chevron_left" size={26} color={mutedColor} />
-            </TouchableOpacity>
+              fill={colors.surfaceAlt}
+              iconSize={26}
+              color={onDarkBg ? COLORS.white : "#121212"}
+              style={styles.backButton}
+            />
           )}
           {loading ? (
             <SkeletonBlock color={colors.surfaceAlt} style={styles.nameSkeleton} />
@@ -355,12 +355,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
     marginLeft: -8,
     marginRight: 4,
   },

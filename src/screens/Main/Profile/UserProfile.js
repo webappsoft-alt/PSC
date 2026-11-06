@@ -30,9 +30,14 @@ import PostCardSkeleton from "../Home/molecules/PostCardSkeleton";
 import DelImagesModal from "./molecules/DelImagesModal";
 import LockInfo from "./molecules/LockInfo";
 import MediaGrid from "./molecules/MediaGrid";
+import CareerTab from "./molecules/CareerTab";
 import ProfileCard, { getProfileCardLayout } from "./molecules/ProfileCard";
 import ProfileCardSkeleton from "./molecules/ProfileCardSkeleton";
 import ProfileHeader from "./molecules/ProfileHeader";
+
+// Figma Profile tabs: Posts · Career · Reposts … (Career = Jobs module)
+const CAREER_TAB = 1;
+const MEDIA_TAB = 4;
 
 const UserProfile = ({ route }) => {
   const item = route?.params?.item;
@@ -205,14 +210,19 @@ const UserProfile = ({ route }) => {
       let queryParams = `type=post&${userId}`;
       let endpoint = `posts/user/${userId}`;
 
-      if (tab === 1) queryParams = `reposts=true&${userId}`;
-      else if (tab === 2) queryParams = `mentions=true&${userId}`;
-      else if (tab === 4) queryParams = `comments=true&${userId}`;
-      else if (tab === 5) queryParams = `likes=true&${userId}`;
-      else if (tab === 6) {
+      if (tab === CAREER_TAB) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      if (tab === 2) queryParams = `reposts=true&${userId}`;
+      else if (tab === 3) queryParams = `mentions=true&${userId}`;
+      else if (tab === 5) queryParams = `comments=true&${userId}`;
+      else if (tab === 6) queryParams = `likes=true&${userId}`;
+      else if (tab === 7) {
         endpoint = "saved";
         queryParams = `page=1&limit=10&${userId}`;
-      } else if (tab === 3) {
+      } else if (tab === MEDIA_TAB) {
         endpoint = "posts/media";
         queryParams = `page=1&limit=20&${userId}`;
       }
@@ -221,7 +231,7 @@ const UserProfile = ({ route }) => {
 
       if (response?.data?.success) {
         let resultData = response.data.data;
-        if (tab === 3) {
+        if (tab === MEDIA_TAB) {
           // Transform media response for MediaGrid
           resultData = resultData.map((item, index) => ({
             ...item,
@@ -488,6 +498,7 @@ const UserProfile = ({ route }) => {
               setTab={setTab}
               tabNames={[
                 "Posts",
+                "Career",
                 "Reposts",
                 ...(isMeProfile
                   ? ["Mentions", "Media", "Replies", "Liked", "Saved"]
@@ -525,7 +536,17 @@ const UserProfile = ({ route }) => {
             return <LockInfo coverImage={localUser?.profile?.cover} />;
           }
 
-          if (tab === 3) {
+          if (tab === CAREER_TAB) {
+            return (
+              <CareerTab
+                userId={localUser?._id}
+                isOwner={isMe}
+                viewerId={userData?._id}
+              />
+            );
+          }
+
+          if (tab === MEDIA_TAB) {
             return (
               <MediaGrid
                 mediaData={posts}
@@ -571,7 +592,7 @@ const UserProfile = ({ route }) => {
       </ScreenWrapper>
 
       {/* Fixed Delete Button */}
-      {tab === 3 && isMediaEditMode && mediaSelectedCount > 0 && (
+      {tab === MEDIA_TAB && isMediaEditMode && mediaSelectedCount > 0 && (
         <TouchableOpacity
           style={styles.fixedDeleteButton}
           onPress={() => mediaDeleteHandler?.()}

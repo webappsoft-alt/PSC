@@ -7,7 +7,6 @@ import {
   Image,
   RefreshControl,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
@@ -25,7 +24,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Images } from "../../../assets/images";
-import Icons from "../../../components/Icons";
+import GlassBackButton from "../../../components/GlassBackButton";
 import fonts from "../../../assets/fonts";
 import MatchDetailCard from "./molecules/MatchDetailCard";
 import PostCard from "../Home/molecules/PostCard";
@@ -341,18 +340,13 @@ const MatchingDetail = ({ route, navigation }) => {
       ]}
     >
       <View style={styles.floatingHeaderLeft}>
-        <TouchableOpacity
-          activeOpacity={0.6}
-          style={[styles.floatingBackBtn, { backgroundColor: bgColor ? "#FFFFFF14" : colors.surfaceAlt }]}
+        <GlassBackButton
           onPress={() => navigation.goBack()}
-        >
-          <Icons
-            name="keyboard-arrow-left"
-            family="MaterialIcons"
-            size={26}
-            color={bgColor ? COLORS.white : colors.text}
-          />
-        </TouchableOpacity>
+          fill={bgColor ? "#FFFFFF14" : colors.surfaceAlt}
+          iconSize={26}
+          color={bgColor ? COLORS.white : colors.text}
+          fullOpacity
+        />
         <CustomText
           label={localUser?.profile?.category?.toUpperCase() || "MEMBER"}
           fontSize={20}
@@ -449,15 +443,6 @@ const styles = StyleSheet.create({
   floatingHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  floatingBackBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF14",
-    overflow: "hidden",
   },
   floatingCrossBtn: {
     width: 32,

@@ -51,11 +51,20 @@ const FloatingSheet = ({
   // Chat sheets (Figma Chat page): close icon 16 @64% instead of 18 white
   closeIconSize,
   closeIconColor,
+  // pull-up below the subtitle (default −10). Exact Figma conversion for a
+  // cap-trimmed 14pt subtitle is −0.35 × 14 = −4.9 (Jobs sheets)
+  subtitleTrim = -10,
+  // called once the sheet (and its blurred backdrop) is fully gone — open
+  // the next screen from here, not from the button press, or the fading
+  // backdrop stays layered over the new screen
+  onClosed,
 }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(visible);
   const slide = useRef(new Animated.Value(visible ? 0 : SCREEN_HEIGHT)).current;
+  const onClosedRef = useRef(onClosed);
+  onClosedRef.current = onClosed;
 
   useEffect(() => {
     if (visible) {
@@ -74,7 +83,11 @@ const FloatingSheet = ({
       duration: 250,
       useNativeDriver: true,
     }).start(({ finished }) => {
-      if (finished) setModalVisible(false);
+      if (finished) {
+        setModalVisible(false);
+        // iOS reports the end through Modal.onDismiss
+        if (Platform.OS !== "ios") onClosedRef.current?.();
+      }
     });
   }, [visible, slide]);
 
@@ -85,6 +98,7 @@ const FloatingSheet = ({
       transparent
       statusBarTranslucent
       onRequestClose={onDismiss}
+      onDismiss={() => onClosedRef.current?.()}
     >
       <View style={styles.root}>
         <BlurView
@@ -131,7 +145,7 @@ const FloatingSheet = ({
                     {header ? (
                       header
                     ) : (
-                    <View style={{ marginBottom: subtitle ? -10 : 0 }}>
+                    <View style={{ marginBottom: subtitle ? subtitleTrim : 0 }}>
                       <View
                         style={[
                           styles.header,
@@ -175,7 +189,7 @@ const FloatingSheet = ({
 };
 
 /** Figma sheet footer: Reset All (white 4%) + Confirm (white), h48 r100. */
-export const SheetActions = ({ onReset, onConfirm, confirmLabel = "Confirm" }) => {
+export const SheetActions = ({ onReset, onConfirm, confirmLabel = "Confirm", resetLabel = "Reset All" }) => {
   const { colors } = useTheme();
   return (
     <View style={styles.actions}>
@@ -185,7 +199,7 @@ export const SheetActions = ({ onReset, onConfirm, confirmLabel = "Confirm" }) =
         style={[styles.actionBtn, { backgroundColor: colors.surfaceAlt }]}
       >
         <CustomText
-          label="Reset All"
+          label={resetLabel}
           fontSize={16}
           fontFamily={fonts.medium}
           color={colors.text}

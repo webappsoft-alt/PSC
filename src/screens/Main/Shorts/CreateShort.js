@@ -34,6 +34,7 @@ import { Camera, useCameraDevice } from "react-native-vision-camera";
 import fonts from "../../../assets/fonts";
 import { Images } from "../../../assets/images";
 import Blur from "../../../components/Blur";
+import GlassBackButton from "../../../components/GlassBackButton";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
 import Icons from "../../../components/Icons";
@@ -750,14 +751,14 @@ const CreateShort = () => {
 
       {/* Top Controls */}
       <View style={[styles.topControls, { top: insets.top + 10 }]}>
-        <TouchableOpacity
-          style={styles.iconBtn}
+        <GlassBackButton
           onPress={handleClose}
           disabled={isRecording || isUploading}
-        >
-          <Blur />
-          <Image source={Images.back} style={styles.navIcon} />
-        </TouchableOpacity>
+          fill="rgba(0,0,0,0.3)"
+          iconSize={22}
+          color="#FFFFFF"
+          fullOpacity
+        />
 
         <TouchableOpacity
           style={styles.iconBtn}

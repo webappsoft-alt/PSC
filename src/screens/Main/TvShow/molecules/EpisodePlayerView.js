@@ -24,6 +24,7 @@ import Video from "react-native-video";
 import fonts from "../../../../assets/fonts";
 import CustomText from "../../../../components/CustomText";
 import UserBadge from "../../../../components/UserBadge";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import { saveWatchProgress } from "../../../../services/showApi";
 import { findCurrency } from "../../../../utils/currencies";
 import { Avatar } from "./ShowCards";
@@ -384,7 +385,7 @@ const EpisodePlayerView = ({
           {locked ? (
             <>
               <View style={styles.headerRow}>
-                <Circle40 icon="chevron_left" iconSize={24} onPress={onBack} />
+                <GlassBackButton onPress={onBack} fill={SHOWS.white04} color={SHOWS.white} fullOpacity />
                 <View style={styles.flex}>
                   <CustomText
                     label={episode?.title || ""}
@@ -422,7 +423,12 @@ const EpisodePlayerView = ({
             </>
           ) : (
             <View style={styles.headerRow}>
-              <Circle40 icon="chevron_left" iconSize={24} onPress={landscape ? () => setLandscape(false) : onBack} />
+              <GlassBackButton
+                onPress={landscape ? () => setLandscape(false) : onBack}
+                fill={SHOWS.white04}
+                color={SHOWS.white}
+                fullOpacity
+              />
               <View style={[styles.flex, styles.row, { gap: 8 }]}>
                 <View style={styles.avatarRing}>
                   <Avatar uri={creator?.profile?.avatar} color={creator?.profile?.profileColor} size={32} />

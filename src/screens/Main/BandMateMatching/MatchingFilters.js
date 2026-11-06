@@ -18,6 +18,7 @@ import CustomText from "../../../components/CustomText";
 import HeaderProgressiveBlur, {
   FooterProgressiveBlur,
 } from "../../../components/HeaderProgressiveBlur";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import ScreenWrapper from "../../../components/ScreenWrapper";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -521,19 +522,12 @@ const MatchingFilters = () => {
         <HeaderProgressiveBlur visible={edge.headerVisible} />
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity
-              activeOpacity={0.7}
+            <GlassBackButton
               onPress={() => navigation.goBack()}
-              style={styles.backButton}
-            >
-              <GlassFill fill={colors.surfaceAlt} />
-              <Icons
-                family="MaterialSymbolsRounded"
-                name="chevron_left"
-                size={20}
-                color={COLORS.gray64}
-              />
-            </TouchableOpacity>
+              fill={colors.surfaceAlt}
+              iconSize={20}
+              color={COLORS.white}
+            />
             <View style={styles.titleRow}>
               <CustomText
                 label="Filters"
@@ -627,13 +621,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
   },
   titleRow: {
     flexDirection: "row",

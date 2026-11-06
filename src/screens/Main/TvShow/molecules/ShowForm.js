@@ -12,6 +12,7 @@ import CustomSwitch from "../../../../components/CustomSwitch";
 import CustomText from "../../../../components/CustomText";
 import HeaderProgressiveBlur from "../../../../components/HeaderProgressiveBlur";
 import Icons from "../../../../components/Icons";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import { GlassFill, SHOWS, baseline, capGap, capTop } from "./showsLayout";
 
 /**
@@ -53,7 +54,9 @@ export const FormHeader = ({
       <HeaderProgressiveBlur visible={blurVisible} />
       <View style={styles.headerRow}>
         <View style={[styles.headerLeft, { gap: titleGap }]}>
-          {onBack ? <CircleButton icon="chevron_left" onPress={onBack} /> : null}
+          {onBack ? (
+            <GlassBackButton onPress={onBack} fill={SHOWS.white04} color={SHOWS.white} />
+          ) : null}
           <CustomText
             label={title}
             fontSize={20}

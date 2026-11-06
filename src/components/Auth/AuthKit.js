@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SvgXml } from "react-native-svg";
 
 import CustomText from "../CustomText";
-import HeaderIconButton from "../HeaderIconButton";
+import GlassBackButton from "../GlassBackButton";
 import Icons from "../Icons";
 
 import fonts from "../../assets/fonts";
@@ -193,14 +193,14 @@ export const AuthStepFooter = ({
     >
       <View style={styles.footerRow}>
         {showBack ? (
-          // Viral's HeaderIconButton: glyph 64% idle → 100% while pressed.
-          <HeaderIconButton
+          // Shared back button (HeaderIconButton: glyph 64% idle → 100% pressed).
+          <GlassBackButton
             onPress={onBackPress}
-            accessibilityLabel="Back"
-            style={[styles.circle48, { backgroundColor: p.t04 }]}
-          >
-            <Icons family={MS} name="chevron_left" size={27.4} color={p.text} />
-          </HeaderIconButton>
+            fill={p.t04}
+            size={48}
+            iconSize={27.4}
+            color={p.text}
+          />
         ) : null}
         <TouchableOpacity
           activeOpacity={0.8}
@@ -932,13 +932,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  circle48: {
-    width: 48,
-    height: 48,
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
   },
   continueBtn: {
     flex: 1,

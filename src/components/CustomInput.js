@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 
 import CustomText from "./CustomText";
 import Icons from "./Icons";
@@ -54,6 +54,11 @@ const CustomInput = ({
   publishPost,
   errorMarginBottom,
   enableMentionHighlight = false,
+  // publish box: mic button (Figma 36 circle, white 4%, 18pt filled mic)
+  onMicPress,
+  micActive = false,
+  // extra text style for the field (and its mention overlay)
+  inputTextStyle,
 }) => {
   const { colors } = useTheme();
   const resolvedPlaceholderColor = placeholderTextColor || colors.iconMuted;
@@ -138,6 +143,7 @@ const CustomInput = ({
             position: "absolute",
             pointerEvents: "none",
           },
+          inputTextStyle,
         ]}
       >
         {parts.map((part, index) => (
@@ -248,6 +254,7 @@ const CustomInput = ({
                   ? "#64CD75"
                   : colors.text,
               },
+              inputTextStyle,
             ]}
             secureTextEntry={
               secureTextEntry ? (hidePass ? true : false) : false
@@ -406,10 +413,27 @@ const CustomInput = ({
               </View>
             </View>
 
-            {/* <ImageFast
-              source={Images.micBg}
-              style={{ height: 36, width: 36, marginRight: 8 }}
-            /> */}
+            {onMicPress ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={onMicPress}
+                style={[
+                  styles.micButton,
+                  {
+                    backgroundColor: micActive
+                      ? "rgba(161, 147, 117, 0.16)"
+                      : colors.surfaceAlt,
+                  },
+                ]}
+              >
+                <Icons
+                  family="MaterialSymbolsRoundedFilled"
+                  name="mic"
+                  size={18}
+                  color={micActive ? COLORS.buttonColor : colors.text}
+                />
+              </TouchableOpacity>
+            ) : null}
           </View>
         )}
       </View>
@@ -465,5 +489,13 @@ const styles = StyleSheet.create({
   dot: {
     height: 14,
     width: 14,
+  },
+  micButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
 });

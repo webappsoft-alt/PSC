@@ -18,6 +18,7 @@ import CustomText from "../../../components/CustomText";
 import HeaderProgressiveBlur from "../../../components/HeaderProgressiveBlur";
 import ProgressiveBlur from "../../../components/ProgressiveBlur";
 import UserBadge from "../../../components/UserBadge";
+import GlassBackButton from "../../../components/GlassBackButton";
 import { openPagerTab } from "../../../navigation/TabStack";
 import { fetchShow, toggleSaveShow } from "../../../services/showApi";
 import { findCurrency } from "../../../utils/currencies";
@@ -447,7 +448,7 @@ const ShowDetail = () => {
       <View style={styles.page}>
         <ShowDetailSkeleton />
         <View style={[styles.header, { height: headerHeight, paddingTop: insets.top + 8 }]}>
-          <HeaderButton icon="chevron_left" size={24} onPress={() => navigation.goBack()} />
+          <GlassBackButton fill={SHOWS.white16} color={SHOWS.white} fullOpacity onPress={() => navigation.goBack()} />
         </View>
       </View>
     );
@@ -757,7 +758,7 @@ const ShowDetail = () => {
           {/* solid PSC header with the progressive edge (as Conversation settings) */}
           <HeaderProgressiveBlur color={SHOWS.section} />
         </Animated.View>
-        <HeaderButton icon="chevron_left" size={24} onPress={() => navigation.goBack()} />
+        <GlassBackButton fill={SHOWS.white16} color={SHOWS.white} fullOpacity onPress={() => navigation.goBack()} />
         <Fit
           size={20}
           box={14}

@@ -1,9 +1,12 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { DEFAULT_MATCHING_FILTERS } from "../../utils/matchingFilters";
+import { DEFAULT_JOB_FILTERS } from "../../utils/career";
 
 const initialState = {
   cardData: [],
   filters: DEFAULT_MATCHING_FILTERS,
+  // Jobs tab (Figma Filters-Job-Marketplace / Salary-Range)
+  jobFilters: DEFAULT_JOB_FILTERS,
 };
 export const MatchingSlice = createSlice({
   name: "matching",
@@ -23,6 +26,9 @@ export const MatchingSlice = createSlice({
     },
     setMatchingFilters(state, action) {
       state.filters = { ...DEFAULT_MATCHING_FILTERS, ...(action.payload || {}) };
+    },
+    setJobFilters(state, action) {
+      state.jobFilters = { ...DEFAULT_JOB_FILTERS, ...(state.jobFilters || {}), ...(action.payload || {}) };
     },
     removeCard(state) {
       state.cardData = state.cardData.slice(1);
@@ -55,5 +61,6 @@ export const {
   addCardToTop,
   updateUserFollowers,
   setMatchingFilters,
+  setJobFilters,
 } =
   MatchingSlice.actions;

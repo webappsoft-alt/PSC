@@ -7,13 +7,13 @@ import {Image,
 
 import CustomButton from "../CustomButton";
 import CustomText from "../CustomText";
+import GlassBackButton from "../GlassBackButton";
 import Icons from "../Icons";
 
 import fonts from "../../assets/fonts";
 import { PNGIcons } from "../../assets/images/icons";
 import { COLORS } from "../../utils/COLORS";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Images } from "../../assets/images";
 import { useTheme } from "../../contexts/ThemeContext";
 import Text from "../ScaledText";
 
@@ -41,7 +41,6 @@ const AuthFooter = ({
   iconColor = COLORS.primaryColor,
   iconBackgroundColor,
   paddingHorizontal,
-  backImage,
 }) => {
   const { colors, isDark } = useTheme();
   const navigation = useNavigation();
@@ -63,24 +62,19 @@ const AuthFooter = ({
       ]}
     >
       <View style={styles.row}>
-        <TouchableOpacity
+        <GlassBackButton
           onPress={
             onBackPress
               ? onBackPress
               : () => navigation.canGoBack() && navigation.goBack()
           }
-          style={[
-            styles.backButton,
-            {
-              backgroundColor: iconBackgroundColor || (isDark ? "#1b1b1b" : colors.surfaceAlt),
-            },
-          ]}
-        >
-          <Image
-            source={backImage || Images.back}
-            style={{ height: 28, width: 28, tintColor: isDark ? undefined : colors.text }}
-          />
-        </TouchableOpacity>
+          fill={iconBackgroundColor || (isDark ? "#1b1b1b" : colors.surfaceAlt)}
+          size={48}
+          iconSize={28}
+          color={isDark ? COLORS.white : colors.text}
+          fullOpacity
+          style={styles.backButton}
+        />
         <CustomButton
           title={btnTitle || "Continue"}
           width={isCalender ? "70%" : "84%"}
@@ -172,11 +166,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   backButton: {
-    height: 48,
-    width: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 99,
     marginRight: 8,
   },
   darkText: {

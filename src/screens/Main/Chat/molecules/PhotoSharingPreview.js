@@ -16,6 +16,7 @@ import Video from "react-native-video";
 import fonts from "../../../../assets/fonts";
 import Blur from "../../../../components/Blur";
 import CustomText from "../../../../components/CustomText";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
@@ -68,9 +69,13 @@ const PhotoSharingPreview = ({ media, onCancel, onSend, onReplace }) => {
           <Blur blurType="dark" blurAmount={32} borderRadius={0.01} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(18, 18, 18, 0.64)" }]} />
           <View style={styles.headerRow}>
-            <TouchableOpacity activeOpacity={0.7} onPress={onCancel} style={styles.back}>
-              <Icons family="MaterialSymbolsRounded" name="chevron_left" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
+            <GlassBackButton
+              onPress={onCancel}
+              fill="rgba(18, 18, 18, 0.08)"
+              iconSize={20}
+              color="#FFFFFF"
+              fullOpacity
+            />
             <CustomText label="Cancel" fontSize={32} fontFamily={fonts.medium} letterSpacing={-0.64} color="#FFFFFF" onPress={onCancel} />
           </View>
         </View>
@@ -125,14 +130,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    backgroundColor: "rgba(18, 18, 18, 0.08)",
-    alignItems: "center",
-    justifyContent: "center",
   },
   footerWrap: {
     position: "absolute",

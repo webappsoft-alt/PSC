@@ -21,6 +21,7 @@ import CustomSwitch from "../../../../components/CustomSwitch";
 import CustomText from "../../../../components/CustomText";
 import FloatingSheet from "../../../../components/FloatingSheet";
 import { FloatingBlurHeader } from "../../../../components/HeaderProgressiveBlur";
+import GlassBackButton from "../../../../components/GlassBackButton";
 import Icons from "../../../../components/Icons";
 import { useSocket } from "../../../../components/SocketProvider";
 import { useTheme } from "../../../../contexts/ThemeContext";
@@ -334,14 +335,11 @@ const ScheduleMeeting = ({ route }) => {
       <FloatingBlurHeader visible={edge.headerVisible} onHeightChange={setHeaderH} includeStatusBar={false}>
       <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity
-            activeOpacity={0.7}
+          <GlassBackButton
             onPress={() => (step === 3 ? setStep(2) : navigation.goBack())}
-            style={[styles.back, { backgroundColor: tint(0.08) }]}
-          >
-            <Blur blurType={isDark ? "dark" : "xlight"} borderRadius={100} />
-            <Icons family="MaterialSymbolsRounded" name="chevron_left" size={20} color={tint(0.64)} />
-          </TouchableOpacity>
+            fill={tint(0.08)}
+            iconSize={20}
+          />
           <CustomText label="Schedule A Meeting" fontSize={24} fontFamily={fonts.semiBold} letterSpacing={-0.5} color={colors.text} containerStyle={styles.shrink} />
         </View>
         <View style={styles.progress}>
@@ -368,16 +366,16 @@ const ScheduleMeeting = ({ route }) => {
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 34) }]}>
         <LinearGradient pointerEvents="none" colors={[`${colors.background}00`, colors.background]} style={StyleSheet.absoluteFill} />
         <View style={styles.buttons}>
-          <TouchableOpacity
-            activeOpacity={0.7}
+          {/* Figma: white 8% on a 27 background blur */}
+          <GlassBackButton
             onPress={() => (step === 3 ? setStep(2) : navigation.goBack())}
-            style={styles.footerBack}
-          >
-            {/* Figma: white 8% on a 27 background blur */}
-            <Blur blurType={isDark ? "dark" : "xlight"} blurAmount={27} borderRadius={100} />
-            <View style={[StyleSheet.absoluteFill, { borderRadius: 100, backgroundColor: tint(0.08) }]} />
-            <Icons family="MaterialSymbolsRounded" name="chevron_left" size={27} color={tint(0.64)} />
-          </TouchableOpacity>
+            fill={tint(0.08)}
+            size={48}
+            iconSize={27}
+            backdrop={
+              <Blur blurType={isDark ? "dark" : "xlight"} blurAmount={27} borderRadius={100} pointerEvents="none" />
+            }
+          />
           <View style={{ flex: 1 }}>
             <CustomButton
               title={step === 2 ? "Confirm" : "Share"}
@@ -421,9 +419,7 @@ const ScheduleMeeting = ({ route }) => {
       <Modal visible={platformOpen} animationType="slide" onRequestClose={() => setPlatformOpen(false)}>
         <View style={[styles.screen, { backgroundColor: isDark ? "#262626" : colors.surfaceAlt }]}>
           <View style={[styles.platformHeader, { paddingTop: insets.top + 8, backgroundColor: colors.background }]}>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => setPlatformOpen(false)} style={[styles.platformBack, { backgroundColor: tint(0.04) }]}>
-              <Icons family="MaterialSymbolsRounded" name="chevron_left" size={24} color={tint(0.64)} />
-            </TouchableOpacity>
+            <GlassBackButton onPress={() => setPlatformOpen(false)} fill={tint(0.04)} />
             <CustomText label="Platform" fontSize={20} fontFamily={fonts.semiBold} letterSpacing={-0.1} color={colors.text} />
           </View>
           <View style={{ marginTop: 1, backgroundColor: colors.background }}>
@@ -470,14 +466,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
   },
   progress: {
     flexDirection: "row",
@@ -593,27 +581,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  footerBack: {
-    width: 48,
-    height: 48,
-    borderRadius: 100,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   platformHeader: {
     paddingHorizontal: 12,
     paddingBottom: 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
-  },
-  platformBack: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
   },
   platformValue: {
     flexDirection: "row",

@@ -43,6 +43,8 @@ import {
 } from "../../../../utils/navTone";
 import Svg, { Path } from "react-native-svg";
 import VotingComponent from "./VotingComponent";
+import PollPostBlock from "../../../../components/Poll/PollPostBlock";
+import { isPollPost } from "../../../../components/Poll/pollUtils";
 import Text from "../../../../components/ScaledText";
 import {
   activeSubtitleText,
@@ -121,6 +123,19 @@ const PostCard = ({
   const setPagerScrollEnabled = tabBarCtx?.setPagerScrollEnabled;
 
   const isOwner = item?.author?._id === userData?._id;
+  // rows under the action bar (Figma Frame 9 8100:2472)
+  const hasReactedRow = upvotes?.length > 0 && item?.friendLikes?.length > 0;
+  const hasTopComment = !isDetail && !!item?.topComment?.author?.firstName;
+  // PSC special-edition election polls open the election page (general map)
+  // and SI topic posts open their topic hub
+  const openPostDetail = () =>
+    item?.poll?.election?._id
+      ? navigation.navigate("ElectionDetail", {
+          electionId: item.poll.election._id,
+        })
+      : item?.kind === "topic" && item?.topicId
+      ? navigation.navigate("TopicDetail", { topicId: item.topicId })
+      : navigation.navigate("DetailPage", { item: item });
 
   // Animation values for swipe
   const translateX = useRef(new Animated.Value(0)).current;
@@ -1043,9 +1058,7 @@ const PostCard = ({
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() =>
-            navigation.navigate("DetailPage", {
-              item: item,
-            })
+            openPostDetail()
           }
         >
           <View>
@@ -1310,16 +1323,20 @@ const PostCard = ({
                 </View>
               </TouchableOpacity>
             )}
-            {/* Glow Background */}
-
-            <View style={styles.investmentCard}>
-              <CustomText
-                label={"LOOKING FOR INVESTMENT"}
-                fontSize={10}
-                fontFamily={fonts.semiBold}
-                color={COLORS.white}
-              />
-            </View>
+            {/* Figma: "Looking for INVESTMENT" chip only on posts whose author
+                has that status; there is no such field yet, so the old
+                hard-coded chip (shown on every post) is off until the backend
+                sends `author.profile.lookingFor` */}
+            {item?.author?.profile?.lookingFor ? (
+              <View style={styles.investmentCard}>
+                <CustomText
+                  label={`LOOKING FOR ${String(item.author.profile.lookingFor).toUpperCase()}`}
+                  fontSize={10}
+                  fontFamily={fonts.semiBold}
+                  color={COLORS.white}
+                />
+              </View>
+            ) : null}
 
             {item?.hashtags?.length > 0 && (
             <View
@@ -1336,10 +1353,11 @@ const PostCard = ({
                   style={[styles.tagBg, { backgroundColor: colors.surfaceAlt }]}
                   key={index}
                 >
+                  {/* Figma chip (8100:2417): 12 icon · 1.5 · Medium 12 @64% */}
                   <Icons
                     family="MaterialSymbolsRounded"
                     name="tag"
-                    size={16}
+                    size={12}
                     color={COLORS.gray64}
                   />
                   <CustomText
@@ -1347,7 +1365,7 @@ const PostCard = ({
                     fontSize={12}
                     color={COLORS.gray64}
                     fontFamily={fonts.medium}
-                    marginLeft={2}
+                    marginLeft={1.5}
                   />
                 </View>
               ))}
@@ -1434,9 +1452,7 @@ const PostCard = ({
                               label={"Read full post..."}
                               fontFamily={fonts.medium}
                               onPress={() =>
-                                navigation.navigate("DetailPage", {
-                                  item: item,
-                                })
+                                openPostDetail()
                               }
                             />
                           ) : (
@@ -1493,13 +1509,26 @@ const PostCard = ({
                           />
                         ) : null}
                         <CustomText
-                          marginTop={4}
+                          // Figma header block (8100:2385, gap 10): header / chips → 10 →
+                          // caption cap; the 14pt line box adds 0.353 × 14 above the cap
+                          marginTop={isDetail ? 4 : 10 - 0.353 * 14}
                           fontSize={14}
                           letterSpacing={-0.14}
                           color={COLORS.gray64}
                           // hug: no reserved "Read full post" row when the
                           // caption fits (Figma block gap 10)
-                          marginBottom={!isDetail && isTruncated ? 6 : 10}
+                          // Figma: caption → 10 → read-more / topic row; last block of the
+                          // header (pad B8) → 8 → media / poll options. The line boxes add
+                          // 0.35 × 14 below the caption and 0.353 × 14 above "Read full post"
+                          marginBottom={
+                            isDetail
+                              ? 10
+                              : isTruncated
+                              ? 10 - 0.35 * 14 - 0.353 * 14
+                              : item?.topic
+                              ? 10 - 0.35 * 14
+                              : 8 - 0.35 * 14
+                          }
                           numberOfLines={!isDetail && 2}
                         >
                           <Text>
@@ -1518,7 +1547,9 @@ const PostCard = ({
                               styles.row,
                               {
                                 justifyContent: "space-between",
-                                marginBottom: 12,
+                                // Figma: read-more → 10 → topic row, or → 8 (header pad B8)
+                                // → media / options; minus the 14pt line box below the cap
+                                marginBottom: (item?.topic ? 10 : 8) - 0.35 * 14,
                                 paddingHorizontal: 0,
                               },
                             ]}
@@ -1526,11 +1557,11 @@ const PostCard = ({
                             <CustomText
                               color={COLORS.buttonColor}
                               label={"Read full post..."}
-                              fontFamily={fonts.medium}
+                              // Figma 7431:1527: Regular 14 / −1%
+                              fontFamily={fonts.regular}
+                              letterSpacing={-0.14}
                               onPress={() =>
-                                navigation.navigate("DetailPage", {
-                                  item: item,
-                                })
+                                openPostDetail()
                               }
                             />
                           </View>
@@ -1551,7 +1582,7 @@ const PostCard = ({
                     <Icons
                       family="MaterialSymbolsRounded"
                       name="tag"
-                      size={16}
+                      size={14}
                       color={colors.text}
                     />
                     <View style={styles.findPostsTextWrap}>
@@ -1592,8 +1623,8 @@ const PostCard = ({
                     <Icons
                       family="MaterialSymbolsRounded"
                       name="chevron_right"
-                      size={18}
-                      color={colors.text}
+                      size={24}
+                      color={COLORS.gray64}
                     />
                   </TouchableOpacity>
                 ) : null}
@@ -1706,7 +1737,13 @@ const PostCard = ({
                         }
                         style={[
                           styles.scrollView,
-                          { width: screenWidth - MEDIA_INSET, borderRadius: MEDIA_RADIUS },
+                          {
+                            width: screenWidth - MEDIA_INSET,
+                            // reserve the media's full height so the next
+                            // block (poll options, action bar) never overlaps it
+                            height: getImageHeight(),
+                            borderRadius: MEDIA_RADIUS,
+                          },
                         ]}
                       >
                         {images.map((imageUri, index) => (
@@ -1721,9 +1758,7 @@ const PostCard = ({
                               <TouchableOpacity
                                 activeOpacity={0.9}
                                 onPress={() =>
-                                  navigation.navigate("DetailPage", {
-                                    item: item,
-                                  })
+                                  openPostDetail()
                                 }
                               >
                                 <Video
@@ -2085,7 +2120,7 @@ const PostCard = ({
                         </View>
                       )}
                     </>
-                  ) : (
+                  ) : isPollPost(item) ? null : (
                     <View
                       style={{
                         height: getImageHeight(),
@@ -2098,7 +2133,6 @@ const PostCard = ({
 
                   {/* Dynamic Pagination Indicators */}
                 </View>
-                {null}
               </>
             )}
             {!isDetail && images?.length > 1 && (
@@ -2114,6 +2148,21 @@ const PostCard = ({
                 ))}
               </View>
             )}
+            {/* Poll post: options + votes / time left (Figma 8100:2384) */}
+            {isPollPost(item) ? (
+              <View
+                style={
+                  images?.length > 0 && images[0] ? { marginTop: 8 } : null
+                }
+              >
+                <PollPostBlock
+                  postId={item?._id}
+                  poll={item.poll}
+                  isOwner={isOwner}
+                  paddingHorizontal={isDetail ? 12 : 8}
+                />
+              </View>
+            ) : null}
             <View
               style={[
                 styles.rowButtons,
@@ -2125,9 +2174,10 @@ const PostCard = ({
                     ? images?.length > 1
                       ? 26
                       : 8
-                    : images?.length > 1
+                    : images?.length > 1 && !isPollPost(item)
                     ? 8
-                    : 12,
+                    : // poll (Figma 8100:2384): meta row → 8 → pill row pad 4
+                      12,
                   paddingHorizontal: isDetail ? 12 : 8,
                 },
               ]}
@@ -2359,11 +2409,15 @@ const PostCard = ({
                 />
               </TouchableOpacity>
             </View>
-            {upvotes?.length > 0 && item?.friendLikes?.length > 0 && (
+            {hasReactedRow && (
               <View
                 style={[
                   styles.row,
-                  { gap: 4, marginTop: 4 },
+                  // Figma Frame 9 (8100:2472): pill row (32, pad 4) → 8 →
+                  // reacted row (16) ⇒ 4 + 8 below the 28 pills; pinned to 16
+                  // (the 12pt line boxes overflow it symmetrically)
+                  { gap: 4, marginTop: 12 },
+                  !isDetail && { height: 16 },
                   isDetail && { paddingHorizontal: 16, marginTop: 8 },
                 ]}
               >
@@ -2418,7 +2472,14 @@ const PostCard = ({
               <View
                 style={[
                   styles.row,
-                  { justifyContent: "space-between", marginTop: 4 },
+                  // Figma Frame 9: reacted row → 8 → comment row; straight
+                  // after the pills: 4 (pill row pad) + 8
+                  {
+                    justifyContent: "space-between",
+                    marginTop: hasReactedRow ? 8 : 12,
+                    // Figma row 16 (16 icons); 12pt line boxes overflow it
+                    height: 16,
+                  },
                 ]}
               >
                 <View style={[styles.row, { gap: 4, paddingHorizontal: 0 }]}>
@@ -2476,8 +2537,12 @@ const PostCard = ({
                 letterSpacing={-0.06}
                 color={COLORS.gray48}
                 fontFamily={fonts.regular}
-                marginBottom={4}
-                marginTop={2}
+                // Figma Frame 2085663870: comment row → 8 → "View all" cap
+                // (Frame 9: reacted → 8; pills → 4 + 8); minus the 12pt line
+                // box above the cap
+                marginTop={
+                  (hasTopComment || hasReactedRow ? 8 : 12) - 0.353 * 12
+                }
                 marginLeft={8}
               />
             )}
@@ -2488,7 +2553,20 @@ const PostCard = ({
               fontSize={isDetail ? 12 : 10}
               letterSpacing={isDetail ? -0.06 : -0.05}
               marginLeft={isDetail ? 16 : 8}
-              marginTop={commentsCount > 0 && !isDetail ? 0 : 4}
+              // Figma Frame 7: comments block → 12 → time; Frame 9: reacted
+              // row → 8 → time; pills → 4 + 8. Cap to cap: minus the 10pt
+              // line box above the time cap (and the 12pt one below "View all")
+              marginTop={
+                isDetail
+                  ? 4
+                  : commentsCount > 0
+                  ? 12 - 0.35 * 12 - 0.353 * 10
+                  : hasTopComment
+                  ? 12 - 0.353 * 10
+                  : hasReactedRow
+                  ? 8 - 0.353 * 10
+                  : 12 - 0.353 * 10
+              }
               fontFamily={fonts.regular}
             />
           </View>
@@ -2636,9 +2714,9 @@ const createStyles = (colors, themeMode) =>
   StyleSheet.create({
     mainContainer: {
       paddingTop: 12,
-      // Figma (measured): time glyph → section end 9; the 10pt time text's
-      // 1.4 line box already adds ~3 below the glyph
-      paddingBottom: 9,
+      // Figma card pad B12 below the time cap; the 10pt time text's 1.4
+      // line box already adds 0.35 × 10 below the cap
+      paddingBottom: 12 - 0.35 * 10,
       backgroundColor: colors.background,
     },
     row: {
@@ -2954,10 +3032,11 @@ const createStyles = (colors, themeMode) =>
         themeMode === "dark" ? COLORS.inputBg : "rgba(18, 18, 18, 0.04)",
       flexDirection: "row",
       alignItems: "center",
+      // Figma chip (8100:2417): h24, r100, pad L6 R7.5
       borderRadius: 99,
       paddingLeft: 6,
-      paddingRight: 8,
-      height: 28,
+      paddingRight: 7.5,
+      height: 24,
     },
     detailViewersRow: {
       position: "absolute",
@@ -2991,8 +3070,10 @@ const createStyles = (colors, themeMode) =>
       paddingLeft: 8,
       paddingRight: 10,
       marginHorizontal: 8,
-      marginBottom: 12,
-      gap: 4,
+      // Figma: last block of the header (pad B8) → 8 → media / poll options
+      marginBottom: 8,
+      // Figma 8100:2443: icon → 2 → text, chevron space-between
+      gap: 2,
     },
     findPostsTextWrap: {
       flex: 1,

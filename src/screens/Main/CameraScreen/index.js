@@ -28,6 +28,7 @@ import { useDispatch } from "react-redux";
 import fonts from "../../../assets/fonts";
 import { Images } from "../../../assets/images";
 import Blur from "../../../components/Blur";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Header from "../../../components/Header";
 import CustomButton from "../../../components/CustomButton";
 import CustomText from "../../../components/CustomText";
@@ -973,13 +974,13 @@ const CameraScreen = ({ isCameraActive = true }) => {
       {/* Top controls */}
       <View style={styles.topControls}>
         <View style={[styles.row, { gap: 12 }]}>
-          <TouchableOpacity
-            style={[styles.controlButton, { overflow: "hidden" }]}
+          <GlassBackButton
             onPress={handleClose}
-          >
-            <Blur />
-            <Image source={Images.back} style={{ height: 20, width: 20 }} />
-          </TouchableOpacity>
+            fill="rgba(0, 0, 0, 0.5)"
+            iconSize={20}
+            color="#FFFFFF"
+            fullOpacity
+          />
           <CustomText
             label={"Back"}
             fontFamily={fonts.semiBold}

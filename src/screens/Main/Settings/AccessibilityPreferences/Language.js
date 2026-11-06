@@ -1,92 +1,129 @@
-import { StyleSheet } from "react-native";
-import React, { useState, useEffect } from "react";
+import { useNavigation } from "@react-navigation/native";
+import { useEffect, useState } from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
-import ScreenWrapper from "../../../../components/ScreenWrapper";
+
+import fonts from "../../../../assets/fonts";
+import CustomText from "../../../../components/CustomText";
+import FlagImage from "../../../../components/FlagImage";
 import Header from "../../../../components/Header";
-import { COLORS } from "../../../../utils/COLORS";
-import ToggleCard from "../molecules/ToggleCard";
-import Divider from "../../../../components/Divider";
+import Icons from "../../../../components/Icons";
+import ScreenWrapper from "../../../../components/ScreenWrapper";
+import { LANGUAGES, languageOf } from "../../../../utils/languages";
+import { resolvePick } from "../../../../utils/pickerBus";
 import { updateProfilePreference } from "../../../../utils/updateProfilePreference";
 
-const languages = [
-  { id: "1", code: "en", name: "🇺🇸 English", subtitle: "English - Global language" },
-  { id: "2", code: "zh", name: "🇨🇳 Mandarin Chinese", subtitle: "中文 - Most spoken language" },
-  { id: "3", code: "hi", name: "🇮🇳 Hindi", subtitle: "हिन्दी - Official language of India" },
-  { id: "4", code: "es", name: "🇪🇸 Spanish", subtitle: "Español - Widely spoken in Americas" },
-  { id: "5", code: "fr", name: "French", subtitle: "Français - Official language in 29 countries" },
-  { id: "6", code: "ar", name: "Arabic", subtitle: "العربية - Spoken across Middle East" },
-  { id: "7", code: "bn", name: "Bengali", subtitle: "বাংলা - Spoken in Bangladesh and India" },
-  { id: "8", code: "ru", name: "Russian", subtitle: "Русский - Official language of Russia" },
-  { id: "9", code: "pt", name: "Portuguese", subtitle: "Português - Spoken in Brazil and Portugal" },
-  { id: "10", code: "id", name: "Indonesian", subtitle: "Bahasa Indonesia - Official language of Indonesia" },
-  { id: "11", code: "ur", name: "Urdu", subtitle: "اردو - Official language of Pakistan" },
-  { id: "12", code: "de", name: "German", subtitle: "Deutsch - Official language of Germany" },
-  { id: "13", code: "ja", name: "Japanese", subtitle: "日本語 - Official language of Japan" },
-  { id: "14", code: "sw", name: "Swahili", subtitle: "Kiswahili - Widely spoken in East Africa" },
-  { id: "15", code: "mr", name: "Marathi", subtitle: "मराठी - Spoken in Maharashtra, India" },
-  { id: "16", code: "te", name: "Telugu", subtitle: "తెలుగు - Spoken in South India" },
-  { id: "17", code: "tr", name: "Turkish", subtitle: "Türkçe - Official language of Turkey" },
-  { id: "18", code: "ko", name: "Korean", subtitle: "한국어 - Official language of Korea" },
-  { id: "19", code: "ta", name: "Tamil", subtitle: "தமிழ் - Spoken in Tamil Nadu and Sri Lanka" },
-  { id: "20", code: "vi", name: "Vietnamese", subtitle: "Tiếng Việt - Official language of Vietnam" },
-];
+const WHITE_4 = "rgba(255, 255, 255, 0.04)";
+const WHITE_32 = "rgba(255, 255, 255, 0.32)";
+const WHITE_48 = "rgba(255, 255, 255, 0.48)";
+const WHITE_64 = "rgba(255, 255, 255, 0.64)";
+const GOLD = "#A19375";
 
-const Language = () => {
+/**
+ * Figma Matching/Jobs › "App-language" (8276:9334). One screen for the app
+ * language (Settings) and for picking a language (job offer / profile —
+ * client: "re-use the same language screen"): pass `{ pick: true, value }`
+ * and the pick comes back through utils/pickerBus ("language").
+ * Body padding 12: `language` 16 white 48% + "Select your language" Regular
+ * 14 −3% white 48% (gap 4) · 8 · list padding 14/0, rows split by 1pt white
+ * 4% with 16 above and below: 16 round flag · 8 · name Medium 16 −0.5
+ * (white 64%, white when picked) · 10 · native Regular 12 white 48% — 24
+ * radio (white 32% / #A19375 checked).
+ */
+const Language = ({ route }) => {
+  const navigation = useNavigation();
   const dispatch = useDispatch();
   const { userData } = useSelector((state) => state.users);
-  const [selectedLanguage, setSelectedLanguage] = useState("🇺🇸 English");
+  const pickMode = !!route?.params?.pick;
+  const [selected, setSelected] = useState(() =>
+    pickMode ? languageOf(route?.params?.value)?.code || null : languageOf(userData?.profile?.language)?.code || "en",
+  );
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (userData?.profile?.language) {
-      const storedLang = userData.profile.language;
-      const matched = languages.find(
-        (l) => l.code === storedLang || l.name === storedLang || l.name.includes(storedLang)
-      );
-      if (matched) {
-        setSelectedLanguage(matched.name);
-      } else {
-        setSelectedLanguage(storedLang);
-      }
+    if (!pickMode && userData?.profile?.language) {
+      const lang = languageOf(userData.profile.language);
+      if (lang) setSelected(lang.code);
     }
-  }, [userData]);
+  }, [userData?.profile?.language, pickMode]);
 
-  const handleLanguageChange = async (langObj) => {
-    if (loading || selectedLanguage === langObj.name) return;
-    setSelectedLanguage(langObj.name);
+  const choose = async (lang) => {
+    if (pickMode) {
+      setSelected(lang.code);
+      resolvePick("language", lang);
+      navigation.goBack();
+      return;
+    }
+    if (loading || selected === lang.code) return;
+    setSelected(lang.code);
     setLoading(true);
-    await updateProfilePreference(
-      dispatch,
-      userData,
-      { language: langObj.code || langObj.name },
-      "Language updated successfully"
-    );
+    await updateProfilePreference(dispatch, userData, { language: lang.code }, "Language updated successfully");
     setLoading(false);
   };
 
   return (
-    <ScreenWrapper
-      headerUnScrollable={() => <Header title={"Language"} />}
-      scrollEnabled={true}
-      paddingHorizontal={0.1}
-    >
-      <Divider thickness={4} marginVertical={0.1} />
-      {languages.map((lang, index) => (
-        <ToggleCard
-          key={lang.id}
-          title={lang.name}
-          subtitle={lang.subtitle}
-          value={selectedLanguage === lang.name}
-          onPress={() => handleLanguageChange(lang)}
-          isBorder={true}
-          isOption={true}
-          marginBottom={index === languages.length - 1 ? 40 : 0}
-        />
-      ))}
+    <ScreenWrapper headerUnScrollable={() => <Header title="Language" />} scrollEnabled paddingHorizontal={12}>
+      <View style={styles.body}>
+        <View style={styles.info}>
+          <Icons family="MaterialSymbolsRounded" name="language" size={16} color={WHITE_48} />
+          <CustomText label="Select your language" fontSize={14} letterSpacing={-0.42} color={WHITE_48} marginTop={(16 - 19.6) / 2} marginBottom={(16 - 19.6) / 2} />
+        </View>
+        <View style={styles.list}>
+          {LANGUAGES.map((lang, i) => {
+            const on = selected === lang.code;
+            return (
+              <View key={lang.code} style={styles.item}>
+                {i > 0 && <View style={styles.separator} />}
+                <TouchableOpacity activeOpacity={0.7} onPress={() => choose(lang)} style={styles.row}>
+                  <View style={styles.column}>
+                    <View style={styles.nameRow}>
+                      <FlagImage code={lang.flag} size={16} />
+                      <CustomText
+                        label={lang.name}
+                        fontSize={16}
+                        letterSpacing={-0.5}
+                        fontFamily={fonts.medium}
+                        color={on ? "#FFFFFF" : WHITE_64}
+                        numberOfLines={1}
+                        marginTop={(16 - 22.4) / 2}
+                        marginBottom={(16 - 22.4) / 2}
+                      />
+                    </View>
+                    <CustomText
+                      label={lang.native}
+                      fontSize={12}
+                      color={WHITE_48}
+                      numberOfLines={1}
+                      marginTop={(8 - 16.8) / 2}
+                      marginBottom={(8 - 16.8) / 2}
+                    />
+                  </View>
+                  <Icons
+                    family="MaterialSymbolsRounded"
+                    name={on ? "radio_button_checked" : "radio_button_unchecked"}
+                    size={24}
+                    color={on ? GOLD : WHITE_32}
+                  />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+      </View>
     </ScreenWrapper>
   );
 };
 
 export default Language;
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  // Figma: header ends at 104, the info row starts at 128
+  body: { paddingTop: 24, paddingBottom: 106, gap: 8 },
+  info: { flexDirection: "row", alignItems: "center", gap: 4, height: 16 },
+  list: { paddingVertical: 14, gap: 16 },
+  item: { gap: 16 },
+  separator: { height: 1, backgroundColor: WHITE_4 },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 54 },
+  column: { flex: 1, gap: 10 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 8, height: 16 },
+});

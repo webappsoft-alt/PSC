@@ -6,7 +6,6 @@ import {
   Dimensions,
   StatusBar,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -16,7 +15,6 @@ import {
   useCameraPermission,
 } from "react-native-vision-camera";
 
-import { Images } from "../../../assets/images";
 import CustomText from "../../../components/CustomText";
 
 import CameraErrorMessage from "../../../components/CamerErrorMessage";
@@ -27,7 +25,7 @@ import { useIsForeground } from "../../../utils/UseIsForground";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "@react-native-community/blur";
 import MaskedView from "@react-native-masked-view/masked-view";
-import ImageFast from "../../../components/ImageFast";
+import GlassBackButton from "../../../components/GlassBackButton";
 
 const { width, height } = Dimensions.get("window");
 
@@ -177,17 +175,20 @@ const ImageCamera = ({ onCapture, onClose }) => {
           {/* Top Controls */}
           <View style={[styles.topControls, { paddingTop: insets.top + 10 }]}>
             <View style={styles.row}>
-              <TouchableOpacity style={styles.controlButton} onPress={onClose}>
-                <BlurView
-                  blurType="dark"
-                  blurAmount={5}
-                  style={StyleSheet.absoluteFill}
-                />
-                <ImageFast
-                  source={Images.back}
-                  style={{ height: 20, width: 20 }}
-                />
-              </TouchableOpacity>
+              <GlassBackButton
+                onPress={onClose}
+                fill="transparent"
+                iconSize={20}
+                color="#FFFFFF"
+                fullOpacity
+                backdrop={
+                  <BlurView
+                    blurType="dark"
+                    blurAmount={5}
+                    style={StyleSheet.absoluteFill}
+                  />
+                }
+              />
               <CustomText
                 label={"Back"}
                 fontFamily={"Poppins_600SemiBold"}
@@ -226,14 +227,6 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 20,
     zIndex: 10,
-  },
-  controlButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 20,
-    overflow: "hidden",
   },
 
   row: {

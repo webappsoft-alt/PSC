@@ -5,7 +5,7 @@ import fonts from "../assets/fonts";
 import { COLORS } from "../utils/COLORS";
 import CustomModal from "./CustomModal";
 import CustomText from "./CustomText";
-import Icons from "./Icons";
+import GlassBackButton from "./GlassBackButton";
 
 const AgeRatingModal = ({
   isVisible,
@@ -67,18 +67,14 @@ const AgeRatingModal = ({
               { paddingTop: insests.top, paddingHorizontal: 12 },
             ]}
           >
-            <TouchableOpacity
+            <GlassBackButton
               onPress={onDisable}
-              activeOpacity={0.6}
-              style={[styles.backIcon, { backgroundColor: "#FFFFFF14" }]}
-            >
-              <Icons
-                name="keyboard-arrow-left"
-                family="MaterialIcons"
-                size={26}
-                color={COLORS.white}
-              />
-            </TouchableOpacity>
+              fill="#FFFFFF14"
+              iconSize={26}
+              color={COLORS.white}
+              fullOpacity
+              style={styles.backIcon}
+            />
 
             <CustomText
               label={title}
@@ -156,11 +152,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryColor,
   },
   backIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    justifyContent: "center",
-    alignItems: "center",
     marginRight: 16,
   },
   row: {

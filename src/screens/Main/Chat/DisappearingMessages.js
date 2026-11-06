@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
 import Blur from "../../../components/Blur";
 import CustomText from "../../../components/CustomText";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { updateConversationSettings } from "../../../services/ChatService";
@@ -69,10 +70,7 @@ const DisappearingMessages = () => {
         <Blur blurType={isDark ? "dark" : "xlight"} blurAmount={32} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, opacity: 0.9 }]} />
         <View style={styles.headerRow}>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={[styles.back, { backgroundColor: tint(0.08) }]}>
-            <Blur blurType={isDark ? "dark" : "xlight"} borderRadius={100} />
-            <Icons family="MaterialSymbolsRounded" name="chevron_left" size={20} color={tint(0.64)} />
-          </TouchableOpacity>
+          <GlassBackButton onPress={() => navigation.goBack()} fill={tint(0.08)} iconSize={20} />
           <CustomText label="Disappearing Messages" fontSize={24} fontFamily={fonts.semiBold} letterSpacing={-0.12} color={colors.text} containerStyle={styles.flex} numberOfLines={1} />
         </View>
       </View>
@@ -115,14 +113,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 100,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
   },
   list: {
     marginTop: 4,
