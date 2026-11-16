@@ -468,6 +468,9 @@ const Home = ({
   const newestLoadedRef = useRef(0);
   const newestRemoteRef = useRef(0);
   const myId = useSelector((state) => state.users?.userData?._id);
+  // radio mini-player (64 + 8 gap) floats over the bottom of the feed:
+  // leave room so the last post can scroll clear of it
+  const radioPlayerShown = useSelector((state) => !!state.player?.showRadioPlayer);
 
   useEffect(() => {
     let newest = 0;
@@ -1011,7 +1014,7 @@ const Home = ({
             windowSize={10}
             contentContainerStyle={{
               paddingTop: listTopPadding,
-              paddingBottom: 100,
+              paddingBottom: 100 + (radioPlayerShown ? 72 : 0),
             }}
           />
           {Platform.OS === "ios" ? (

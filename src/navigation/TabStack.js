@@ -690,7 +690,19 @@ const HomeWithCameraPager = ({ route, navigation }) => {
         onPageScrollStateChanged={handlePageScrollStateChanged}
       >
         {/* Page 0 - Camera */}
-        <View key="camera" style={styles.pagerPage}>
+        {/* iOS insets pager pages by the status bar (see PagerPage
+            bleedTop): undo it, or the camera starts 59pt low and its
+            shutter row is pushed off the bottom of the screen */}
+        <View
+          key="camera"
+          style={[
+            styles.pagerPage,
+            Platform.OS === "ios" && {
+              marginTop: -insets.top,
+              marginBottom: insets.top,
+            },
+          ]}
+        >
           <CameraScreen
             navigation={navigation}
             isCameraActive={isCameraActive}
@@ -1404,6 +1416,9 @@ const CustomTabBar = ({ state, navigation }) => {
   const insets = useSafeAreaInsets();
   // Viral (app/(tabs)/index.tsx): bar bottom = max(12, safe area − 4)
   const tabBarBottomOffset = Math.max(12, (insets.bottom ?? 0) - 4);
+  // the bar's progressive blur (32pt band above it) frosted the lowest menu
+  // item ("Social Feed" cut off): lift both menus clear of the band
+  const MENU_LIFT = 24;
   const { colors, themeMode } = useTheme();
   const {
     isTabBarVisible,
@@ -1446,7 +1461,10 @@ const CustomTabBar = ({ state, navigation }) => {
   // it with the bar as before, and it stays while the create menu is open.
   // Threads behaviour on every tab: the "+" is hidden while the bar is
   // visible and floats in when the bar hides on scroll
-  const plusVisibleEffective = menuOpen || !isTabBarVisible;
+  // never on the camera page (pager page 0): the bar is hidden there and
+  // the floating "+" sat on top of the shutter row (client screenshot)
+  const plusVisibleEffective =
+    (menuOpen || !isTabBarVisible) && activePagerPage !== 0;
   const plusAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.spring(plusAnim, {
@@ -1942,7 +1960,7 @@ const CustomTabBar = ({ state, navigation }) => {
       {/* Floating Right Menu Options — Figma create menu: 6 items, 48px gold circles, 24 SemiBold labels, gap 10 */}
       {menuOpen && (
         <View
-          style={[styles.menuContainer, { bottom: 30 + tabBarBottomOffset }]}
+          style={[styles.menuContainer, { bottom: 30 + MENU_LIFT + tabBarBottomOffset }]}
         >
           {CREATE_MENU_ITEMS.map((menuItem, idx) => (
             <Animated.View
@@ -1997,7 +2015,7 @@ const CustomTabBar = ({ state, navigation }) => {
       {/* Floating Left Menu Options */}
       {leftMenuOpen && (
         <View
-          style={[styles.leftMenuContainer, { bottom: 30 + tabBarBottomOffset }]}
+          style={[styles.leftMenuContainer, { bottom: 30 + MENU_LIFT + tabBarBottomOffset }]}
         >
           <Animated.View
             style={[

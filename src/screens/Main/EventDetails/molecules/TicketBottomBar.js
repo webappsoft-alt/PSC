@@ -1,5 +1,6 @@
 import { View, TouchableOpacity, StyleSheet, Image } from "react-native";
 import React from "react";
+import moment from "moment";
 import CustomButton from "../../../../components/CustomButton";
 import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
@@ -13,8 +14,28 @@ const TicketBottomBar = ({
   finalPrice = 0,
   onPressBook = () => {},
   loading,
+  startDate,
+  startTime,
+  endTime,
 }) => {
   const { colors, isDark } = useTheme();
+  // was hardcoded "Today 2:00 PM" · "4h": the event's own day, start, length
+  const start = startTime ? moment(startTime, ["HH:mm", "H:mm", "hh:mm A", "h:mm A"]) : null;
+  const end = endTime ? moment(endTime, ["HH:mm", "H:mm", "hh:mm A", "h:mm A"]) : null;
+  const day = startDate
+    ? moment(startDate).calendar(null, {
+        sameDay: "[Today]",
+        nextDay: "[Tomorrow]",
+        lastDay: "[Yesterday]",
+        nextWeek: "ddd, MMM D",
+        lastWeek: "ddd, MMM D",
+        sameElse: "ddd, MMM D",
+      })
+    : "";
+  const when = [day, start?.isValid() ? start.format("h:mm A") : ""].filter(Boolean).join(" ");
+  let mins = start?.isValid() && end?.isValid() ? end.diff(start, "minutes") : 0;
+  if (mins < 0) mins += 24 * 60;
+  const length = mins > 0 ? (mins % 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m`.replace(/^0h /, "") : `${mins / 60}h`) : "";
   const styles = createStyles(colors, isDark);
   return (
     <View style={styles.container}>
@@ -40,7 +61,7 @@ const TicketBottomBar = ({
             marginLeft={4}
           />
           <CustomText
-            label={"Today 2:00 PM"}
+            label={when}
             color={colors.iconMuted}
             fontSize={10}
             marginLeft={4}
@@ -53,7 +74,7 @@ const TicketBottomBar = ({
             marginLeft={4}
           />
           <CustomText
-            label={"4h"}
+            label={length}
             color={colors.iconMuted}
             fontSize={10}
             marginLeft={4}

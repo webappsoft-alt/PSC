@@ -1226,7 +1226,7 @@ const PublishShort = ({ route }) => {
           <View style={{ width: "80%" }}>
             <CustomText
               fontSize={12}
-              label={"MAKE IT CONTINOUS"}
+              label={"MAKE IT CONTINUOUS"}
               fontFamily={fonts.medium}
               color={colors.textSecondary}
             />

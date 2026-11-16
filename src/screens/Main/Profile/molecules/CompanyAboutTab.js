@@ -19,6 +19,7 @@ import { ToastMessage } from "../../../../utils/ToastMessage";
 import { BoxIcon } from "../../Career/molecules/CareerUI";
 import { AboutIcon } from "./AboutIcons";
 import CompanyInsightsSections, { RichSub, UNLOCK_COPY, UnlockCard } from "./CompanyInsightsSections";
+import TabEmptyState from "./TabEmptyState";
 
 const X = (fs) => Math.round(fs * 0.35 * 10) / 10;
 const INK = "#121212";
@@ -184,7 +185,8 @@ const CompanyAboutTab = ({ user }) => {
     }
   };
 
-  if (failed) return null;
+  // nothing to show (or the request failed): the profile tabs' empty state
+  if (failed) return <TabEmptyState tabKey="About" />;
   if (!data) {
     return (
       <SkeletonGroup>
@@ -206,6 +208,14 @@ const CompanyAboutTab = ({ user }) => {
     data.facts.countries && { icon: "countries", label: "Operating in", value: `${data.facts.countries} ${data.facts.countries === 1 ? "country" : "countries"}` },
   ].filter(Boolean);
   const website = data.facts.website;
+  const hasContent =
+    !!data.bio ||
+    facts.length > 0 ||
+    !!website ||
+    !!data.employees?.estimated ||
+    data.employees?.onPsc > 0 ||
+    data.keyIndividuals?.length > 0;
+  if (!hasContent) return <TabEmptyState tabKey="About" />;
   const rep = data.reputation;
   const openUser = (uid) => uid && navigation.push("UserProfile", { userId: uid });
 

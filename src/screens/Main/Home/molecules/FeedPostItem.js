@@ -20,6 +20,8 @@ const FeedPostItem = memo(
     onHidePost,
     onHideUserPosts,
     topicPostsCount,
+    // false on a user's own profile page: no Follow pill on every post
+    showFollowButton = true,
   }) => {
     const author = post?.author || {};
     const displayName =
@@ -85,6 +87,7 @@ const FeedPostItem = memo(
     return (
       <>
         <PostCard
+          showFollowButton={showFollowButton}
           displayName={displayName}
           username={username}
           description={description}

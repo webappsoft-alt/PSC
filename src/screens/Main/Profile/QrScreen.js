@@ -43,9 +43,12 @@ const QrScreen = ({ route }) => {
   };
 
   return (
-    <ScreenWrapper headerUnScrollable={() => <Header title="Qr Code" />}>
+    <ScreenWrapper headerUnScrollable={() => <Header title="QR Code" textTransform="none" />}>
       <CustomText
-        label={localUser?.firstName + " " + localUser?.lastName}
+        label={
+          `${localUser?.firstName || ""} ${localUser?.lastName || ""}`.trim() ||
+          localUser?.username
+        }
         fontFamily={fonts.semiBold}
         fontSize={24}
         lineHeight={24 * 1.4}
@@ -55,7 +58,7 @@ const QrScreen = ({ route }) => {
 
       <View style={[styles.usernamePill, { backgroundColor: isDark ? COLORS.white16 : colors.surfaceAlt }]}>
         <CustomText
-          label={localUser?.email}
+          label={localUser?.username ? `@${localUser.username}` : ""}
           fontSize={12}
           color={isDark ? COLORS.white : colors.textSecondary}
         />

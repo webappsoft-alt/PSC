@@ -164,6 +164,10 @@ const UserProfile = ({ route }) => {
     const isFollowing = localUser?.stats?.followers?.includes(userData?._id);
     const isFriend = localUser?.stats?.friends?.includes(userData?._id);
     const currentlyFollowing = isFollowing || isFriend;
+    // they follow me → following them back makes us friends (server rule)
+    const followsMe = (localUser?.stats?.following || []).some(
+      (id) => String(id) === String(userData?._id),
+    );
 
     const authorName = localUser?.firstName || "User";
     const isPrivate = localUser?.profilePrivacy === "private";
@@ -195,10 +199,17 @@ const UserProfile = ({ route }) => {
         stats: {
           ...prev.stats,
           followers: currentlyFollowing
-            ? (prev.stats?.followers || []).filter((id) => id !== userData._id)
+            ? (prev.stats?.followers || []).filter((id) => String(id) !== String(userData._id))
             : !isPrivate
             ? [...(prev.stats?.followers || []), userData._id]
             : prev.stats?.followers || [],
+          // the server drops the friendship on unfollow and makes one on a
+          // follow back (mutual) — mirror it, or the button stays "Friend"
+          friends: currentlyFollowing
+            ? (prev.stats?.friends || []).filter((id) => String(id) !== String(userData._id))
+            : !isPrivate && followsMe
+            ? [...(prev.stats?.friends || []), userData._id]
+            : prev.stats?.friends || [],
         },
         followersCount: currentlyFollowing
           ? (prev.followersCount || 1) - 1
@@ -421,6 +432,7 @@ const UserProfile = ({ route }) => {
         onEditPress={handleEditPost}
         onHidePost={hidePost}
         onHideUserPosts={hideUserPosts}
+        showFollowButton={false}
       />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps

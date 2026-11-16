@@ -38,6 +38,7 @@ import ImageFast from "./ImageFast";
 
 import { Images } from "../assets/images";
 import { useTheme } from "../contexts/ThemeContext";
+import GlassBackButton from "./GlassBackButton";
 
 const { width, height } = Dimensions.get("window");
 
@@ -267,9 +268,9 @@ const ScreenWrapper = ({
             <SafeAreaView style={{ backgroundColor: resolvedStatusBarColor }} />
           )}
           {isAuth ? (
-            <ImageFast
-              source={Images.backIcon}
-              style={{ width: 41, height: 41, margin: 16 }}
+            // was a PNG back icon: the one shared back button instead
+            <GlassBackButton
+              style={{ margin: 16 }}
               onPress={() => {
                 if (navigation.canGoBack()) navigation.goBack();
               }}

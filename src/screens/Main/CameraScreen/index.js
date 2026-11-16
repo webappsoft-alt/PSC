@@ -973,7 +973,8 @@ const CameraScreen = ({ isCameraActive = true }) => {
       />
 
       {/* Top controls */}
-      <View style={styles.topControls}>
+      {/* same place as every header: 10pt under the status bar */}
+      <View style={[styles.topControls, { top: insets.top + 10 }]}>
         <View style={[styles.row, { gap: 12 }]}>
           <GlassBackButton
             onPress={handleClose}

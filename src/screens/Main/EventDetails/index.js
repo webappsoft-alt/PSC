@@ -395,6 +395,9 @@ const EventDetail = ({ navigation }) => {
           finalPrice={ticketPayload?.finalPrice ?? 0}
           onPressBook={submitTickets}
           loading={submitting}
+          startDate={detail?.startDate}
+          startTime={detail?.startTime}
+          endTime={detail?.endTime}
         />
       </View>
 

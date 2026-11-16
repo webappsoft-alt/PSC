@@ -316,7 +316,11 @@ const AccountInfo = () => {
           color={colors.textSecondary}
           marginBottom={20}
         />
-        <CustomText label=" July 13, 2025" fontSize={12} marginBottom={20} />
+        <CustomText
+          label={userData?.createdAt ? ` ${moment(userData.createdAt).format("MMMM D, YYYY")}` : ""}
+          fontSize={12}
+          marginBottom={20}
+        />
       </View>
 
       <View style={styles.profilePicturesContainer}>

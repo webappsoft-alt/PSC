@@ -405,7 +405,9 @@ const styles = StyleSheet.create({
   engine: { position: "absolute", width: 0, height: 0, opacity: 0 },
   playerContainer: {
     position: "absolute",
-    width: "90%",
+    // centred with the bar's 16 gutters (was 90% wide + 16 left: off-centre)
+    left: 16,
+    right: 16,
     height: 64,
     padding: 4,
     borderRadius: 20,
@@ -413,7 +415,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 1000,
     overflow: "hidden",
-    marginLeft: 16,
   },
   cardInner: {
     height: 56,

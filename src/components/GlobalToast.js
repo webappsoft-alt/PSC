@@ -52,6 +52,11 @@ const GlobalToast = forwardRef((props, ref) => {
   );
 });
 
+// client: a toast must not cover the header (title / back / actions) — it
+// drops in just below the standard header row (40pt controls under the
+// status bar) instead of on top of it
+const TOAST_TOP = 64;
+
 const ToastItem = ({ toast, index, onHide }) => {
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(-150);
@@ -75,7 +80,7 @@ const ToastItem = ({ toast, index, onHide }) => {
   }, [hide]);
 
   useEffect(() => {
-    translateY.value = withSpring(insets.top + 10 + index * 50, {
+    translateY.value = withSpring(insets.top + TOAST_TOP + index * 50, {
       damping: 15,
     });
     startHideTimeout();
@@ -85,7 +90,7 @@ const ToastItem = ({ toast, index, onHide }) => {
   }, []);
 
   useEffect(() => {
-    translateY.value = withSpring(insets.top + 10 + index * 50, {
+    translateY.value = withSpring(insets.top + TOAST_TOP + index * 50, {
       damping: 15,
     });
   }, [index, insets.top]);
@@ -97,7 +102,7 @@ const ToastItem = ({ toast, index, onHide }) => {
       }
     })
     .onUpdate((event) => {
-      const basePos = insets.top + 10 + index * 50;
+      const basePos = insets.top + TOAST_TOP + index * 50;
       const newY = basePos + event.translationY;
       if (newY > basePos + 20) {
         translateY.value = basePos + 20 + (newY - (basePos + 20)) * 0.2;
@@ -109,7 +114,7 @@ const ToastItem = ({ toast, index, onHide }) => {
       if (event.translationY < -20 || event.velocityY < -500) {
         runOnJS(hide)();
       } else {
-        translateY.value = withSpring(insets.top + 10 + index * 50, {
+        translateY.value = withSpring(insets.top + TOAST_TOP + index * 50, {
           damping: 15,
         });
         runOnJS(startHideTimeout)();

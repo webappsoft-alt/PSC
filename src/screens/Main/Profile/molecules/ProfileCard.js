@@ -424,7 +424,7 @@ export default function ProfileCard({
           )}
           <Stat
             value={formatProfileCount(followers)}
-            label="Followers"
+            label={followers === 1 ? "Follower" : "Followers"}
             onPress={() => openPeople("followers")}
           />
           <Stat

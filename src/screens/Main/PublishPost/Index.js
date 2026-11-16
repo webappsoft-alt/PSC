@@ -1615,14 +1615,29 @@ const CreatePost = ({ route }) => {
                       },
                     ]}
                   >
-                    <ImageFast
-                      source={{ uri: item }}
-                      style={{
-                        height: 64,
-                        width: 64,
-                        borderRadius: 12,
-                      }}
-                    />
+                    {uploadedMediaTypes[index] === "video" ? (
+                      // a video URL in an Image draws black: show its first
+                      // frame (paused, muted player) instead
+                      <View style={{ height: 64, width: 64, borderRadius: 12, overflow: "hidden" }}>
+                        <Video
+                          source={{ uri: item }}
+                          style={{ height: 64, width: 64 }}
+                          resizeMode="cover"
+                          paused
+                          muted
+                          controls={false}
+                        />
+                      </View>
+                    ) : (
+                      <ImageFast
+                        source={{ uri: item }}
+                        style={{
+                          height: 64,
+                          width: 64,
+                          borderRadius: 12,
+                        }}
+                      />
+                    )}
                   </TouchableOpacity>
                 )}
               />
@@ -1667,7 +1682,7 @@ const CreatePost = ({ route }) => {
             <View style={{ width: "80%" }}>
               <CustomText
                 fontSize={12}
-                label={"MAKE IT CONTINOUS"}
+                label={"MAKE IT CONTINUOUS"}
                 fontFamily={fonts.medium}
                 color={colors.textSecondary}
               />

@@ -15,6 +15,7 @@ const TABS = {
   Replies: ["forum", "No Replies", "There are no replies right now."],
   Liked: ["favorite", "No Likes", "There are no liked posts right now."],
   Saved: ["bookmark", "No Saved Posts", "There are no saved posts right now."],
+  About: ["info", "No Info", "There is no information about this profile yet."],
 };
 
 /** Empty state of the profile post tabs, same pattern as the rest of PSC. */

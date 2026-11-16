@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../../../assets/fonts";
 import { FloatingBlurHeader } from "../../../components/HeaderProgressiveBlur";
 import CustomText from "../../../components/CustomText";
+import GlassBackButton from "../../../components/GlassBackButton";
 import Icons from "../../../components/Icons";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { updateConversationSettings } from "../../../services/ChatService";
@@ -64,11 +65,10 @@ const ChatTheme = () => {
       <FloatingBlurHeader visible={edge.headerVisible} onHeightChange={setHeaderH} includeStatusBar={false}>
       <View style={[styles.header, { paddingTop: insets.top + 28 }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} hitSlop={12}>
-            <Icons family="MaterialSymbolsRounded" name="chevron_left" size={20} color={colors.text} />
-          </TouchableOpacity>
+          {/* the one shared back button (client: same component everywhere) */}
+          <GlassBackButton onPress={() => navigation.goBack()} />
           <CustomText label="Theme" fontSize={18} fontFamily={fonts.medium} letterSpacing={-0.09} color={colors.text} textAlign="center" containerStyle={styles.flex} />
-          <View style={{ width: 20 }} />
+          <View style={{ width: 40 }} />
         </View>
       </View>
       {/* preview stays pinned with the header; only the colour rows scroll */}
