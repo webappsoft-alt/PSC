@@ -20,15 +20,29 @@ export const useSocket = () => {
 
 const SocketProvider = ({ children }) => {
   const token = useSelector((state) => state.authConfig.token);
+  // the signed-in account: switching accounts must reconnect the socket even
+  // if a token store lags behind (messages were being sent as the previous
+  // account — sender and receiver both the old user)
+  const userId = useSelector((state) => state.users?.userData?._id);
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef(null);
 
-  const initializeSocket = () => {
-    if (!token) return;
+  const initializeSocket = async () => {
+    const key = currentKey.current;
+    // same credential as the REST calls (ApiRequest reads AsyncStorage)
+    let authToken = token;
+    try {
+      authToken = (await AsyncStorage.getItem("token")) || token;
+    } catch (e) {
+      // fall back to the store's token
+    }
+    if (!authToken) return;
+    // a newer account/token arrived while we were reading storage
+    if (key !== currentKey.current) return;
 
     const newSocket = io(endPoints.SOCKET_BASE_URL, {
-      auth: { token: token },
+      auth: { token: authToken },
       transports: ["websocket"],
       reconnectionAttempts: 15,
       reconnection: true,
@@ -38,8 +52,15 @@ const SocketProvider = ({ children }) => {
       timeout: 20000,
     });
 
+    // only the current socket may drive state; an older one is closed
+    const isCurrent = () => socketRef.current === newSocket;
+
     // Connection events
     newSocket.on("connect", () => {
+      if (!isCurrent()) {
+        newSocket.disconnect();
+        return;
+      }
       console.log("Socket connected successfully");
       setIsConnected(true);
       setSocket(newSocket);
@@ -52,6 +73,7 @@ const SocketProvider = ({ children }) => {
     });
 
     newSocket.on("disconnect", () => {
+      if (!isCurrent()) return;
       console.log("Socket disconnected");
       setIsConnected(false);
       setSocket(null);
@@ -72,6 +94,7 @@ const SocketProvider = ({ children }) => {
 
     // Reconnection events
     newSocket.on("reconnect", (attemptNumber) => {
+      if (!isCurrent()) return;
       console.log("Reconnected after", attemptNumber, "attempts");
       setIsConnected(true);
     });
@@ -83,8 +106,12 @@ const SocketProvider = ({ children }) => {
     socketRef.current = newSocket;
   };
 
+  const currentKey = useRef(null);
+
   useEffect(() => {
+    currentKey.current = `${userId || ""}:${token || ""}`;
     if (token) {
+      socketRef.current = null;
       initializeSocket();
     } else {
       console.log("No token found for authentication");
@@ -94,13 +121,13 @@ const SocketProvider = ({ children }) => {
 
     // Clean up on unmount or app kill
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
+      const old = socketRef.current;
+      socketRef.current = null;
+      if (old) old.disconnect();
       setSocket(null);
       setIsConnected(false);
     };
-  }, [token]);
+  }, [token, userId]);
 
   const socketValue = {
     socket,

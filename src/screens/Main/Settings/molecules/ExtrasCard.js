@@ -1,51 +1,56 @@
-import React from "react";
-import { View, StyleSheet, Image, TouchableOpacity } from "react-native";
+import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
-import CustomText from "../../../../components/CustomText";
-import { COLORS } from "../../../../utils/COLORS";
-import { PNGIcons } from "../../../../assets/images/icons";
+
 import fonts from "../../../../assets/fonts";
-import { useTheme } from "../../../../contexts/ThemeContext";
+import { PNGIcons } from "../../../../assets/images/icons";
+import CustomText from "../../../../components/CustomText";
 
+const X = (fs) => Math.round(fs * 0.35 * 10) / 10;
+
+/**
+ * Figma Settings cards (2307:1632 / 2307:1612): 171.5 × 139 r12, 1pt white 4%
+ * border, padding 24/12, gap 16 — 24pt icons (gap 4) · title (Get Extras
+ * Medium 16 / Invite Friends Medium 14) · 12 · subtitle Regular 14 white 64%.
+ * Get Extras: linear (0,0)→(1,1) #121212 64% → #A19375; Invite Friends:
+ * (0.5,0)→(1,1) #121212 0–64% → #007BFF.
+ */
 const ExtrasCard = ({ onPress, type }) => {
-  const { colors } = useTheme();
-
+  const invite = type === "invite";
   return (
-    <TouchableOpacity
-      style={{ width: "49%" }}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <LinearGradient
-        colors={[COLORS.black, type == "invite" ? "#007BFF" : "#A19375"]}
-        locations={type == "invite" ? [0.76, 0.98] : [0.62, 0.98]}
-        angle={type == "invite" ? 112 : 125}
-        useAngle={true}
-        style={[styles.card, { borderColor: colors.surfaceAlt }]}
-      >
-        {type == "invite" ? (
-          <View>
-            <Image source={PNGIcons.add_user} style={styles.addUser} />
-          </View>
-        ) : (
-          <View style={styles.iconRow}>
-            <Image source={PNGIcons.rewind} style={styles.icon} />
-            <Image source={PNGIcons.star_blue} style={styles.icon} />
-            <Image source={PNGIcons.blot} style={styles.icon} />
-          </View>
-        )}
-
-        <View style={styles.container}>
-          <CustomText textStyle={styles.title}>
-            {type == "invite" ? "Invite Friends" : "Get Extras"}
-          </CustomText>
-          <CustomText textStyle={styles.subtitle}>
-            {type == "invite"
-              ? "Earn Benefits\n& more!"
-              : "Super Likes, Boosts, Rewinds!"}
-          </CustomText>
+        colors={invite ? ["#121212", "#121212", "#007BFF"] : ["#121212", "#A19375"]}
+        locations={invite ? [0, 0.64, 1] : [0.64, 1]}
+        start={invite ? { x: 0.5, y: 0 } : { x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {invite ? (
+        <Image source={PNGIcons.add_user} style={styles.icon} />
+      ) : (
+        <View style={styles.iconRow}>
+          <Image source={PNGIcons.rewind} style={styles.icon} />
+          <Image source={PNGIcons.star_blue} style={styles.icon} />
+          <Image source={PNGIcons.blot} style={styles.icon} />
         </View>
-      </LinearGradient>
+      )}
+      <View style={styles.texts}>
+        <CustomText
+          label={invite ? "Invite Friends" : "Get Extras"}
+          fontSize={invite ? 14 : 16}
+          fontFamily={fonts.medium}
+          color="#FFFFFF"
+          marginTop={-X(invite ? 14 : 16)}
+          marginBottom={-X(invite ? 14 : 16)}
+        />
+        <CustomText
+          label={invite ? "Earn Benefits & more!" : "Super Likes, Boosts, Rewinds!"}
+          fontSize={14}
+          color="rgba(255, 255, 255, 0.64)"
+          marginTop={-X(14)}
+          marginBottom={-X(14)}
+        />
+      </View>
     </TouchableOpacity>
   );
 };
@@ -54,44 +59,18 @@ export default ExtrasCard;
 
 const styles = StyleSheet.create({
   card: {
-    height: 120,
-    borderRadius: 14,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: COLORS.inputBg,
-  },
-  iconRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginLeft: 12,
-    marginTop: 12,
-  },
-  container: {
     flex: 1,
-    justifyContent: "flex-end",
-    marginVertical: 8,
-    marginHorizontal: 12,
+    minHeight: 139,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.04)",
+    paddingVertical: 24,
+    paddingHorizontal: 12,
+    gap: 16,
+    justifyContent: "flex-start",
+    overflow: "hidden",
   },
-  title: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontFamily: fonts.medium,
-  },
-  subtitle: {
-    color: COLORS.subtitle,
-    fontSize: 14,
-  },
-  icon: {
-    height: 28,
-    width: 28,
-    resizeMode: "contain",
-  },
-  addUser: {
-    height: 24,
-    width: 24,
-    resizeMode: "contain",
-    marginLeft: 12,
-    marginTop: 12,
-  },
+  iconRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  icon: { width: 24, height: 24, resizeMode: "contain" },
+  texts: { gap: 12 },
 });

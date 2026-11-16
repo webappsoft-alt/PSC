@@ -39,6 +39,7 @@ import { setStoryUploadStatus } from "../../../store/reducer/appSlice";
 import { COLORS } from "../../../utils/COLORS";
 import { uploadAndGetUrl, uploadFileGetUrl } from "../../../utils/constants";
 import { ToastMessage } from "../../../utils/ToastMessage";
+import { HELD_MESSAGE, blockedMessage, isHeld } from "../../../utils/moderation";
 import { useIsForeground } from "../../../utils/UseIsForground";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -434,7 +435,7 @@ const CameraScreen = ({ isCameraActive = true }) => {
         const res = await post("stories", payload);
         if (res.data?.success) {
           dispatch(setStoryUploadStatus("success"));
-          ToastMessage("Story uploaded", "success");
+          ToastMessage(isHeld(res) ? HELD_MESSAGE : "Story uploaded", "success");
           // Reset to idle after 5 seconds to clear the success UI
           setTimeout(() => {
             dispatch(setStoryUploadStatus("idle"));
@@ -443,7 +444,7 @@ const CameraScreen = ({ isCameraActive = true }) => {
       } catch (error) {
         console.log("Story upload failed:", error);
         dispatch(setStoryUploadStatus("error"));
-        ToastMessage("Failed to upload story", "error");
+        ToastMessage(blockedMessage(error) || "Failed to upload story", "error");
       } finally {
         if (isMounted.current) setIsUploadingStory(false);
       }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import Svg, { Rect } from "react-native-svg";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import Animated, {
   Easing,
   cancelAnimation,
@@ -20,6 +20,10 @@ const AnimatedRect = Animated.createAnimatedComponent(Rect);
  *
  * The dash length is fitted to the measured perimeter so the pattern tiles a
  * whole number of times — the loop and the corners never show a seam.
+ *
+ * `colors` (e.g. the French tricolour ["#2F6BFF", "#FFFFFF", "#EE1045"])
+ * paints the travelling dashes with a left → right gradient instead of one
+ * `color`.
  */
 export default function AnimatedDashedBorder({
   color,
@@ -29,8 +33,12 @@ export default function AnimatedDashedBorder({
   gapLength = 8,
   speed = 7,
   direction = "clockwise",
+  lineCap = "butt",
+  colors,
   style,
 }) {
+  const gradientId = useMemo(() => `dashGrad${Math.random().toString(36).slice(2, 8)}`, []);
+  const multi = Array.isArray(colors) && colors.length > 1;
   const [size, setSize] = useState(null);
   const offset = useSharedValue(0);
   const reducedMotion = useReducedMotion();
@@ -100,6 +108,15 @@ export default function AnimatedDashedBorder({
     >
       {geometry && size ? (
         <Svg width={size.width} height={size.height}>
+          {multi ? (
+            <Defs>
+              <LinearGradient id={gradientId} x1="0" y1="0" x2={size.width} y2="0" gradientUnits="userSpaceOnUse">
+                {colors.map((c, i) => (
+                  <Stop key={i} offset={i / (colors.length - 1)} stopColor={c} />
+                ))}
+              </LinearGradient>
+            </Defs>
+          ) : null}
           <AnimatedRect
             x={geometry.inset}
             y={geometry.inset}
@@ -108,10 +125,10 @@ export default function AnimatedDashedBorder({
             rx={geometry.r}
             ry={geometry.r}
             fill="none"
-            stroke={color}
+            stroke={multi ? `url(#${gradientId})` : color}
             strokeWidth={strokeWidth}
             strokeDasharray={`${geometry.dash} ${geometry.gap}`}
-            strokeLinecap="butt"
+            strokeLinecap={lineCap}
             animatedProps={animatedProps}
           />
         </Svg>

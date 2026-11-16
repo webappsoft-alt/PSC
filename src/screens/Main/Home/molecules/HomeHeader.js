@@ -5,7 +5,6 @@ import fonts from "../../../../assets/fonts";
 import {
   HomeBellSvg,
   HomeChatSvg,
-  HomeSearchSvg,
 } from "../../../../assets/svgs";
 import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
@@ -179,8 +178,10 @@ const HomeHeader = ({ isShort, isHome, isLive, pagerProgress, onSetPage }) => {
           <TouchableOpacity
             onPress={() => navigation.navigate("SearchScreen")}
             activeOpacity={0.7}
+            style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}
           >
-            <HomeSearchSvg width={40} height={40} color={COLORS.white} />
+            {/* same `search` glyph as the Search screen field */}
+            <Icons size={24} name="search" family="MaterialSymbolsRounded" color={COLORS.white} />
           </TouchableOpacity>
 
           <TouchableOpacity

@@ -6,6 +6,8 @@ import fonts from "../../../../assets/fonts";
 import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import ImageFastViewer from "../../../../components/ImageFastViewer";
+import LogoAvatar, { LOGO_INSET, isLogoAvatar } from "../../../../components/LogoAvatar";
+import { titleCase } from "../../../../utils/career";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import moment from "moment";
 import {
@@ -85,6 +87,10 @@ export default function ProfileCard({
   const isCompany = user?.role === "company";
   const politicalValue = getProfileLabel(user);
   const politicalChip = getOrientation(politicalValue);
+  // my own profile without a label yet → "Insufficient Data" chip so I can
+  // still open the map and my Interaction History
+  const politicalPending =
+    !isOtherUser && !politicalChip && ["PENDING", "INSUFFICIENT_DATA"].includes(user?.political?.aiAnalysisStatus);
 
   const ink = (a) =>
     isDark ? `rgba(255, 255, 255, ${a})` : `rgba(18, 18, 18, ${a})`;
@@ -93,15 +99,7 @@ export default function ProfileCard({
   const text64 = ink(0.64);
   const BLUE = "rgba(0, 123, 255, 1)";
 
-  const followText = isFriend
-    ? "Friend"
-    : isFollowing || user?.isRequestApproved === true
-    ? "Following"
-    : user?.isRequestApproved === false
-    ? "Request Sent"
-    : isRequested
-    ? "Requested"
-    : "Follow";
+  const followText = getFollowText({ user, isFriend, isFollowing, isRequested });
   const isFollowState = followText === "Follow";
   const canMessage = followText === "Following" || followText === "Friend";
 
@@ -134,8 +132,19 @@ export default function ProfileCard({
   const followerPreviews = (user?.followerPreviews || []).slice(0, 3);
 
   const education = user?.education?.[0];
-  const industries = (user?.industry || []).slice(0, 3);
-  const bio = user?.profile?.bio
+  // a company's first industry is already its category row ("Transportation"),
+  // so its chip would repeat it — keep only the other industries as chips
+  const rawIndustries = Array.isArray(user?.industry) ? user.industry : user?.industry ? [user.industry] : [];
+  const categoryKey = String(rawIndustries[0] || user?.profile?.category || "").trim().toLowerCase();
+  const industries = (isCompany
+    ? rawIndustries.filter((i) => String(i).trim().toLowerCase() !== categoryKey)
+    : rawIndustries
+  ).slice(0, 3);
+  // imported company profiles: the long bio lives in the About tab, the card
+  // gets the one-line description (Figma Careem: short bio in the card)
+  const bio = isLogoAvatar(user)
+    ? user?.publicInfo?.tagline || ""
+    : user?.profile?.bio
     ? user.profile.bio
     : isOtherUser
     ? "No Bio Available"
@@ -165,7 +174,7 @@ export default function ProfileCard({
         />
       );
     }
-    return (
+    const viewer = (style, resizeMode) => (
       <ImageFastViewer
         isView
         profile
@@ -175,9 +184,15 @@ export default function ProfileCard({
         followText={followText}
         name={name}
         source={{ uri: user.profile.avatar }}
-        style={{ height: size, width: size, borderRadius: 100 }}
+        style={style}
+        resizeMode={resizeMode}
       />
     );
+    if (isLogoAvatar(user)) {
+      const inner = Math.round(size * (1 - 2 * LOGO_INSET));
+      return <LogoAvatar size={size}>{viewer({ height: inner, width: inner }, "contain")}</LogoAvatar>;
+    }
+    return viewer({ height: size, width: size, borderRadius: 100 });
   };
 
   const Stat = ({ value, label, onPress }) => (
@@ -269,7 +284,7 @@ export default function ProfileCard({
               <Icons family={MSF} name="category" size={16} color={text64} />
               <CustomText
                 label={
-                  companyCategory ||
+                  titleCase(companyCategory) ||
                   (isOtherUser ? "No category added" : "Add your category")
                 }
                 fontFamily={fonts.medium}
@@ -423,7 +438,7 @@ export default function ProfileCard({
       </View>
 
       {/* Industry chips (other users) + PSC political label (Figma "Chips") */}
-      {(isOtherUser && industries.length > 0) || politicalChip ? (
+      {(isOtherUser && industries.length > 0) || politicalChip || politicalPending ? (
         <View style={[styles.chips, { marginTop: layout.gap - ROW_EXTRA }]}>
           {isOtherUser &&
             industries.map((item, index) => (
@@ -441,7 +456,7 @@ export default function ProfileCard({
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() =>
-                navigation.navigate("PoliticalInformation", { value: politicalChip.value })
+                navigation.navigate("PoliticalInformation", { value: politicalChip.value, userId: user?._id })
               }
               style={[styles.chip, styles.politicalChip, { backgroundColor: politicalChip.chipBg }]}
             >
@@ -454,11 +469,21 @@ export default function ProfileCard({
               <Icons family={MS} name="info" size={12} color="rgba(255, 255, 255, 0.64)" />
             </TouchableOpacity>
           )}
+          {politicalPending && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate("PoliticalInformation", { value: null, userId: user?._id })}
+              style={[styles.chip, styles.politicalChip, { backgroundColor: ink(0.04) }]}
+            >
+              <CustomText label="Insufficient Data" fontFamily={fonts.medium} fontSize={12} color={text48} />
+              <Icons family={MS} name="info" size={12} color={text48} />
+            </TouchableOpacity>
+          )}
         </View>
       ) : null}
 
       {/* Bio — previous block ends in a 24/52pt box (no extra) or a text row */}
-      <CustomText
+      {!!bio && <CustomText
         onPress={() => !isOtherUser && navigation.navigate("AccountInfo")}
         label={bio}
         color={text64}
@@ -466,10 +491,10 @@ export default function ProfileCard({
         marginTop={
           layout.gap -
           BIO_EXTRA -
-          (!(isOtherUser && industries.length > 0) && !politicalChip ? ROW_EXTRA : 0)
+          (!(isOtherUser && industries.length > 0) && !politicalChip && !politicalPending ? ROW_EXTRA : 0)
         }
         marginBottom={isOtherUser ? 0 : -BIO_EXTRA}
-      />
+      />}
 
       {/* Other user: Follow / Following + Mention (+ message) */}
       {isOtherUser && (
@@ -527,6 +552,18 @@ export default function ProfileCard({
     </View>
   );
 }
+
+/** Follow button wording (also the compact scrolled header's pill). */
+export const getFollowText = ({ user, isFriend, isFollowing, isRequested }) =>
+  isFriend
+    ? "Friend"
+    : isFollowing || user?.isRequestApproved === true
+    ? "Following"
+    : user?.isRequestApproved === false
+    ? "Request Sent"
+    : isRequested
+    ? "Requested"
+    : "Follow";
 
 const PreviewAvatar = ({ item, size }) =>
   item?.profile?.avatar ? (

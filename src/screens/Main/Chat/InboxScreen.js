@@ -37,6 +37,7 @@ import { openCamera, openPicker } from "react-native-image-crop-picker";
 import moment from "moment";
 import AnimatedListItem from "../../../utils/AnimatedListItem";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { insertMention, mentionName, mentionRanges } from "../../../utils/mentions";
 
 /**
  * Figma Inbox_General-Default (2212:7108) dividers.
@@ -112,6 +113,13 @@ const dividerStyles = StyleSheet.create({
   },
 });
 
+// The socket acks a send with { success, message: <saved message> } (older
+// code read `data`): take whichever holds the saved message object.
+const sentMessage = (response) => {
+  const m = response?.message ?? response?.data;
+  return m && typeof m === "object" && m._id ? m : null;
+};
+
 const InboxScreen = ({ route }) => {
   const navigation = useNavigation();
   const { socket } = useSocket();
@@ -126,6 +134,9 @@ const InboxScreen = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
+  // "@" mentions picked while typing: [{ user, name }] (ranges derive from text)
+  const [inputMentions, setInputMentions] = useState([]);
+  const inputRanges = mentionRanges(inputText, inputMentions);
   const [replyMessage, setReplyMessage] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
@@ -378,10 +389,14 @@ const InboxScreen = ({ route }) => {
     if (!socket) return;
     if (type === "text" && !inputText.trim()) return;
 
+    const ranges = type === "text" ? mentionRanges(inputText, inputMentions) : [];
     const payload = {
       ...target,
       content: inputText,
       type: type,
+      ...(ranges.length && {
+        mentions: ranges.map((r) => ({ user: r.user?._id, offset: r.offset, length: r.length })),
+      }),
       ...(attachment && { attachment }),
       ...(replyMessage && { replyTo: replyMessage._id }),
     };
@@ -393,6 +408,7 @@ const InboxScreen = ({ route }) => {
       receiverId: recipientId,
       content: inputText,
       type: type,
+      ...(ranges.length && { mentions: ranges }),
       status: "sending",
       timestamp: new Date().toISOString(),
       createdAt: new Date().toISOString(),
@@ -404,25 +420,34 @@ const InboxScreen = ({ route }) => {
 
     if (replyMessage) {
       socket.emit("reply:message", payload, (response) => {
-        if (response.success && response.data) {
+        if (response?.success && sentMessage(response)) {
           setMessages((prev) =>
-            prev.map((m) => (m._id === tempId ? response.data : m)),
+            prev.map((m) => (m._id === tempId ? sentMessage(response) : m)),
           );
           setReplyMessage(null);
+        } else if (response && !response.success) {
+          // refused (e.g. blocked link): drop the placeholder and say why
+          setMessages((prev) => prev.filter((m) => m._id !== tempId));
+          ToastMessage(response.error || "Message not sent", "error");
         }
       });
     } else {
       socket.emit("send:message", payload, (response) => {
-        if (response.success && response.data) {
+        if (response?.success && sentMessage(response)) {
           setMessages((prev) =>
-            prev.map((m) => (m._id === tempId ? response.data : m)),
+            prev.map((m) => (m._id === tempId ? sentMessage(response) : m)),
           );
+        } else if (response && !response.success) {
+          // refused (e.g. blocked link): drop the placeholder and say why
+          setMessages((prev) => prev.filter((m) => m._id !== tempId));
+          ToastMessage(response.error || "Message not sent", "error");
         }
       });
     }
 
     // Optimistic UI could be added here
     setInputText("");
+    setInputMentions([]);
     setReplyMessage(null);
   };
 
@@ -437,7 +462,8 @@ const InboxScreen = ({ route }) => {
   const pickFromLibrary = async () => {
     try {
       const picked = await openPicker({ mediaType: "any", cropping: false });
-      if (picked?.path) handleMediaSelect(picked);
+      // client: label chat media "From the gallery"
+      if (picked?.path) handleMediaSelect({ ...picked, source: "gallery" });
     } catch (e) {
       // cancelled
     }
@@ -447,7 +473,7 @@ const InboxScreen = ({ route }) => {
   const takePhoto = async () => {
     try {
       const shot = await openCamera({ mediaType: "any", cropping: false });
-      if (shot?.path) handleMediaSelect(shot);
+      if (shot?.path) handleMediaSelect({ ...shot, source: "camera" });
     } catch (e) {
       if (String(e?.message || "").toLowerCase().includes("permission")) {
         ToastMessage("Please allow camera access in Settings", "error");
@@ -459,7 +485,7 @@ const InboxScreen = ({ route }) => {
     try {
       const picked = await openPicker({ mediaType: "photo", cropping: false });
       if (!picked?.path) return;
-      if (String(picked.mime || "").includes("gif")) setGifPreview(picked);
+      if (String(picked.mime || "").includes("gif")) setGifPreview({ ...picked, source: "gallery" });
       else ToastMessage("Please pick a GIF", "error");
     } catch (e) {
       // cancelled
@@ -481,7 +507,7 @@ const InboxScreen = ({ route }) => {
       receiverId: recipientId,
       content: caption,
       type: isVideo ? "file" : "image",
-      attachment: { url: result.path },
+      attachment: { url: result.path, source: result.source },
       status: "sending",
       timestamp: new Date().toISOString(),
       createdAt: new Date().toISOString(),
@@ -513,6 +539,7 @@ const InboxScreen = ({ route }) => {
             filename: result.filename || result.path.split("/").pop(),
             mimetype: result.mime,
             size: result.size,
+            ...(result.source ? { source: result.source } : {}),
             ...(isVideo
               ? {}
               : { dimensions: { width: result.width, height: result.height } }),
@@ -522,9 +549,9 @@ const InboxScreen = ({ route }) => {
 
         const eventName = replyMessage ? "reply:message" : "send:message";
         socket.emit(eventName, payload, (response) => {
-          if (response.success && response.data) {
+          if (response?.success && sentMessage(response)) {
             setMessages((prev) =>
-              prev.map((m) => (m._id === tempId ? response.data : m)),
+              prev.map((m) => (m._id === tempId ? sentMessage(response) : m)),
             );
             setReplyMessage(null);
           }
@@ -605,9 +632,9 @@ const InboxScreen = ({ route }) => {
         socket.emit(eventName, payload, (response) => {
           console.log("response.success----", response);
 
-          if (response.success && response.data) {
+          if (response?.success && sentMessage(response)) {
             setMessages((prev) =>
-              prev.map((m) => (m._id === tempId ? response.data : m)),
+              prev.map((m) => (m._id === tempId ? sentMessage(response) : m)),
             );
             setReplyMessage(null);
           }
@@ -675,6 +702,16 @@ const InboxScreen = ({ route }) => {
         <ChatFooter
           // item={item}
           setInputText={handleTyping}
+          mentionRanges={inputRanges}
+          onPickMention={(user) => {
+            if (!user?._id) return;
+            setInputText((t) => insertMention(t, user));
+            setInputMentions((prev) => [
+              // the text order is the insertion order (always at the end)
+              ...prev.filter((p) => mentionRanges(inputText, [p]).length),
+              { user, name: mentionName(user) },
+            ]);
+          }}
           sendMessage={handleSend}
           inputText={inputText}
           replyMessage={replyMessage}
@@ -781,11 +818,12 @@ const InboxScreen = ({ route }) => {
                     "send:message",
                     { ...target, content: "Hi 👋", type: "text" },
                     (response) => {
-                      if (response?.success && response?.data) {
+                      const saved = sentMessage(response);
+                      if (response?.success && saved) {
                         setMessages((prev) =>
-                          prev.some((m) => m._id === response.data._id)
+                          prev.some((m) => m._id === saved._id)
                             ? prev
-                            : [response.data, ...prev],
+                            : [saved, ...prev],
                         );
                       }
                     },

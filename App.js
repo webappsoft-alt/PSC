@@ -37,6 +37,7 @@ import { FontScaleProvider } from "./src/contexts/FontScaleContext";
 import { HighContrastProvider } from "./src/contexts/HighContrastContext";
 import SocketProvider from "./src/components/SocketProvider";
 import GlobalToast from "./src/components/GlobalToast";
+import AnimatedSplash from "./src/components/AnimatedSplash";
 import UploadProgress from "./src/components/UploadProgress";
 import InAppNotification from "./src/components/InAppNotification";
 import { useNotificationNavigation } from "./src/hooks/useNotificationNavigation";
@@ -134,6 +135,7 @@ const AppContent = () => {
     prefixes: ["psc://", "https://psc.sola-group.ch"],
     config: {
       screens: {
+        ClaimProfile: "claim",
         MainStack: {
           screens: {
             DetailPageWithId: "post/:postId",
@@ -169,6 +171,7 @@ const AppContent = () => {
   const [isConnected, setIsConnected] = useState(true);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   const [showNetworkError, setShowNetworkError] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   // Copy the topic Lotties to local files at launch (Viral does the same in
   // app/_layout) so the topic sheets paint their icons on the first frame.
@@ -377,6 +380,8 @@ const AppContent = () => {
               </GestureHandlerRootView>
             </PersistGate>
           </Provider>
+          {/* animated launch screen, above everything until it fades out */}
+          {showSplash ? <AnimatedSplash onFinish={() => setShowSplash(false)} /> : null}
         </StripeProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

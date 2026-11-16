@@ -76,11 +76,19 @@ export const StatusChip = ({ chip }) =>
  * irreversible", red 48 r100 button with `delete` 24 white + "Yes, Delete
  * This Offer" Medium 16 white (gap 4).
  */
-export const DeleteOfferSheet = ({ visible, onDismiss, onConfirm, busy, onClosed }) => (
+export const DeleteOfferSheet = ({
+  visible,
+  onDismiss,
+  onConfirm,
+  busy,
+  onClosed,
+  title = "Delete This Offer",
+  confirmLabel = "Yes, Delete This Offer",
+}) => (
   <FloatingSheet
     visible={visible}
     onDismiss={onDismiss}
-    title="Delete This Offer"
+    title={title}
     subtitle="This is irreversible"
     closeIconSize={16}
     closeIconColor="muted"
@@ -89,7 +97,7 @@ export const DeleteOfferSheet = ({ visible, onDismiss, onConfirm, busy, onClosed
   >
     <TouchableOpacity activeOpacity={0.8} disabled={busy} onPress={onConfirm} style={[styles.deleteBtn, busy && { opacity: 0.5 }]}>
       <Icons family={MSF} name="delete_forever" size={24} color="#FFFFFF" />
-      <CustomText label="Yes, Delete This Offer" fontSize={16} fontFamily={fonts.medium} color="#FFFFFF" />
+      <CustomText label={confirmLabel} fontSize={16} fontFamily={fonts.medium} color="#FFFFFF" />
     </TouchableOpacity>
   </FloatingSheet>
 );

@@ -130,6 +130,7 @@ const ChangeUsername = () => {
 
             <CustomInput
               withLabel="Username"
+              prefix="@"
               placeholder="viktorsola"
               value={username}
               maxLength={MAX_LENGTH}

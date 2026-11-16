@@ -21,6 +21,7 @@ import { setUserData } from "../../../../store/reducer/usersSlice";
 import { COLORS } from "../../../../utils/COLORS";
 import { uploadAndGetUrl } from "../../../../utils/constants";
 import { ToastMessage } from "../../../../utils/ToastMessage";
+import { blockedMessage } from "../../../../utils/moderation";
 import UserBadge from "../../../../components/UserBadge";
 
 const BannerModal = ({ isVisible, onClose, user, onHidePress }) => {
@@ -70,8 +71,11 @@ const BannerModal = ({ isVisible, onClose, user, onHidePress }) => {
         }
       }
     } catch (error) {
-      console.error("Banner upload error:", error);
-      ToastMessage("An error occurred while uploading banner", "error");
+      if (!blockedMessage(error)) console.error("Banner upload error:", error);
+      ToastMessage(
+        blockedMessage(error) || "An error occurred while uploading banner",
+        "error",
+      );
     } finally {
       setImgLoading(false);
     }

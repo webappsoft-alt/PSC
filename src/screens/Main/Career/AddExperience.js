@@ -55,6 +55,8 @@ const AddExperience = ({ route }) => {
   );
   const [employmentType, setEmploymentType] = useState(item?.employmentType || "");
   const [current, setCurrent] = useState(item?.current ?? true);
+  // primary employer → its logo shows beside the name once verified
+  const [primary, setPrimary] = useState(!!item?.primary);
   const [startDate, setStartDate] = useState(item?.startDate ? new Date(item.startDate) : null);
   const [endDate, setEndDate] = useState(item?.endDate ? new Date(item.endDate) : null);
   const [rating, setRating] = useState({
@@ -112,6 +114,7 @@ const AddExperience = ({ route }) => {
         companyName: company?.name,
         employmentType,
         current,
+        primary: current && primary,
         startDate,
         endDate: current ? null : endDate,
         location: company?.address?.city
@@ -208,6 +211,15 @@ const AddExperience = ({ route }) => {
               switchValue={current}
               onSwitch={setCurrent}
             />
+            {current && (
+              <FieldBox
+                label="Primary employer"
+                value={primary ? "Yes" : "No"}
+                trailing="switch"
+                switchValue={primary}
+                onSwitch={setPrimary}
+              />
+            )}
             <View style={styles.dateRow}>
               <View style={styles.grow}>
                 <CustomDatePicker

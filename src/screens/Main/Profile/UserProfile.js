@@ -6,7 +6,9 @@ import {
 import moment from "moment";
 import { useCallback, useEffect, useState } from "react";
 import {
+  Animated,
   BackHandler,
+  Dimensions,
   FlatList,
   Image,
   RefreshControl,
@@ -31,13 +33,29 @@ import DelImagesModal from "./molecules/DelImagesModal";
 import LockInfo from "./molecules/LockInfo";
 import MediaGrid from "./molecules/MediaGrid";
 import CareerTab from "./molecules/CareerTab";
-import ProfileCard, { getProfileCardLayout } from "./molecules/ProfileCard";
+import CompanyAboutTab from "./molecules/CompanyAboutTab";
+import CompanyListsTab from "./molecules/CompanyListsTab";
+import TabEmptyState from "./molecules/TabEmptyState";
+import ProfileCard, { getFollowText, getProfileCardLayout } from "./molecules/ProfileCard";
 import ProfileCardSkeleton from "./molecules/ProfileCardSkeleton";
 import ProfileHeader from "./molecules/ProfileHeader";
+import ProfileCompactHeader, { ProfileSortRow, TabFade } from "./molecules/ProfileCompactHeader";
+import PostsGrid from "./molecules/PostsGrid";
+import useCompactProfileHeader from "./molecules/useCompactProfileHeader";
 
-// Figma Profile tabs: Posts · Career · Reposts … (Career = Jobs module)
-const CAREER_TAB = 1;
-const MEDIA_TAB = 4;
+// Figma Profile tabs: Posts · Career · Reposts … (Career = Jobs module).
+// Company / Pro entity profiles (Figma Careem): About · Posts · Mentions ·
+// Media · Jobs · Events. Tabs are handled by name so both sets share the
+// same fetching / rendering.
+const PERSON_TABS = ["Posts", "Career", "Reposts"];
+const OWN_EXTRA_TABS = ["Mentions", "Media", "Replies", "Liked", "Saved"];
+const COMPANY_TABS = ["About", "Posts", "Mentions", "Media", "Jobs", "Events"];
+const POST_QUERY = { Reposts: "reposts=true", Mentions: "mentions=true", Replies: "comments=true", Liked: "likes=true" };
+const NO_POSTS = ["About", "Career", "Jobs", "Events"];
+// tabs served by posts/user (sortable) · tabs shown as a post list (grid-able)
+const SORTABLE = ["Posts", "Reposts", "Mentions", "Replies", "Liked"];
+const LISTS = [...SORTABLE, "Saved"];
+const isCompanyProfile = (u) => u?.role === "company" || !!u?.external?.wikidataQid;
 
 const UserProfile = ({ route }) => {
   const item = route?.params?.item;
@@ -59,6 +77,13 @@ const UserProfile = ({ route }) => {
   const [mediaSelectedCount, setMediaSelectedCount] = useState(0);
   const [mediaDeleteHandler, setMediaDeleteHandler] = useState(null);
   const [isRequested, setIsRequested] = useState(false);
+  // compact header sort row: "recent" | "popular", layout "list" | "grid"
+  const [sortKey, setSortKey] = useState("recent");
+  const [postLayout, setPostLayout] = useState("list");
+  // the ScrollView's native-driven scroll value (ScreenWrapper hands it over
+  // from its sticky header) → the compact header animates on the UI thread
+  const [stickyScroll, setStickyScroll] = useState(null);
+  const compact = useCompactProfileHeader(stickyScroll);
 
   const userId =
     route?.params?.userId ||
@@ -91,6 +116,13 @@ const UserProfile = ({ route }) => {
   );
   const [localUser, setLocalUser] = useState(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  // which "<userId>|<tab>" the rows on screen belong to — the empty state
+  // may only show once this matches (no flash before the response)
+  const [loadedKey, setLoadedKey] = useState(null);
+  const viewingSelf = !!userData?._id && userData?._id === localUser?._id;
+  const tabNames =
+    isCompanyProfile(localUser) && !viewingSelf ? COMPANY_TABS : [...PERSON_TABS, ...(viewingSelf ? OWN_EXTRA_TABS : [])];
+  const tabKey = tabNames[tab] || tabNames[0];
 
   // console.log("localUser---", localUser?.stats);
   // console.log("current User---", userData?._id);
@@ -101,7 +133,14 @@ const UserProfile = ({ route }) => {
       return;
     }
     try {
-      setIsProfileLoading(true);
+      // skeleton only on the first load (or another user's id): a focus
+      // refetch updates the data silently instead of flashing the top half
+      if (!localUser) {
+        setIsProfileLoading(true);
+      } else if (String(localUser._id) !== String(userId)) {
+        setLocalUser(null);
+        setIsProfileLoading(true);
+      }
       const response = await get(`user/profile-views/${userId}`);
       if (response?.data?.success) {
         setLocalUser(response.data.data);
@@ -210,32 +249,32 @@ const UserProfile = ({ route }) => {
       let queryParams = `type=post&${userId}`;
       let endpoint = `posts/user/${userId}`;
 
-      if (tab === CAREER_TAB) {
+      if (NO_POSTS.includes(tabKey)) {
         setLoading(false);
         setRefreshing(false);
+        setLoadedKey(`${userId}|${tabKey}`);
         return;
       }
-      if (tab === 2) queryParams = `reposts=true&${userId}`;
-      else if (tab === 3) queryParams = `mentions=true&${userId}`;
-      else if (tab === 5) queryParams = `comments=true&${userId}`;
-      else if (tab === 6) queryParams = `likes=true&${userId}`;
-      else if (tab === 7) {
+      if (POST_QUERY[tabKey]) queryParams = `${POST_QUERY[tabKey]}&${userId}`;
+      else if (tabKey === "Saved") {
         endpoint = "saved";
         queryParams = `page=1&limit=10&${userId}`;
-      } else if (tab === MEDIA_TAB) {
+      } else if (tabKey === "Media") {
         endpoint = "posts/media";
-        queryParams = `page=1&limit=20&${userId}`;
+        queryParams = `page=1&limit=20&userId=${userId}`;
       }
+
+      if (sortKey === "popular" && SORTABLE.includes(tabKey)) queryParams += "&sortBy=popular";
 
       const response = await get(`${endpoint}?${queryParams}`);
 
       if (response?.data?.success) {
         let resultData = response.data.data;
-        if (tab === MEDIA_TAB) {
+        if (tabKey === "Media") {
           // Transform media response for MediaGrid
           resultData = resultData.map((item, index) => ({
             ...item,
-            id: item.media,
+            id: `${item.postId || "m"}-${index}`,
             uri: item.media,
             dateLabel: moment(item.createdAt).format("DD MMM, YYYY"),
             isMediaTab: true,
@@ -251,6 +290,7 @@ const UserProfile = ({ route }) => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadedKey(`${userId}|${tabKey}`);
     }
   };
 
@@ -329,34 +369,14 @@ const UserProfile = ({ route }) => {
   useEffect(() => {
     fetchPosts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, tab]);
+  }, [userId, tab, tabKey, sortKey]);
 
   const renderListEmpty = () => {
     if (loading) return null;
 
-    if (error) {
-      return (
-        <View style={styles.centerContainer}>
-          <CustomText
-            label={error}
-            color={colors.textSecondary}
-            fontSize={16}
-            textAlign={"center"}
-          />
-        </View>
-      );
-    }
+    if (error) return <TabEmptyState tabKey={tabKey} text={error} />;
 
-    return (
-      <View style={styles.centerContainer}>
-        <CustomText
-          label={"No post found"}
-          color={colors.textSecondary}
-          fontSize={16}
-          textAlign={"center"}
-        />
-      </View>
-    );
+    return <TabEmptyState tabKey={tabKey} />;
   };
 
   const openComments = useCallback(
@@ -424,6 +444,7 @@ const UserProfile = ({ route }) => {
         scrollEnabled
         translucent
         stickyHeaderIndices={[1]}
+        onStickyScrollValue={setStickyScroll}
         // the banner header floats and the profile scrolls under it (its
         // own Figma background: banner, tier gradient, or #121212 64% + blur
         // 32); the tabs stick right below it
@@ -438,6 +459,7 @@ const UserProfile = ({ route }) => {
         headerUnScrollable={() => (
           <>
             <ProfileHeader
+              contentOpacity={compact.anim?.bigHeaderOpacity}
               isBack
               loading={isProfileLoading}
               user={localUser}
@@ -453,6 +475,7 @@ const UserProfile = ({ route }) => {
           </>
         )}
       >
+        <View onLayout={compact.onCardLayout}>
         {isProfileLoading ? (
           <ProfileCardSkeleton />
         ) : (
@@ -479,15 +502,18 @@ const UserProfile = ({ route }) => {
             showTopTab={false}
           />
         )}
+        </View>
 
         {/* Figma: tabs close the info block (Premium 20/16 · Premium+ 12/12),
             32pt chips, padding 12, Medium 14 / −0.5, tier accent */}
-        <View
+        <Animated.View
           style={{
             backgroundColor: colors.background,
             paddingTop: cardLayout.outerGap,
             paddingBottom: cardLayout.padTop,
             paddingHorizontal: 12,
+            // hands over to the compact header's icon tabs
+            opacity: compact.anim ? compact.anim.textTabsOpacity : 1,
           }}
         >
           {!isProfileLoading && (
@@ -496,14 +522,7 @@ const UserProfile = ({ route }) => {
               tab={tab}
               oval
               setTab={setTab}
-              tabNames={[
-                "Posts",
-                "Career",
-                "Reposts",
-                ...(isMeProfile
-                  ? ["Mentions", "Media", "Replies", "Liked", "Saved"]
-                  : []),
-              ]}
+              tabNames={tabNames}
               paddingHorizontal={isMeProfile ? 14 : 12}
               height={32}
               borderWidth={1}
@@ -516,10 +535,14 @@ const UserProfile = ({ route }) => {
               textLetterSpacing={-0.5}
             />
           )}
-        </View>
+        </Animated.View>
 
+        {/* at least a screen tall: switching to a short tab while the compact
+            header is showing keeps the page pinned instead of jumping up */}
+        <View style={{ minHeight: Dimensions.get("window").height }}>
         <View style={sectionGapStyle} />
 
+        <TabFade key={`tab-${tabKey}-${postLayout}`}>
         {(() => {
           const isMe = userData?._id === localUser?._id;
           const isFollowing = localUser?.stats?.followers?.includes(
@@ -536,7 +559,15 @@ const UserProfile = ({ route }) => {
             return <LockInfo coverImage={localUser?.profile?.cover} />;
           }
 
-          if (tab === CAREER_TAB) {
+          if (tabKey === "About") {
+            return <CompanyAboutTab user={localUser} />;
+          }
+
+          if (tabKey === "Jobs" || tabKey === "Events") {
+            return <CompanyListsTab kind={tabKey === "Jobs" ? "jobs" : "events"} userId={localUser?._id} viewingSelf={isMe} />;
+          }
+
+          if (tabKey === "Career") {
             return (
               <CareerTab
                 userId={localUser?._id}
@@ -546,10 +577,11 @@ const UserProfile = ({ route }) => {
             );
           }
 
-          if (tab === MEDIA_TAB) {
+          if (tabKey === "Media") {
             return (
               <MediaGrid
                 mediaData={posts}
+                editable={isMe}
                 onDeletePress={handleDeleteSelectedPosts}
                 marginBottom={80}
                 onEditModeChange={(editMode) => setIsMediaEditMode(editMode)}
@@ -561,9 +593,21 @@ const UserProfile = ({ route }) => {
             );
           }
 
-          if (loading) {
+          // Figma sort row above the list (also in the compact header)
+          // hidden until the profile is known (a company opens on About)
+          const sortRow = !isProfileLoading && SORTABLE.includes(tabKey) ? (
+            <ProfileSortRow
+              sortKey={sortKey}
+              onSort={() => setSortKey((k) => (k === "recent" ? "popular" : "recent"))}
+              layout={postLayout}
+              onLayoutToggle={() => setPostLayout((l) => (l === "list" ? "grid" : "list"))}
+            />
+          ) : null;
+
+          if (loading || loadedKey !== `${userId}|${tabKey}`) {
             return (
               <View style={{ flex: 1 }}>
+                {sortRow}
                 {[1, 2, 3, 4, 5].map((_, index) => (
                   <PostCardSkeleton key={index} />
                 ))}
@@ -571,16 +615,30 @@ const UserProfile = ({ route }) => {
             );
           }
 
+          if (postLayout === "grid" && LISTS.includes(tabKey)) {
+            return (
+              <>
+                {sortRow}
+                <PostsGrid posts={posts} ListEmptyComponent={renderListEmpty()} />
+              </>
+            );
+          }
+
           return (
-            <FlatList
-              data={posts}
-              renderItem={renderItem}
-              keyExtractor={(item) => item._id}
-              scrollEnabled={false}
-              ListEmptyComponent={renderListEmpty}
-            />
+            <>
+              {sortRow}
+              <FlatList
+                data={posts}
+                renderItem={renderItem}
+                keyExtractor={(item, i) => String(item?._id ?? item?.id ?? i)}
+                scrollEnabled={false}
+                ListEmptyComponent={renderListEmpty}
+              />
+            </>
           );
         })()}
+        </TabFade>
+        </View>
 
         <DelImagesModal
           isVisible={showDelModal}
@@ -591,8 +649,33 @@ const UserProfile = ({ route }) => {
         />
       </ScreenWrapper>
 
+      {/* Figma "Header-When-Scrolling-Instagram-Inspired" */}
+      {!isProfileLoading && !!localUser && (
+        <ProfileCompactHeader
+          user={localUser}
+          isOwn={isMeProfile}
+          anim={compact.anim}
+          interactive={compact.interactive}
+          tabNames={tabNames}
+          tab={tab}
+          onTab={setTab}
+          followText={getFollowText({
+            user: localUser,
+            isFriend: localUser?.stats?.friends?.includes(userData?._id),
+            isFollowing: localUser?.stats?.followers?.includes(userData?._id),
+            isRequested,
+          })}
+          onFollowPress={handleFollowPress}
+          showSort={SORTABLE.includes(tabKey)}
+          sortKey={sortKey}
+          onSort={() => setSortKey((k) => (k === "recent" ? "popular" : "recent"))}
+          layout={postLayout}
+          onLayoutToggle={() => setPostLayout((l) => (l === "list" ? "grid" : "list"))}
+        />
+      )}
+
       {/* Fixed Delete Button */}
-      {tab === MEDIA_TAB && isMediaEditMode && mediaSelectedCount > 0 && (
+      {tabKey === "Media" && isMediaEditMode && mediaSelectedCount > 0 && (
         <TouchableOpacity
           style={styles.fixedDeleteButton}
           onPress={() => mediaDeleteHandler?.()}

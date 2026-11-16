@@ -54,9 +54,13 @@ const CustomInput = ({
   publishPost,
   errorMarginBottom,
   enableMentionHighlight = false,
+  // picked people's names: "@First Last" is painted as one mention
+  mentionNames = [],
   // publish box: mic button (Figma 36 circle, white 4%, 18pt filled mic)
   onMicPress,
   micActive = false,
+  // fixed text before the value (e.g. "@" on username fields)
+  prefix,
   // extra text style for the field (and its mention overlay)
   inputTextStyle,
 }) => {
@@ -98,7 +102,13 @@ const CustomInput = ({
 
     const parts = [];
     let lastIndex = 0;
-    const mentionRegex = /@\S+/g;
+    const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const names = [...new Set((mentionNames || []).filter(Boolean))].sort(
+      (a, b) => b.length - a.length,
+    );
+    const mentionRegex = names.length
+      ? new RegExp(`@(?:${names.map(esc).join("|")})|@\\S+`, "g")
+      : /@\S+/g;
     let match;
 
     while ((match = mentionRegex.exec(value)) !== null) {
@@ -233,6 +243,9 @@ const CustomInput = ({
               color={colors.textSecondary}
             />
           ) : null}
+          {prefix ? (
+            <CustomText label={prefix} fontSize={16} fontFamily={fonts.regular} color={error ? "#EE1045" : resolvedPlaceholderColor} />
+          ) : null}
 
           <TextInput
             ref={ref}
@@ -243,7 +256,7 @@ const CustomInput = ({
             style={[
               styles.input,
               {
-                width: secureTextEntry ? "91%" : isSwitch ? "80%" : "99%",
+                width: secureTextEntry ? "91%" : isSwitch ? "80%" : prefix ? undefined : "99%",
                 paddingVertical: paddingVertical,
                 paddingLeft: search ? 8 : 0,
                 color: enableMentionHighlight

@@ -36,6 +36,7 @@ import { COLORS } from "../../../utils/COLORS";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { uploadAndGetUrl, uploadFileGetUrl } from "../../../utils/constants";
 import { ToastMessage } from "../../../utils/ToastMessage";
+import { HELD_MESSAGE, blockedMessage, isHeld } from "../../../utils/moderation";
 
 const topics = [
   { name: "Technology", image: Images.Topis1 },
@@ -262,7 +263,9 @@ const CreateAudio = () => {
           const response = await post("radio", payload);
 
           if (response?.data?.success) {
-            completeUpload("Audio post created successfully");
+            completeUpload(
+              isHeld(response) ? HELD_MESSAGE : "Audio post created successfully",
+            );
           } else {
             const errorMessage =
               response?.data?.message ||
@@ -271,8 +274,11 @@ const CreateAudio = () => {
             failUpload(errorMessage);
           }
         } catch (error) {
-          console.error("Error submitting audio:", error);
-          failUpload("Failed to create audio post. Please try again.");
+          if (!blockedMessage(error)) console.error("Error submitting audio:", error);
+          failUpload(
+            blockedMessage(error) ||
+              "Failed to create audio post. Please try again.",
+          );
         } finally {
           setIsSubmitting(false);
         }
@@ -318,6 +324,7 @@ const CreateAudio = () => {
             fontFamily={fonts.medium}
             onPress={handleSubmit}
             loading={isSubmitting}
+            indicatorColor={COLORS.white}
             disabled={
               !title.trim() ||
               !audioUrl ||
@@ -367,7 +374,7 @@ const CreateAudio = () => {
             <View style={styles.audioPickerInner}>
               {audioUploading ? (
                 <>
-                  <ActivityIndicator size="small" color={COLORS.buttonColor} />
+                  <ActivityIndicator size="small" color={COLORS.white} />
                   <CustomText
                     label="Uploading audio..."
                     fontSize={14}
@@ -469,7 +476,7 @@ const CreateAudio = () => {
                   <View style={styles.uploadingIndicator}>
                     <ActivityIndicator
                       size="small"
-                      color={COLORS.buttonColor}
+                      color={COLORS.white}
                     />
                   </View>
                 ) : (

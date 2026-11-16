@@ -19,15 +19,15 @@ import {
 } from "../../../../components/ScreenWrapper";
 import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
-import TopTab from "../../../../components/TopTab";
 import { get } from "../../../../services/ApiRequest";
 import AnimatedListItem from "../../../../utils/AnimatedListItem";
 import { COLORS } from "../../../../utils/COLORS";
 import SearchCard from "./SearchCard";
 import SearchCardSkeleton from "./SearchCardSkeleton";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import TopicChips from "./TopicChips";
 
-const TAB_NAMES = [
+export const TAB_NAMES = [
   "Technology",
   "Politics",
   "Sports",
@@ -137,40 +137,12 @@ const PostTab = ({ isActive }) => {
     >
       {/* starts below the floating blurred header */}
       <ScreenHeaderSpacer />
-      <View
-        style={[
-          styles.row,
-          {
-            marginBottom: 12,
-            paddingHorizontal: 12,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => setTab(null)}
-          activeOpacity={0.7}
-          style={{
-            backgroundColor: tab === null ? (isDark ? COLORS.white : colors.text) : (isDark ? "#FFFFFF0A" : colors.surfaceAlt),
-            height: 32,
-            width: 36,
-            justifyContent: "center",
-            alignItems: "center",
-            borderRadius: 8,
-          }}
-        >
-          <Icons
-            family="MaterialCommunityIcons"
-            name="compass"
-            size={22}
-            color={tab === null ? (isDark ? COLORS.black : COLORS.white) : (isDark ? COLORS.white : colors.textSecondary)}
-          />
-        </TouchableOpacity>
-        <TopTab
-          rounded
-          tab={tab}
-          setTab={setTab}
-          borderRadius={8}
-          tabNames={TAB_NAMES}
+      {/* client: the category tabs are the same as the Home feed's chips */}
+      <View style={{ marginBottom: 12 }}>
+        <TopicChips
+          topics={TAB_NAMES}
+          value={tab === null ? null : TAB_NAMES[tab]}
+          onChange={(t) => setTab(t == null ? null : TAB_NAMES.indexOf(t))}
         />
       </View>
       {loading && !trendingPost ? (

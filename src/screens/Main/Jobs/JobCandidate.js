@@ -1,7 +1,7 @@
 import { useNavigation } from "@react-navigation/native";
 import moment from "moment";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Linking, StyleSheet, TouchableOpacity, View } from "react-native";
 
 import fonts from "../../../assets/fonts";
 import CustomText from "../../../components/CustomText";
@@ -18,10 +18,11 @@ import {
 } from "../../../utils/career";
 import { ToastMessage } from "../../../utils/ToastMessage";
 import { GlassFill } from "../BandMateMatching/molecules/matchLayout";
-import { CareerHeader, GOLD, INK, MS, MSF, SHEET_BG, WHITE_4, WHITE_48, WHITE_64 } from "../Career/molecules/CareerUI";
+import { CareerHeader, FieldBox, GOLD, INK, MS, MSF, SHEET_BG, WHITE_4, WHITE_48, WHITE_64 } from "../Career/molecules/CareerUI";
 import { Item } from "../Profile/molecules/CareerTab";
 import { FilterChip } from "./JobMarketplace";
 import { AnswerBox, BodyText, DetailHero, DetailSection, LanguageRow } from "./JobDetail";
+import { DocumentRow, openDocument } from "../Career/molecules/DocumentUI";
 import { fullName, userPlace } from "./JobOffer";
 import { GREEN, RED } from "./molecules/OfferUI";
 import { DetailSkeleton } from "./molecules/JobSkeletons";
@@ -302,22 +303,75 @@ const JobCandidate = ({ route }) => {
             </>
           )}
 
-          {tab === "Q&A" &&
-            ((job.questions || []).length ? (
-              job.questions.map((q, i) => (
-                <DetailSection key={`q-${i}`} title={q || `Question asked #${i + 1}`}>
-                  <AnswerBox label={`${first}’s answer:`} value={candidate.answers?.[i] || ""} editable={false} placeholder="" />
+          {tab === "Q&A" && (
+            <>
+              {(job.questions || []).length ? (
+                job.questions.map((q, i) => (
+                  <DetailSection key={`q-${i}`} title={q || `Question asked #${i + 1}`}>
+                    <AnswerBox label={`${first}’s answer:`} value={candidate.answers?.[i] || ""} editable={false} placeholder="" />
+                  </DetailSection>
+                ))
+              ) : !candidate.motivation ? (
+                <DetailSection title="Q&A">
+                  <BodyText label="This offer has no questions." />
                 </DetailSection>
-              ))
-            ) : (
-              <DetailSection title="Q&A">
-                <BodyText label="This offer has no questions." />
-              </DetailSection>
-            ))}
+              ) : null}
+              {/* Job-Apply answers (no poster frame yet — same boxes as the form) */}
+              {!!candidate.languages?.length && (
+                <DetailSection title="Language">
+                  <View style={styles.docList}>
+                    {candidate.languages.map((l, i) => (
+                      <LanguageRow key={`${l.code}-${i}`} item={l} />
+                    ))}
+                  </View>
+                </DetailSection>
+              )}
+              {(typeof candidate.hasDegree === "boolean" && !!job.educationDegree) && (
+                <DetailSection title="Education Requirement">
+                  <FieldBox label="Education Degree" value={`${job.educationDegree} · ${candidate.hasDegree ? "Yes" : "No"}`} trailing="none" valueLetterSpacing={0} />
+                </DetailSection>
+              )}
+              {(typeof candidate.hasExperience === "boolean" || !!candidate.experience) && (
+                <DetailSection title="Experience Requirement">
+                  <FieldBox
+                    label="Experience"
+                    value={[candidate.experience, typeof candidate.hasExperience === "boolean" ? (candidate.hasExperience ? "Has this experience" : "Doesn’t have this experience") : null].filter(Boolean).join(" · ")}
+                    trailing="none"
+                    valueLetterSpacing={0}
+                  />
+                </DetailSection>
+              )}
+              {!!candidate.motivation && (
+                <DetailSection title="What Motivates You To Apply Here">
+                  <AnswerBox label={`${first}’s answer:`} value={candidate.motivation} editable={false} placeholder="" maxLength={1000} />
+                </DetailSection>
+              )}
+            </>
+          )}
 
           {tab === "Documents" && (
             <DetailSection title="Documents">
-              <BodyText label={`${first} hasn’t shared any documents yet.`} />
+              {candidate.documents?.length ? (
+                <View style={styles.docList}>
+                  {candidate.documents.map((d, i) => (
+                    <DocumentRow key={`${d.path || d.url}-${i}`} doc={d} onPress={() => openDocument(d)} />
+                  ))}
+                </View>
+              ) : !candidate.portfolioUrl ? (
+                <BodyText label={`${first} hasn’t shared any documents yet.`} />
+              ) : null}
+              {!!candidate.portfolioUrl && (
+                <FieldBox
+                  label="Portfolio URL"
+                  value={candidate.portfolioUrl}
+                  valueLetterSpacing={0}
+                  chevronColor={WHITE_64}
+                  onPress={() => {
+                    const url = /^https?:\/\//i.test(candidate.portfolioUrl) ? candidate.portfolioUrl : `https://${candidate.portfolioUrl}`;
+                    Linking.openURL(url).catch(() => ToastMessage("Could not open the link", "error"));
+                  }}
+                />
+              )}
             </DetailSection>
           )}
 
@@ -344,6 +398,7 @@ const JobCandidate = ({ route }) => {
 export default JobCandidate;
 
 const styles = StyleSheet.create({
+  docList: { gap: 16 },
   header: {},
   loading: { height: 300, alignItems: "center", justifyContent: "center" },
   page: { gap: 1, backgroundColor: SHEET_BG },

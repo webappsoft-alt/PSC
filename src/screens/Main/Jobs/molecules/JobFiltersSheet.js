@@ -68,6 +68,7 @@ const JobFiltersSheet = ({ visible, onDismiss, initialStep = null }) => {
       closeIconSize={16}
       closeIconColor="muted"
       subtitleTrim={-4.9}
+      stepKey={step || "main"}
       onClosed={() => {
         if (!openSalary.current) return;
         openSalary.current = false;

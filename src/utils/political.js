@@ -86,6 +86,7 @@ export const POLITICAL_ORIENTATIONS = [
     tileLabel: "Center",
     chipBg: "rgba(255, 255, 255, 0.08)",
     dot: "rgba(255, 255, 255, 0.64)",
+    activeDot: "rgba(18, 18, 18, 0.64)",
     headerColor: "rgba(255, 255, 255, 0.16)",
     overview:
       "The Center generally seeks a balance between social progress and tradition, combining market economy with a strong rule of law and social cohesion.",

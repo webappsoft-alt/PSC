@@ -7,6 +7,7 @@ import moment from "moment";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Dimensions,
   FlatList,
   Image,
   RefreshControl,
@@ -30,28 +31,47 @@ import { ToastMessage } from "../../../utils/ToastMessage";
 import FeedPostItem from "../Home/molecules/FeedPostItem";
 import PostCardSkeleton from "../Home/molecules/PostCardSkeleton";
 import BannerModal from "./molecules/BannerModal";
+import TabEmptyState from "./molecules/TabEmptyState";
 import DelImagesModal from "./molecules/DelImagesModal";
 import FinalizeProfile from "./molecules/FinalizeProfile";
 import MediaGrid from "./molecules/MediaGrid";
 import CareerTab from "./molecules/CareerTab";
 import ProfileCard, { getProfileCardLayout } from "./molecules/ProfileCard";
 import ProfileHeader from "./molecules/ProfileHeader";
+import ProfileCompactHeader, { ProfileSortRow, TabFade } from "./molecules/ProfileCompactHeader";
+import PostsGrid from "./molecules/PostsGrid";
+import useCompactProfileHeader from "./molecules/useCompactProfileHeader";
 import { getProfile } from "../../../utils/constants";
 import { accentA, getProfileAccent } from "../../../utils/profileTier";
 import { post } from "../../../services/ApiRequest";
+import BirthdaySheet, { useBirthdayGreeting } from "../../../components/BirthdaySheet";
 
 // Figma Profile tabs: Posts · Career · Reposts · Mentions · Media · Replies ·
 // Liked · Saved (Career = the Jobs module's experience / education / skills)
 const CAREER_TAB = 1;
 const MEDIA_TAB = 4;
 
-const Profile = () => {
+const OWN_TABS = ["Posts", "Career", "Reposts", "Mentions", "Media", "Replies", "Liked", "Saved"];
+// tabs served by posts/user (sortable) · tabs shown as a post list (grid-able)
+const SORTABLE_TABS = [0, 2, 3, 5, 6];
+const LIST_TABS = [0, 2, 3, 5, 6, 7];
+
+const Profile = ({ isFocusedPage }) => {
   const isFocus = useIsFocused();
+  const userDataForBirthday = useSelector((state) => state.users.userData);
+  // client: confetti + greeting the first time I open my profile on my birthday
+  const [birthdayVisible, closeBirthday] = useBirthdayGreeting(
+    userDataForBirthday,
+    !!isFocusedPage && isFocus,
+  );
   const navigation = useNavigation();
   const { colors } = useTheme();
   const userData = useSelector((state) => state.users.userData);
 
   const [tab, setTab] = useState(0);
+  // compact header sort row: "recent" | "popular", layout "list" | "grid"
+  const [sortKey, setSortKey] = useState("recent");
+  const [postLayout, setPostLayout] = useState("list");
   const [posts, setPosts] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -106,6 +126,11 @@ const Profile = () => {
     }, []),
   );
 
+  // the ScrollView's native-driven scroll value (ScreenWrapper hands it over
+  // from its sticky header) → the compact header animates on the UI thread
+  const [stickyScroll, setStickyScroll] = useState(null);
+  const compact = useCompactProfileHeader(stickyScroll);
+
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     { useNativeDriver: false },
@@ -114,7 +139,7 @@ const Profile = () => {
   useEffect(() => {
     fetchPosts();
     dispatch(getProfile());
-  }, [isFocus, tab]);
+  }, [isFocus, tab, sortKey]);
 
   const fetchPosts = async (isRefreshing = false) => {
     try {
@@ -153,6 +178,8 @@ const Profile = () => {
         endpoint = "posts/media";
         queryParams = "page=1&limit=20";
       }
+
+      if (sortKey === "popular" && SORTABLE_TABS.includes(tab)) queryParams += "&sortBy=popular";
 
       const response = await get(`${endpoint}?${queryParams}`);
 
@@ -209,31 +236,11 @@ const Profile = () => {
   }, []);
 
   const renderListEmpty = () => {
-    if (loading) return null; // Loading handled in the main render block for better UX
+    if (loading || !loadedTabs.includes(tab)) return null; // loading/skeleton is handled in the main render block
 
-    if (error) {
-      return (
-        <View style={styles.centerContainer}>
-          <CustomText
-            label={error}
-            color={colors.textSecondary}
-            fontSize={16}
-            textAlign={"center"}
-          />
-        </View>
-      );
-    }
+    if (error) return <TabEmptyState tabKey={OWN_TABS[tab]} text={error} />;
 
-    return (
-      <View style={styles.centerContainer}>
-        <CustomText
-          label={"No post found"}
-          color={colors.textSecondary}
-          fontSize={16}
-          textAlign={"center"}
-        />
-      </View>
-    );
+    return <TabEmptyState tabKey={OWN_TABS[tab]} />;
   };
 
   const deletePost = async (postId) => {
@@ -366,6 +373,7 @@ const Profile = () => {
 
   return (
     <View style={{ flex: 1 }}>
+      <BirthdaySheet visible={birthdayVisible} onClose={closeBirthday} user={userData} />
       <ScreenWrapper
         // bottom-nav blur only while content sits under it
         onScrollEdgeChange={(edges) => reportPageEdges?.("Profile", edges)}
@@ -375,6 +383,7 @@ const Profile = () => {
         scrollEventThrottle={16}
         translucent
         stickyHeaderIndices={[1]}
+        onStickyScrollValue={setStickyScroll}
         // the banner header floats and the profile scrolls under it (its
         // own Figma background: banner, tier gradient, or #121212 64% + blur
         // 32); the tabs stick right below it
@@ -389,6 +398,7 @@ const Profile = () => {
         headerUnScrollable={() => (
           <>
             <ProfileHeader
+              contentOpacity={compact.anim?.bigHeaderOpacity}
               isUser
               user={userData}
               name={`${userData?.firstName || ""} ${userData?.lastName || ""}`}
@@ -404,6 +414,7 @@ const Profile = () => {
           </>
         )}
       >
+        <View onLayout={compact.onCardLayout}>
         <ProfileCard
           tab={tab}
           setTab={setTab}
@@ -419,15 +430,18 @@ const Profile = () => {
           postsCount={userData?.postsCount}
           showTopTab={false}
         />
+        </View>
 
         {/* Figma "Profile": tabs close the info block — 20 above, 16 below,
             32pt chips, padding 14, Medium 16 / −0.5, accent text */}
-        <View
+        <Animated.View
           style={{
             backgroundColor: colors.background,
             paddingTop: cardLayout.outerGap,
             paddingBottom: cardLayout.padTop,
             paddingHorizontal: 12,
+            // hands over to the compact header's icon tabs
+            opacity: compact.anim ? compact.anim.textTabsOpacity : 1,
           }}
         >
           <TopTab
@@ -456,8 +470,11 @@ const Profile = () => {
             textFontSize={16}
             textLetterSpacing={-0.5}
           />
-        </View>
+        </Animated.View>
 
+        {/* at least a screen tall: switching to a short tab while the compact
+            header is showing keeps the page pinned instead of jumping up */}
+        <View style={{ minHeight: Dimensions.get("window").height }}>
         <View style={styles.sectionGap} />
         <TouchableOpacity
           activeOpacity={0.8}
@@ -486,6 +503,16 @@ const Profile = () => {
 
         <FinalizeProfile />
 
+        {SORTABLE_TABS.includes(tab) && (
+          <ProfileSortRow
+            sortKey={sortKey}
+            onSort={() => setSortKey((k) => (k === "recent" ? "popular" : "recent"))}
+            layout={postLayout}
+            onLayoutToggle={() => setPostLayout((l) => (l === "list" ? "grid" : "list"))}
+          />
+        )}
+
+        <TabFade key={`tab-${tab}-${postLayout}`}>
         {tab === CAREER_TAB ? (
           <CareerTab userId={userData?._id} isOwner viewerId={userData?._id} />
         ) : tab === MEDIA_TAB ? (
@@ -499,17 +526,19 @@ const Profile = () => {
               setMediaDeleteHandler(() => deleteHandler);
             }}
           />
-        ) : loading && !loadedTabs.includes(tab) ? (
+        ) : loading || !loadedTabs.includes(tab) ? (
           <View style={{ flex: 1 }}>
             {[1, 2, 3].map((_, index) => (
               <PostCardSkeleton key={index} />
             ))}
           </View>
+        ) : postLayout === "grid" && LIST_TABS.includes(tab) ? (
+          <PostsGrid posts={posts} ListEmptyComponent={renderListEmpty()} />
         ) : (
           <FlatList
             data={posts}
             renderItem={renderItem}
-            keyExtractor={(item) => item._id}
+            keyExtractor={(item, i) => String(item?._id ?? item?.id ?? i)}
             scrollEnabled={false}
             ListEmptyComponent={renderListEmpty}
             contentContainerStyle={{ paddingBottom: 100 }}
@@ -522,6 +551,8 @@ const Profile = () => {
             onViewableItemsChanged={onViewableItemsChanged}
           />
         )}
+        </TabFade>
+        </View>
 
         <DelImagesModal
           isVisible={showDelModal}
@@ -550,6 +581,22 @@ const Profile = () => {
           </View>
         </TouchableOpacity>
       )}
+
+      {/* Figma "Header-When-Scrolling-Instagram-Inspired" */}
+      <ProfileCompactHeader
+        user={userData}
+        isOwn
+        anim={compact.anim}
+        interactive={compact.interactive}
+        tabNames={OWN_TABS}
+        tab={tab}
+        onTab={setTab}
+        showSort={SORTABLE_TABS.includes(tab)}
+        sortKey={sortKey}
+        onSort={() => setSortKey((k) => (k === "recent" ? "popular" : "recent"))}
+        layout={postLayout}
+        onLayoutToggle={() => setPostLayout((l) => (l === "list" ? "grid" : "list"))}
+      />
 
       <BannerModal
         isVisible={bannerModal}

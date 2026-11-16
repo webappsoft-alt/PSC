@@ -87,6 +87,7 @@ import HeaderProgressiveBlur, {
   FooterProgressiveBlur,
 } from "../components/HeaderProgressiveBlur";
 import ViewerWatchScreen from "../screens/Main/LiveScreens/ViewerWatchScreen";
+import { get as apiGet } from "../services/ApiRequest";
 
 const TAB_NAMES = [
   "Technology",
@@ -282,7 +283,25 @@ const HomeWithCameraPager = ({ route, navigation }) => {
   );
 
   const [currentPage, setCurrentPage] = useState(HOME_PAGE_INDEX);
-  const [tab, setTab] = useState(null);
+  const [tabState, setTabState] = useState(null);
+  // Home feed election chips ("🇫🇷 PRÉSIDENTIELLE 2027"): picking one
+  // filters the feed to that election; picking a topic / For You clears it
+  const [elections, setElections] = useState([]);
+  const [electionId, setElectionId] = useState(null);
+  const tab = tabState;
+  const setTab = useCallback((next) => {
+    setElectionId(null);
+    setTabState(next);
+  }, []);
+  useEffect(() => {
+    apiGet("elections/active")
+      .then((r) => setElections(Array.isArray(r?.data?.data) ? r.data.data : []))
+      .catch(() => {});
+  }, []);
+  const pickElection = useCallback((id) => {
+    setTabState(null);
+    setElectionId(id);
+  }, []);
   // "+" chip → the app's existing topic sheet in toggle mode: a switch per
   // topic, on = shown as a header chip. Saved on device (utils/feedTopics).
   const [topicSheetVisible, setTopicSheetVisible] = useState(false);
@@ -653,6 +672,9 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           onLocationPress={() => setLocationModalVisible(true)}
           onAddTopicPress={() => setTopicSheetVisible(true)}
           onFilterPress={() => setFilterSheetVisible(true)}
+          elections={elections}
+          electionId={electionId}
+          onElectionPress={pickElection}
         />
       </Animated.View>
 
@@ -691,6 +713,7 @@ const HomeWithCameraPager = ({ route, navigation }) => {
             isFocusedPage={currentPage === PAGER_HOME_INDEX && isFocused}
             sharedTab={tab}
             sharedTabNames={enabledTopics}
+            sharedElectionId={electionId}
             feedFilters={feedFilters}
           />
         </PagerPage>

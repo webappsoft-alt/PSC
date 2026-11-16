@@ -1,6 +1,7 @@
 import { useNavigation } from "@react-navigation/native";
-import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useSelector } from "react-redux";
+import { useMemo } from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -8,6 +9,7 @@ import fonts from "../../../assets/fonts";
 import Blur from "../../../components/Blur";
 import CustomText from "../../../components/CustomText";
 import GlassBackButton from "../../../components/GlassBackButton";
+import ScreenWrapper from "../../../components/ScreenWrapper";
 import Icons from "../../../components/Icons";
 import { useTheme } from "../../../contexts/ThemeContext";
 import {
@@ -46,7 +48,8 @@ const OrientationTiles = ({ selected, onSelect }) => {
             onPress={() => onSelect?.(o.value)}
             style={[styles.tile, active && { backgroundColor: "#FFFFFF" }]}
           >
-            <View style={[styles.dot, { backgroundColor: o.dot }]} />
+            {/* Figma: the active Center dot turns #121212 @64 on the white tile */}
+            <View style={[styles.dot, { backgroundColor: active && o.activeDot ? o.activeDot : o.dot }]} />
             <CustomText
               label={o.tileLabel}
               fontSize={12}
@@ -75,22 +78,73 @@ const PoliticalInformation = ({ route }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const initial = route?.params?.value ?? 2;
-  const [value, setValue] = useState(initial);
-  const orientation = useMemo(() => getOrientation(value) || POLITICAL_ORIENTATIONS[2], [value]);
+  // the profile's own orientation — shown, never picked (client: the tiles
+  // are not tappable; the label comes from the user's PSC activity)
+  // `value: null` = not enough PSC activity yet → "Insufficient Data"
+  // (client weighting doc §3): no tile is active, criteria show a dash
+  const insufficient = route?.params?.value === null;
+  const value = insufficient ? null : route?.params?.value ?? 2;
+  const userId = route?.params?.userId;
+  const myId = useSelector((st) => st.users.userData?._id);
+  // history is private: only the owner sees the button (API is owner-only)
+  const isMine = !!userId && String(userId) === String(myId);
+  const orientation = useMemo(() => {
+    const base = getOrientation(value) || POLITICAL_ORIENTATIONS[2];
+    if (!insufficient) return base;
+    return {
+      ...base,
+      label: "Insufficient Data",
+      overview:
+        "PSC needs more political activity from you before it can define your orientation. Your posts, comments, responses and votes on political posts all count, each with its own weight.",
+      positions: base.positions.map(() => "—"),
+    };
+  }, [value, insufficient]);
 
   const text64 = "rgba(255, 255, 255, 0.64)";
-  const headerHeight = insets.top + 8 + 40 + 8;
+  // Figma header: status area + 40 row + 8 (insets fall back to the Figma 52)
+  const headerHeight = (insets.top > 0 ? insets.top + 8 : 60) + 40 + 8;
 
   return (
-    <View style={[styles.screen, { backgroundColor: "#121212" }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: headerHeight + 16 - X(24) },
-        ]}
-      >
+    <ScreenWrapper
+      paddingHorizontal={0.1}
+      scrollEnabled
+      translucent
+      headerBlur
+      headerUnScrollable={() => (
+        <View style={[styles.header, { paddingTop: insets.top > 0 ? insets.top + 8 : 60, height: headerHeight }]}>
+          {/* orientation tint over the shared frosted blur — gradient to
+              transparent so the blur shows through (client: never a solid) */}
+          <LinearGradient
+            colors={[orientation.headerColor, "rgba(18, 18, 18, 0)"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          <GlassBackButton onPress={() => navigation.goBack()} />
+          <CustomText
+            label={orientation.label}
+            fontSize={20}
+            letterSpacing={-0.1}
+            fontFamily={fonts.semiBold}
+            color={colors.text}
+            textAlign={"center"}
+            containerStyle={styles.grow}
+          />
+          {/* Figma: 40 glass circle with `history` → Interaction History */}
+          {isMine ? (
+            <GlassBackButton
+            icon="history"
+            onPress={() => navigation.navigate("InteractionHistory", { userId })}
+            accessibilityLabel="Interaction history"
+          />
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
+        </View>
+      )}
+    >
+      <View style={[styles.content, { paddingTop: 16 - X(24) }]}>
         {/* Political Map */}
         <View style={styles.section16}>
           <CustomText
@@ -109,7 +163,7 @@ const PoliticalInformation = ({ route }) => {
           />
         </View>
 
-        <OrientationTiles selected={value} onSelect={setValue} />
+        <OrientationTiles selected={value} />
 
         {/* Overview */}
         <View style={styles.section12}>
@@ -136,6 +190,7 @@ const PoliticalInformation = ({ route }) => {
               label="Read below about this system"
               fontSize={12}
               fontFamily={fonts.light}
+              textDecorationLine="underline" // Figma: underlined
               color={text64}
             />
             <Icons family={MS} name="info" size={12} color={text64} />
@@ -187,39 +242,14 @@ const PoliticalInformation = ({ route }) => {
             marginTop={12 - X(16) - X(12)}
           />
         </View>
-      </ScrollView>
-
-      {/* Header: label colour → #121212 */}
-      <LinearGradient
-        colors={[orientation.headerColor, "#121212"]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 8, height: headerHeight }]}
-      >
-        <GlassBackButton
-          onPress={() => navigation.goBack()}
-          fill={colors.surface}
-          color="#FFFFFF"
-        />
-        <CustomText
-          label={orientation.label}
-          fontSize={20}
-          letterSpacing={-0.1}
-          fontFamily={fonts.semiBold}
-          color={colors.text}
-          textAlign={"center"}
-          containerStyle={styles.grow}
-        />
-        <View style={styles.circle} />
-      </LinearGradient>
-    </View>
+      </View>
+    </ScreenWrapper>
   );
 };
 
 export default PoliticalInformation;
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
   grow: { flex: 1 },
   content: {
     paddingHorizontal: 8,
@@ -227,10 +257,6 @@ const styles = StyleSheet.create({
     gap: 32,
   },
   header: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: 12,
     paddingBottom: 8,
     flexDirection: "row",

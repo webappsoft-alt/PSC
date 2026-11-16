@@ -6,6 +6,7 @@ import AuthStack from "./AuthStack";
 import MainStack from "./MainStack";
 import SessionExpiryModal from "../components/SessionExpiryModal";
 import ProfileSelector from "../screens/Auth/ProfileSelector";
+import ClaimProfile from "../screens/Main/ClaimProfile";
 import PinVerification from "../screens/Auth/PinVerification";
 import { hasProfilePin } from "../utils/profileLock";
 
@@ -52,6 +53,8 @@ const RootNavigation = () => {
   const accountScreens = (
     <>
       <Stack.Screen name="ProfileSelector" component={ProfileSelector} />
+      {/* reachable logged in or out: the "Claim Now" invite link lands here */}
+      <Stack.Screen name="ClaimProfile" component={ClaimProfile} />
       <Stack.Screen
         name="PinVerification"
         component={PinVerification}

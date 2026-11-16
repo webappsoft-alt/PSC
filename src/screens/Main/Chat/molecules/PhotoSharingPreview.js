@@ -17,6 +17,7 @@ import fonts from "../../../../assets/fonts";
 import Blur from "../../../../components/Blur";
 import CustomText from "../../../../components/CustomText";
 import GlassBackButton from "../../../../components/GlassBackButton";
+import Svg, { Path } from "react-native-svg";
 import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
@@ -45,7 +46,7 @@ const PhotoSharingPreview = ({ media, onCancel, onSend, onReplace }) => {
   const pickAnother = async () => {
     try {
       const next = await openPicker({ mediaType: "any", cropping: false });
-      if (next?.path) onReplace?.(next);
+      if (next?.path) onReplace?.({ ...next, source: "gallery" });
     } catch (e) {
       // cancelled
     }
@@ -85,11 +86,17 @@ const PhotoSharingPreview = ({ media, onCancel, onSend, onReplace }) => {
           <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 34) }]}>
             <LinearGradient pointerEvents="none" colors={["rgba(18, 18, 18, 0)", "#121212"]} style={StyleSheet.absoluteFill} />
             <TouchableOpacity activeOpacity={0.7} onPress={pickAnother} style={styles.add}>
-              <Blur blurType="dark" blurAmount={32} borderRadius={100} />
-              <Icons family="MaterialSymbolsRounded" name="refresh" size={24} color="#FFFFFF" />
+              <Blur blurType="dark" blurAmount={32} borderRadius={24} />
+              {/* Figma: Material "replay" (counter-clockwise), exact vector */}
+              <Svg width={24} height={24} viewBox="0 0 24 24">
+                <Path
+                  d="M12 5V1L7 6L12 11V7C15.31 7 18 9.69 18 13C18 16.31 15.31 19 12 19C8.69 19 6 16.31 6 13H4C4 17.42 7.58 21 12 21C16.42 21 20 17.42 20 13C20 8.58 16.42 5 12 5Z"
+                  fill="#FFFFFF"
+                />
+              </Svg>
             </TouchableOpacity>
             <View style={styles.input}>
-              <Blur blurType="dark" blurAmount={32} borderRadius={100} />
+              <Blur blurType="dark" blurAmount={32} borderRadius={24} />
               <TextInput
                 value={caption}
                 onChangeText={setCaption}
@@ -147,7 +154,8 @@ const styles = StyleSheet.create({
   add: {
     width: 48,
     height: 48,
-    borderRadius: 100,
+    // half the height: iOS draws a blur with a bigger radius as an oval
+    borderRadius: 24,
     backgroundColor: "rgba(255, 255, 255, 0.16)",
     overflow: "hidden",
     alignItems: "center",
@@ -156,7 +164,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     height: 48,
-    borderRadius: 100,
+    borderRadius: 24,
     backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.04)",

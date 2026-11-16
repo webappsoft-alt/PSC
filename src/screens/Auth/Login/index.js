@@ -20,6 +20,7 @@ import {
 
 import fonts from "../../../assets/fonts";
 import { post } from "../../../services/ApiRequest";
+import { ToastMessage } from "../../../utils/ToastMessage";
 import { applySession } from "../../../utils/accountSession";
 
 const MAX_LENGTH = 37;
@@ -75,6 +76,10 @@ const Login = () => {
       }
 
       await applySession(dispatch, data?.user, data?.tokens);
+      // signing in within the 30-day grace period cancelled the deletion
+      if (data?.restored) {
+        ToastMessage("Welcome back! Your account deletion has been cancelled.", "success");
+      }
       navigation.reset({ index: 0, routes: [{ name: "WelcomeScreen" }] });
     } catch (err) {
       // ApiRequest throws { status, data, message }.

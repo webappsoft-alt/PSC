@@ -17,12 +17,11 @@ import { MS, Radio, WHITE_64, X } from "../../Career/molecules/CareerUI";
  */
 export const SheetListRow = ({ label, onPress, trailing = "radio", selected, value }) =>
   value ? (
-    // Row with a picked value (Filters sheet): nothing is truncated — the
-    // label keeps its full width, the value wraps right-aligned in the space
-    // left, and label / value / chevron line up on their first line (client
-    // rule for left + right text rows). One line = the same 48pt row.
-    <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.rowValue}>
-      <CustomText label={label} fontSize={16} letterSpacing={-0.5} fontFamily={fonts.medium} color="#FFFFFF" />
+    // Row with a picked value (Filters sheet): the label keeps its full
+    // width, the value takes the space left (right-aligned). Same 48pt, so label, value and chevron
+    // share one centre line and every row keeps the same height
+    <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.row}>
+      <CustomText label={label} fontSize={16} letterSpacing={-0.5} fontFamily={fonts.medium} color="#FFFFFF" marginTop={-X(16)} marginBottom={-X(16)} />
       <CustomText
         label={value}
         fontSize={14}
@@ -30,10 +29,12 @@ export const SheetListRow = ({ label, onPress, trailing = "radio", selected, val
         fontFamily={fonts.medium}
         color={WHITE_64}
         textAlign="right"
-        marginTop={(16 * 1.4 - 14 * 1.4) / 2}
+        numberOfLines={1}
+        marginTop={-X(14)}
+        marginBottom={-X(14)}
         containerStyle={styles.valueText}
       />
-      <Icons family={MS} name={trailing === "chevron" ? "chevron_right" : "radio_button_unchecked"} size={24} color={WHITE_64} style={styles.valueIcon} />
+      <Icons family={MS} name={trailing === "chevron" ? "chevron_right" : "radio_button_unchecked"} size={24} color={WHITE_64} />
     </TouchableOpacity>
   ) : (
     <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.row}>
@@ -122,18 +123,7 @@ export default JobOptionSheet;
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  // 48 = 16 × 1.4 label line + 2 × 12.8
-  rowValue: {
-    minHeight: 48,
-    paddingVertical: (48 - 16 * 1.4) / 2,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-  },
   valueText: { flex: 1 },
-  valueIcon: { marginTop: (16 * 1.4 - 24) / 2 },
   // Figma padding 12/16 on a 48 row: the 24 glyph box is centred by the row
   // height instead — a 24pt vertical slot clips Material Symbols glyphs
   // (their line box is taller than 24) at the bottom on iOS

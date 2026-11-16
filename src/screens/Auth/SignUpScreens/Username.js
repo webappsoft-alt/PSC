@@ -195,7 +195,8 @@ const Username = forwardRef(({ state, setBtnDisabled, setLoading }, ref) => {
       <AuthTextField
         value={username}
         onChangeText={(t) => setUsername(t.toLowerCase().replace(/\s/g, ""))}
-        placeholder="E.g. viktorsola"
+        placeholder="viktorsola"
+        prefix="@"
         maxLength={MAX_LENGTH}
         autoCapitalize="none"
         valueFamily={fonts.medium}

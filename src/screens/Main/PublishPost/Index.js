@@ -44,6 +44,9 @@ import { COLORS } from "../../../utils/COLORS";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { uploadAndGetUrl, uploadFileGetUrl } from "../../../utils/constants";
 import { ToastMessage } from "../../../utils/ToastMessage";
+import { HELD_MESSAGE, blockedMessage, isHeld } from "../../../utils/moderation";
+import MentionCard from "../../../components/MentionCard";
+import { insertMentionTag, mentionName, readMentionQuery } from "../../../utils/mentions";
 import PeopleSelection from "./molecules/PeopleSelection";
 import useDictation from "../../../hooks/useDictation";
 import PollOptionsEditor, {
@@ -442,6 +445,11 @@ const CreatePost = ({ route }) => {
   const camera = useRef(null);
 
   // Form state
+  // "@" mentions typed in WHAT'S HAPPENING: [{ user, name }]
+  const [textMentions, setTextMentions] = useState([]);
+  const [mentionClosed, setMentionClosed] = useState(false);
+  // poll option typing "@…": { query, onSelect, onClose } from the editor
+  const [pollMention, setPollMention] = useState(null);
   const [description, setDescription] = useState(
     transformedPost?.description || "",
   );
@@ -623,6 +631,10 @@ const CreatePost = ({ route }) => {
           // Prepare API payload matching the required structure
           const payload = {
             description: descriptionArray,
+            // "@Name" still in the text → tappable in the feed
+            textMentions: textMentions.filter((m) =>
+              descriptionArray.join("\n").includes(`@${m.name}`),
+            ),
             images: uploadedImages,
             size,
             topic: topic?.name,
@@ -700,7 +712,7 @@ const CreatePost = ({ route }) => {
           // Make API call
           if (isAudioPost) {
             // Audio Post: publish the recorder's draft with these details
-            const { size: _size, parentPostId: _parent, ...audioPayload } =
+            const { size: _size, parentPostId: _parent, textMentions: _textMentions, ...audioPayload } =
               payload;
             if (!location) delete audioPayload.location;
             for (const key of ["startDate", "endDate"]) {
@@ -719,7 +731,7 @@ const CreatePost = ({ route }) => {
               audioPayload,
             );
             if (response?.data?.success) {
-              completeUpload("Audio post published");
+              completeUpload(isHeld(response) ? HELD_MESSAGE : "Audio post published");
             } else {
               failUpload(
                 response?.data?.message || "Failed to publish audio post",
@@ -751,7 +763,9 @@ const CreatePost = ({ route }) => {
 
             if (response?.data?.success) {
               completeUpload(
-                isPoll
+                isHeld(response)
+                  ? HELD_MESSAGE
+                  : isPoll
                   ? payload.publishAt
                     ? "Poll scheduled"
                     : "Poll published"
@@ -767,7 +781,8 @@ const CreatePost = ({ route }) => {
             }
           }
         } catch (error) {
-          console.error("Error submitting post:", error);
+          // a blocked post is an expected outcome, not an app error
+          if (!blockedMessage(error)) console.error("Error submitting post:", error);
           if (editMode) {
             const errorMessage =
               error.response?.data?.message ||
@@ -775,7 +790,9 @@ const CreatePost = ({ route }) => {
               "Failed to submit post";
             ToastMessage(errorMessage, "error");
           } else {
-            failUpload("Failed to create post. Please try again.");
+            failUpload(
+              blockedMessage(error) || "Failed to create post. Please try again.",
+            );
           }
         } finally {
           setIsSubmitting(false);
@@ -1096,7 +1113,29 @@ const CreatePost = ({ route }) => {
 
   const styles = createStyles(colors, isDark);
 
+  // "@…" in WHAT'S HAPPENING or a poll option → one floating people card at
+  // the bottom of the screen (FloatingSheet position, above the keyboard)
+  const descQuery = mentionClosed ? null : readMentionQuery(description);
+  const activeMention =
+    pollMention ||
+    (descQuery !== null
+      ? {
+          query: descQuery,
+          onClose: () => setMentionClosed(true),
+          onSelect: (u) => {
+            if (!u?._id) return;
+            setDescription((d) => insertMentionTag(d, u));
+            setTextMentions((prev) =>
+              prev.some((m) => m.user === u._id)
+                ? prev
+                : [...prev, { user: u._id, name: mentionName(u) }],
+            );
+          },
+        }
+      : null);
+
   return (
+    <View style={{ flex: 1 }}>
     <ScreenWrapper
       headerBlur
       footerBlur
@@ -1124,6 +1163,7 @@ const CreatePost = ({ route }) => {
               fontFamily={fonts.medium}
               onPress={handleSubmit}
               loading={isSubmitting || imgLoading}
+              indicatorColor={COLORS.white}
               disabled={isSubmitting || imgLoading}
             />
           </View>
@@ -1143,6 +1183,7 @@ const CreatePost = ({ route }) => {
             fontFamily={fonts.medium}
             onPress={handleSubmit}
             loading={isSubmitting || imgLoading}
+            indicatorColor={COLORS.white}
             disabled={isSubmitting || imgLoading}
           />
 
@@ -1194,11 +1235,15 @@ const CreatePost = ({ route }) => {
                   isPoll ? { fontSize: 14, fontFamily: fonts.medium } : null
                 }
                 value={description}
-                onChangeText={setDescription}
+                onChangeText={(t) => {
+                  setDescription(t);
+                  if (readMentionQuery(t) === null) setMentionClosed(false);
+                }}
                 placeholder="What's on your mind?"
                 error={errors.description}
                 publishPost
                 enableMentionHighlight
+                mentionNames={textMentions.map((m) => m.name)}
                 onMicPress={dictation.toggle}
                 micActive={dictation.listening}
               />
@@ -1523,7 +1568,7 @@ const CreatePost = ({ route }) => {
                     <View style={styles.uploadingIndicator}>
                       <ActivityIndicator
                         size="small"
-                        color={COLORS.buttonColor}
+                        color={COLORS.white}
                       />
                     </View>
                   </>
@@ -1613,6 +1658,7 @@ const CreatePost = ({ route }) => {
                 }
               }}
               error={errors.pollOptions}
+              onMentionChange={setPollMention}
             />
           </>
         ) : (
@@ -2067,6 +2113,15 @@ const CreatePost = ({ route }) => {
         <ScreenFooterSpacer />
       </ScreenScrollView>
     </ScreenWrapper>
+    {activeMention ? (
+      <MentionCard
+        floating
+        query={activeMention.query}
+        onSelect={activeMention.onSelect}
+        onClose={activeMention.onClose}
+      />
+    ) : null}
+    </View>
   );
 };
 

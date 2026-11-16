@@ -224,7 +224,7 @@ const JobMarketplace = ({ isFocusedPage, onLocationPress }) => {
           ) : (
             <View style={styles.header}>
               <View style={styles.row1}>
-                <HeaderIcon family="Feather" name="search" size={21} onPress={() => setSearchOpen(true)} />
+                <HeaderIcon name="search" size={24} onPress={() => setSearchOpen(true)} />
                 <View style={styles.locationWrap}>
                   <TouchableOpacity
                     activeOpacity={0.7}

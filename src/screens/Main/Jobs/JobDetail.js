@@ -1,6 +1,6 @@
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import moment from "moment";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { StyleSheet, TextInput, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 
@@ -19,16 +19,24 @@ import { GlassFill } from "../BandMateMatching/molecules/matchLayout";
 import { CareerHeader, FieldBox, GOLD, HelperRow, INK, MSF, SHEET_BG, WHITE_48, WHITE_64, X, nameInitials } from "../Career/molecules/CareerUI";
 
 const BLUE = "#007BFF";
-const ANSWER_MAX = 50;
+// Figma "Title Case": first letter of each word up, the rest untouched (iOS
+// `capitalize` would lowercase acronyms — "AG" → "Ag", "UI/UX" → "Ui/Ux")
+import { titleCase } from "../../../utils/career";
+
+export { titleCase };
+// Figma Job-Apply: "0/150 characters."
+export const ANSWER_MAX = 150;
+// Figma counters write thousands as 1’000
+const formatMax = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "’");
 
 /** Figma section: #121212, padding 12, gap 16, title Medium 18 −0.5 (13 trimmed) */
-export const DetailSection = ({ title, icon, children, style }) => (
+export const DetailSection = ({ title, icon, children, style, titleLetterSpacing = -0.5 }) => (
   <View style={[styles.section, style]}>
     {icon ? (
       <View style={styles.iconTitle}>
         <Icons family={MSF} name={icon} size={16} color="#FFFFFF" />
         <CustomText
-          label={title}
+          label={titleCase(title)}
           fontSize={18}
           letterSpacing={-0.09}
           fontFamily={fonts.medium}
@@ -40,9 +48,9 @@ export const DetailSection = ({ title, icon, children, style }) => (
       </View>
     ) : (
       <CustomText
-        label={title}
+        label={titleCase(title)}
         fontSize={18}
-        letterSpacing={-0.5}
+        letterSpacing={titleLetterSpacing}
         fontFamily={fonts.medium}
         color="#FFFFFF"
         marginTop={-X(18)}
@@ -139,7 +147,7 @@ export const AnswerBox = ({ label, value, onChangeText, editable, maxLength = AN
       />
     </View>
     <HelperRow
-      label={error ? "Please answer this question to apply." : `${(value || "").length}/${maxLength} characters.`}
+      label={error ? "Please answer this question to apply." : `${formatMax((value || "").length)}/${formatMax(maxLength)} characters.`}
       color={error ? "#EE1045" : WHITE_48}
       letterSpacing={0}
     />
@@ -173,9 +181,9 @@ export const DetailHero = ({ cover, isNew, time, title, subtitle, place, right, 
               <CustomText label={time} fontSize={14} letterSpacing={-0.28} fontFamily={fonts.medium} color="#FFFFFF" marginTop={-X(14)} marginBottom={-X(14)} />
             )}
           </View>
-          <CustomText label={title} fontSize={32} letterSpacing={-1.28} fontFamily={fonts.semiBold} color="#FFFFFF" marginTop={-X(32)} marginBottom={-X(32)} />
+          <CustomText label={titleCase(title)} fontSize={32} letterSpacing={-1.28} fontFamily={fonts.semiBold} color="#FFFFFF" marginTop={-X(32)} marginBottom={-X(32)} />
           {!!subtitle && (
-            <CustomText label={subtitle} fontSize={16} letterSpacing={-0.5} fontFamily={fonts.medium} color="#FFFFFF" marginTop={-X(16)} marginBottom={-X(16)} />
+            <CustomText label={titleCase(subtitle)} fontSize={16} letterSpacing={-0.5} fontFamily={fonts.medium} color="#FFFFFF" marginTop={-X(16)} marginBottom={-X(16)} />
           )}
           {!!place && (
             <View style={styles.placeRow}>
@@ -204,7 +212,7 @@ export const NewChip = () => (
  * Responsibilities · Language · Education / Experience Requirement ·
  * Question asked #N.
  */
-export const JobInfoSections = ({ job, answers = [], editable, onAnswer, showQuestions = true, answerLabel = "Your answer:", showErrors }) => {
+export const JobInfoSections = ({ job, answers = [], editable, onAnswer, showQuestions = true, answerLabel = "Your answer:", showErrors, beforeQuestions, languageTitle = "Language" }) => {
   const company = companyOf(job);
   return (
     <>
@@ -224,7 +232,7 @@ export const JobInfoSections = ({ job, answers = [], editable, onAnswer, showQue
             </DetailSection>
           )}
           {!!job.languages?.length && (
-            <DetailSection title="Language">
+            <DetailSection title={languageTitle}>
               <View style={styles.langList}>
                 {job.languages.map((l, i) => (
                   <LanguageRow key={`${l.code}-${i}`} item={l} />
@@ -245,6 +253,7 @@ export const JobInfoSections = ({ job, answers = [], editable, onAnswer, showQue
               </View>
             </DetailSection>
           )}
+          {beforeQuestions}
           {showQuestions && (job.questions || []).map((q, i) => (
             <DetailSection key={`q-${i}`} title={q || `Question asked #${i + 1}`}>
               <AnswerBox
@@ -258,6 +267,25 @@ export const JobInfoSections = ({ job, answers = [], editable, onAnswer, showQue
           ))}
     </>
   );
+};
+
+/**
+ * Hero props for an offer (Job-Detail / Job-Apply): the company page's
+ * cover → company logo → the poster's cover; imported directory companies
+ * have none, so the hero then shows the company initials (PSC avatar rule).
+ */
+export const jobHeroProps = (job) => {
+  const company = companyOf(job);
+  const poster = job?.postedBy && typeof job.postedBy === "object" ? job.postedBy : null;
+  return {
+    cover: company?.pscUser?.profile?.cover || companyLogo(job) || poster?.profile?.cover,
+    isNew: !!job?.createdAt && moment().diff(moment(job.createdAt), "hours") < 24,
+    time: job?.createdAt ? moment(job.createdAt).fromNow() : "",
+    title: job?.title,
+    subtitle: companyName(job),
+    place: [job?.location?.city, job?.location?.country].filter(Boolean).join(", "),
+    monogram: companyName(job),
+  };
 };
 
 /**
@@ -276,9 +304,7 @@ const JobDetail = ({ route }) => {
   const navigation = useNavigation();
   const jobId = route?.params?.jobId;
   const [job, setJob] = useState(null);
-  const [answers, setAnswers] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [triedApply, setTriedApply] = useState(false);
   const scrollRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -287,7 +313,6 @@ const JobDetail = ({ route }) => {
       if (res?.data?.success) {
         const data = res.data.data;
         setJob(data);
-        setAnswers((data.questions || []).map((_, i) => data.myAnswers?.[i] || ""));
       }
     } catch (e) {
       ToastMessage("Could not load this offer", "error");
@@ -295,25 +320,25 @@ const JobDetail = ({ route }) => {
     }
   }, [jobId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // reload on focus: coming back from Job-Apply shows "Withdraw Application"
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
+  // Figma: "Apply Now" opens the Job-Apply form; a sent application can be withdrawn here
   const apply = async () => {
     if (!job || busy) return;
-    // answers are mandatory (not when withdrawing)
-    if (!job.applied && (job.questions || []).some((_, i) => !String(answers[i] || "").trim())) {
-      setTriedApply(true);
-      ToastMessage("Please answer every question to apply", "error");
-      // the questions sit at the end of the page — take the user there
-      requestAnimationFrame(() => scrollRef.current?.scrollToEnd?.({ animated: true }));
+    if (!job.applied) {
+      navigation.navigate("JobApply", { jobId: job._id, job });
       return;
     }
     try {
       setBusy(true);
-      const res = await post(`jobs/${job._id}/apply`, { answers });
+      const res = await post(`jobs/${job._id}/apply`, {});
       if (res?.data?.success) {
-        ToastMessage(res.data.data?.applied ? "Application sent" : "Application withdrawn", "success");
+        ToastMessage("Application withdrawn", "success");
         await load();
       }
     } catch (e) {
@@ -323,14 +348,6 @@ const JobDetail = ({ route }) => {
     }
   };
 
-  const company = companyOf(job);
-  // hero: the company page's cover → company logo → the poster's cover; the
-  // imported directory companies have none, so the hero then shows the
-  // company initials (PSC avatar rule) instead of an empty block
-  const poster = job?.postedBy && typeof job.postedBy === "object" ? job.postedBy : null;
-  const cover = company?.pscUser?.profile?.cover || companyLogo(job) || poster?.profile?.cover;
-  const place = [job?.location?.city, job?.location?.country].filter(Boolean).join(", ");
-  const isNew = job?.createdAt && moment().diff(moment(job.createdAt), "hours") < 24;
   const canApply = job && !job.isOwner && job.status === "active";
 
   return (
@@ -355,15 +372,7 @@ const JobDetail = ({ route }) => {
         <DetailSkeleton />
       ) : (
         <View style={styles.page}>
-          <DetailHero
-            cover={cover}
-            isNew={isNew}
-            time={moment(job.createdAt).fromNow()}
-            title={job.title}
-            subtitle={companyName(job)}
-            place={place}
-            monogram={companyName(job)}
-          />
+          <DetailHero {...jobHeroProps(job)} />
 
           {canApply && (
             <View style={styles.applyBand}>
@@ -379,13 +388,8 @@ const JobDetail = ({ route }) => {
             </View>
           )}
 
-          <JobInfoSections
-            job={job}
-            answers={answers}
-            editable={canApply && !job.applied}
-            onAnswer={(i, t) => setAnswers((arr) => arr.map((v, j) => (j === i ? t : v)))}
-            showErrors={triedApply}
-          />
+          {/* Figma Job-Detail: no questions — they are answered in Job-Apply */}
+          <JobInfoSections job={job} showQuestions={false} languageTitle="Language Requirement" />
           {/* Figma: last section padding-bottom 112 (clears the bottom bar) */}
           <View style={styles.bottomSpace} />
         </View>

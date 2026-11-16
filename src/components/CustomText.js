@@ -4,6 +4,11 @@ import fonts from "../assets/fonts";
 import { useTheme } from "../contexts/ThemeContext";
 import { useFontScale } from "../contexts/FontScaleContext";
 
+// iOS's native `capitalize` lower-cases the rest of each word ("UBS" → "Ubs").
+// Capitalize in JS instead: raise each word's first letter, lower nothing.
+const capitalizeWords = (v) =>
+  v.replace(/(^|[\s/(-])([a-zà-öø-ÿ])/g, (m, a, b) => a + b.toUpperCase());
+
 const CustomText = ({
   textStyle,
   fontSize,
@@ -45,6 +50,8 @@ const CustomText = ({
   const scale = isLargeTextEnabled ? 1.25 : 1;
   const defaultFontSize = (fontSize || 14) * scale;
   const defaultLineHeight = lineHeight ? lineHeight * scale : defaultFontSize * 1.4; // 1.4 is a good multiplier for readability
+  const jsCapitalize = textTransform === "capitalize" && typeof label === "string";
+  const shownLabel = jsCapitalize ? capitalizeWords(label) : label;
 
   return (
     <TouchableOpacity
@@ -68,7 +75,7 @@ const CustomText = ({
             fontStyle: fontStyle,
             lineHeight: defaultLineHeight,
             textAlign: textAlign,
-            textTransform: textTransform || "none",
+            textTransform: jsCapitalize ? "none" : textTransform || "none",
             fontWeight: fontWeight,
             bottom: bottom,
             borderBottomWidth: borderBottomWidth,
@@ -86,7 +93,7 @@ const CustomText = ({
           textStyle,
         ]}
       >
-        {label}
+        {shownLabel}
         {children}
       </Text>
     </TouchableOpacity>

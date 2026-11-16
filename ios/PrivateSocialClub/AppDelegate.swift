@@ -5,6 +5,7 @@ import ReactAppDependencyProvider
 import Firebase
 import GoogleMaps
 import UserNotifications
+import RNBootSplash
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -71,6 +72,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 }
 
 class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
+  // keep the launch screen up until JS hides it (AnimatedSplash takes over)
+  override func customize(_ rootView: RCTRootView) {
+    super.customize(rootView)
+    rootView.backgroundColor = .black
+    RNBootSplash.initWithStoryboard("BootSplash", rootView: rootView)
+  }
+
   override func sourceURL(for bridge: RCTBridge) -> URL? {
     self.bundleURL()
   }

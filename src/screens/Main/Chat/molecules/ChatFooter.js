@@ -5,6 +5,7 @@ import {
   Keyboard,
   Platform,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
   View,
@@ -16,6 +17,8 @@ import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import AudioRecorder from "./AudioRecorder";
+import MentionCard from "../../../../components/MentionCard";
+import { mentionSegments, readMentionQuery } from "../../../../utils/mentions";
 
 /**
  * Figma Chat page "Inbox_General-Default" footer — bar #262626 @64% + blur
@@ -49,6 +52,8 @@ const ChatFooter = ({
   showScrollDown,
   onScrollDown,
   recordSignal, // bump to start a voice recording (voice reply chip)
+  mentionRanges = [], // "@" mentions in the text: [{ user, offset, length }]
+  onPickMention, // (user) => insert the picked person
 }) => {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -93,6 +98,15 @@ const ChatFooter = ({
   const bottomPad = keyboardShown ? 12 : Math.max(insets.bottom, 34);
   const hasText = !!inputText && inputText.trim() !== "";
   const state = isRecording ? "recording" : hasText ? "typing" : focused ? "focused" : "idle";
+  // "@…" at the end of the text → people picker above the bar (post form's)
+  const typedQuery = focused && onPickMention ? readMentionQuery(inputText) : null;
+  // closing the card hides it until this "@…" is finished / a new one starts
+  const [mentionClosed, setMentionClosed] = useState(false);
+  useEffect(() => {
+    if (typedQuery === null) setMentionClosed(false);
+  }, [typedQuery]);
+  const mentionQuery = mentionClosed ? null : typedQuery;
+  const hasMentions = mentionRanges.length > 0;
 
   const circle = (icon, size, onPress, color = tint(0.64), bg = field, filled) => (
     <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[styles.circle, { backgroundColor: bg }]}>
@@ -101,14 +115,17 @@ const ChatFooter = ({
   );
 
   const input = (
+    // plain `value` normally; once a person is mentioned, styled children so
+    // the name is Medium (Figma 8428:6550). Same line height either way so
+    // the field never jumps while typing.
     <TextInput
       ref={inputRef}
-      value={inputText}
+      {...(hasMentions ? {} : { value: inputText })}
       style={[
         styles.textInput,
         state === "focused"
-          ? { fontSize: 16, letterSpacing: -0.16 }
-          : { fontSize: 14 },
+          ? { fontSize: 16, letterSpacing: -0.16, lineHeight: 22 }
+          : { fontSize: 14, lineHeight: 20 },
         { color: isDark ? "#F3F3F3" : colors.text },
       ]}
       placeholder={state === "idle" ? "Type your message..." : "Type message"}
@@ -119,7 +136,15 @@ const ChatFooter = ({
       onBlur={() => setTimeout(() => setFocused(false), 200)}
       onChangeText={setInputText}
       multiline
-    />
+    >
+      {hasMentions
+        ? mentionSegments(inputText, mentionRanges).map((seg, i) => (
+            <Text key={i} style={seg.mention ? styles.mentionInput : null}>
+              {seg.text}
+            </Text>
+          ))
+        : null}
+    </TextInput>
   );
 
   return (
@@ -170,6 +195,22 @@ const ChatFooter = ({
         </View>
       )}
 
+      {mentionQuery !== null && (
+        // no Figma frame for it: the floating-modal card (FloatingSheet:
+        // 12 side margin, glass r32 pad 4 white 16% + 1px white 16% + blur,
+        // inner #121212 r28 pad 12), floating 8 above the chat bar
+        <MentionCard
+          style={styles.mentionCard}
+          query={mentionQuery}
+          onSelect={(u) => {
+            onPickMention?.(u);
+            inputRef.current?.focus();
+          }}
+          onClose={() => setMentionClosed(true)}
+          maxVisibleRows={keyboardShown ? 3 : 5}
+        />
+      )}
+
       <Animated.View
         style={[
           styles.footer,
@@ -194,28 +235,40 @@ const ChatFooter = ({
               onCancel={() => setIsRecording(false)}
             />
           </View>
-        ) : state === "idle" ? (
-          <>
-            {circle("calendar_today", 22, onSchedulePress)}
-            {circle("photo_library", 22, onGalleryPress)}
-            {circle("gif", 28, onGifPress)}
-            <TouchableOpacity activeOpacity={1} onPress={() => inputRef.current?.focus()} style={[styles.field, { backgroundColor: field }]}>
-              {input}
-            </TouchableOpacity>
-          </>
-        ) : state === "focused" ? (
-          <View style={[styles.field, styles.fieldFocused, { backgroundColor: field }]}>
+        ) : null}
+        {/* one field for idle / focused / typing: the TextInput is never
+            re-mounted, so it keeps focus and every keystroke while the bar
+            changes around it (hidden, not removed, while recording) */}
+        {state === "idle" ? circle("calendar_today", 22, onSchedulePress) : null}
+        {state === "idle" ? circle("photo_library", 22, onGalleryPress) : null}
+        {state === "idle" ? circle("gif", 28, onGifPress) : null}
+        <View
+          style={[
+            styles.field,
+            state === "focused" && styles.fieldFocused,
+            { backgroundColor: field },
+            state === "recording" && styles.hidden,
+          ]}
+        >
+          {state === "focused" ? (
             <TouchableOpacity onPress={onGalleryPress} hitSlop={8}>
               <Icons family="MaterialSymbolsRounded" name="add" size={24} color={tint(0.64)} />
             </TouchableOpacity>
-            {input}
+          ) : null}
+          {input}
+          {state === "focused" ? (
             <TouchableOpacity onPress={onCameraPress} hitSlop={8}>
               <Icons family="MaterialSymbolsRounded" name="photo_camera" size={24} color={tint(0.64)} />
             </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={[styles.field, { backgroundColor: field }]}>{input}</View>
-        )}
+          ) : null}
+          {state === "idle" ? (
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => inputRef.current?.focus()}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
+        </View>
 
         {state === "focused" && circle("mic", 22, () => setIsRecording(true), colors.text, field, true)}
         {state === "recording" && circle("arrow_upward", 22, () => audioRecorderRef.current?.stopAndSend?.(), "#1E1E1E", "#A19375")}
@@ -291,6 +344,14 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     gap: 8,
   },
+  mentionInput: {
+    fontFamily: fonts.medium,
+  },
+  mentionCard: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+  },
+  hidden: { display: "none" },
   textInput: {
     flex: 1,
     fontFamily: fonts.regular,

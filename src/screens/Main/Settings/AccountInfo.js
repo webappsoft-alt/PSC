@@ -37,6 +37,7 @@ import { COLORS } from "../../../utils/COLORS";
 import { getProfile, uploadAndGetUrl } from "../../../utils/constants";
 import { COUNTRIES } from "../../../utils/COUNTRIES";
 import { ToastMessage } from "../../../utils/ToastMessage";
+import { blockedMessage } from "../../../utils/moderation";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 // Validation schema
@@ -285,8 +286,9 @@ const AccountInfo = () => {
         navigation.goBack();
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
-      ToastMessage("Please check all the missing field");
+      const blocked = blockedMessage(error);
+      if (!blocked) console.error("Error submitting form:", error);
+      ToastMessage(blocked || "Please check all the missing field", blocked ? "error" : undefined);
     } finally {
       setIsLoading(false);
       setSubmitting(false);
@@ -522,6 +524,8 @@ const AccountInfo = () => {
         label: "BIRTH DATE",
         value: values.birthDate,
         setValue: (val) => setFieldValue("birthDate", val),
+        // client: 16+ only (the backend rejects a younger date too)
+        maxDate: moment().subtract(16, "years").toDate(),
         verified: true,
         verifiedText: "Valid legal age.",
       },
@@ -856,6 +860,7 @@ const AccountInfo = () => {
                 value={item.value}
                 setValue={item.setValue}
                 isIcon={item.isIcon}
+                maxDate={item.maxDate}
               />
               {item.verified && (
                 <View style={[styles.verifiedBadge, { marginTop: 2 }]}>

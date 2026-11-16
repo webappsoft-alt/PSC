@@ -1,6 +1,7 @@
 package com.solagroup.psc
 
 import android.os.Bundle
+import com.zoontek.rnbootsplash.RNBootSplash
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -15,6 +16,8 @@ class MainActivity : ReactActivity() {
     override fun getMainComponentName(): String = "PrivateSocialClub"
     
     override fun onCreate(savedInstanceState: Bundle?) {
+        // keep the launch screen up until JS hides it (AnimatedSplash takes over)
+        RNBootSplash.init(this, R.style.BootTheme)
         super.onCreate(null)
     }
 

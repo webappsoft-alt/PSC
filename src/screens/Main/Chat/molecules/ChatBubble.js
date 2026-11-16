@@ -1,3 +1,4 @@
+import { StackActions, useNavigation } from "@react-navigation/native";
 import moment from "moment";
 import { useRef, useState } from "react";
 import {
@@ -5,6 +6,7 @@ import {
   Animated,
   Clipboard,
   StyleSheet,
+  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -21,6 +23,9 @@ import { ToastMessage } from "../../../../utils/ToastMessage";
 import { translateText } from "../../../../utils/translate";
 import MeetingCard from "../meeting/MeetingCard";
 import AudioPlayer from "./AudioPlayer";
+import InitialsFill from "../../../../components/InitialsFill";
+import { openPagerTab } from "../../../../navigation/TabStack";
+import { MENTION_COLOR, mentionSegments } from "../../../../utils/mentions";
 
 /**
  * Figma Chat page "Inbox_General-Default" (2212:7108) message (same parts
@@ -58,6 +63,7 @@ const ChatBubble = ({
   meetingWith, // { name, picture, color } — who the meeting is with
 }) => {
   const { colors, isDark } = useTheme();
+  const navigation = useNavigation();
   const styles = createStyles(colors, isDark);
   const tint = (o) => (isDark ? `rgba(255, 255, 255, ${o})` : `rgba(18, 18, 18, ${o})`);
   const isLiked = item?.reactions?.["❤️"]?.[userId];
@@ -67,6 +73,17 @@ const ChatBubble = ({
   const isMedia = ["image", "file", "video"].includes(item?.type);
   const isMeeting = item?.type === "meeting";
   const when = moment(item?.createdAt || item?.timestamp);
+
+  const openMention = (u) => {
+    if (!u?._id) return;
+    if (String(u._id) === String(userId)) {
+      // my own name → the Profile tab, not a second copy of my profile
+      navigation.dispatch(StackActions.popTo("TabStack"));
+      openPagerTab("Profile");
+      return;
+    }
+    navigation.navigate("UserProfile", { userId: u._id });
+  };
 
   const handlePanGesture = (event) => {
     const { translationX } = event.nativeEvent;
@@ -126,6 +143,14 @@ const ChatBubble = ({
           playWhenInactive={false}
         />
       )}
+      {/* client: media picked from the gallery (not just shot) says so */}
+      {item.attachment?.source === "gallery" && (
+        <View pointerEvents="none" style={styles.galleryTagWrap}>
+          <View style={styles.galleryTag}>
+            <CustomText label="From the gallery" fontSize={10} fontFamily={fonts.medium} color="#FFFFFF" />
+          </View>
+        </View>
+      )}
       {item.status === "sending" && (
         <View style={styles.mediaLoading}>
           <ActivityIndicator color="#FFFFFF" size="small" />
@@ -180,12 +205,35 @@ const ChatBubble = ({
             </View>
           )}
           <CustomText
-            label={translated || item?.content}
+            label={translated || !item?.mentions?.length ? translated || item?.content : undefined}
             fontSize={14}
             fontFamily={fonts.medium}
             letterSpacing={-0.28}
             color={textColor}
-          />
+          >
+            {/* "@" mentions: photo 14 r2 · 4 · name one weight up (SemiBold)
+                in the mention blue, no "@"; tap → their profile */}
+            {!translated && item?.mentions?.length
+              ? mentionSegments(item.content, item.mentions).map((seg, i) => {
+                  const u = seg.mention?.user;
+                  if (!seg.mention || !u?._id) return <Text key={i}>{seg.text}</Text>;
+                  return (
+                    <Text key={i} suppressHighlighting onPress={() => openMention(u)}>
+                      <View style={styles.mentionPhoto}>
+                        {u?.profile?.avatar ? (
+                          <ImageFast source={{ uri: u.profile.avatar }} style={styles.mentionPhotoImg} />
+                        ) : (
+                          <InitialsFill user={u} size={14} />
+                        )}
+                      </View>
+                      {/* 4pt gap: margins on inline views are ignored */}
+                      <Text style={styles.mentionGap}>{" "}</Text>
+                      <Text style={styles.mentionName}>{seg.text}</Text>
+                    </Text>
+                  );
+                })
+              : null}
+          </CustomText>
           {item?.reactions && Object.keys(item.reactions).length > 0 && (
             <View style={styles.reactions}>
               {Object.keys(item.reactions).map((emoji) => (
@@ -273,6 +321,28 @@ const createStyles = (colors, isDark) =>
     wrap: {
       marginBottom: 20, // Figma: messages 20 apart
     },
+    // Figma 8428:6553: photo 14 × 14 (round per client), 4 before the name
+    // inline views sit on the baseline: move the photo down so its centre
+    // meets the centre of the capitals (Poppins cap ≈ 0.7 × 14)
+    mentionPhoto: {
+      width: 14,
+      height: 14,
+      borderRadius: 7, // round (client)
+      overflow: "hidden",
+      transform: [{ translateY: 2 }],
+    },
+    mentionGap: {
+      fontSize: 14,
+      letterSpacing: 0,
+    },
+    mentionPhotoImg: {
+      width: 14,
+      height: 14,
+    },
+    mentionName: {
+      fontFamily: fonts.semiBold,
+      color: MENTION_COLOR,
+    },
     sent: {
       alignItems: "flex-end",
     },
@@ -328,7 +398,15 @@ const createStyles = (colors, isDark) =>
       borderRadius: 6,
       overflow: "hidden",
     },
-    mediaLoading: {
+    galleryTagWrap: { position: "absolute", top: 8, left: 0, right: 0, alignItems: "center" },
+  galleryTag: {
+    height: 20,
+    paddingHorizontal: 8,
+    borderRadius: 100,
+    justifyContent: "center",
+    backgroundColor: "rgba(18, 18, 18, 0.56)",
+  },
+  mediaLoading: {
       ...StyleSheet.absoluteFillObject,
       alignItems: "center",
       justifyContent: "center",

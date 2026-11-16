@@ -4,10 +4,14 @@ import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
 import { PNGIcons } from "../../../../assets/images/icons";
 import CustomText from "../../../../components/CustomText";
+import Icons from "../../../../components/Icons";
 import Divider from "../../../../components/Divider";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
-const SettingsItems = ({ title, des, screen, img, isLast, onPress }) => {
+// Figma Settings (2274:1656): 24pt Material icon, #A19375 at 64 %
+const GLYPH_COLOR = "rgba(161, 147, 117, 0.64)";
+
+const SettingsItems = ({ title, des, screen, img, glyph, glyphFamily = "MaterialSymbolsRounded", isLast, onPress }) => {
   const navigation = useNavigation();
   const { colors } = useTheme();
 
@@ -18,7 +22,13 @@ const SettingsItems = ({ title, des, screen, img, isLast, onPress }) => {
         onPress={() => (onPress ? onPress() : navigation.navigate(screen))}
       >
         <View style={[styles.row, { flex: 1 }]}>
-          <Image source={img ? img : PNGIcons.user} style={[styles.icon, { tintColor: colors.text }]} />
+          {glyph ? (
+            <View style={styles.icon}>
+              <Icons family={glyphFamily} name={glyph} size={24} color={GLYPH_COLOR} />
+            </View>
+          ) : (
+            <Image source={img ? img : PNGIcons.user} style={[styles.icon, { tintColor: colors.text }]} />
+          )}
           <View style={{ width: "90%" }}>
             <CustomText
               label={title}
@@ -63,6 +73,8 @@ const styles = StyleSheet.create({
     height: 24,
     width: 24,
     resizeMode: "contain",
+    alignItems: "center",
+    justifyContent: "center",
   },
   nextIocn: {
     height: 12,

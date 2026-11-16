@@ -9,7 +9,9 @@ import {
 } from "react-native";
 import { useSelector } from "react-redux";
 import fonts from "../../../../assets/fonts";
+import GradientBorder from "../../../../components/GradientBorder";
 import CustomText from "../../../../components/CustomText";
+import FlagImage from "../../../../components/FlagImage";
 import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { COLORS } from "../../../../utils/COLORS";
@@ -136,6 +138,10 @@ const FeedHeader = ({
   onLocationPress,
   onAddTopicPress,
   onFilterPress,
+  // active elections → "🇫🇷 PRÉSIDENTIELLE 2027" chips (Figma Home-Feed)
+  elections = [],
+  electionId = null,
+  onElectionPress,
 }) => {
   const navigation = useNavigation();
   const { colors, themeMode } = useTheme();
@@ -219,7 +225,8 @@ const FeedHeader = ({
     if (onSetPage) onSetPage(2);
   };
 
-  const isTopicActive = (index) => tab === index;
+  const isTopicActive = (index) => !electionId && tab === index;
+  const forYouActive = tab === null && !electionId;
 
   return (
     <View style={styles.container}>
@@ -230,12 +237,9 @@ const FeedHeader = ({
           onPress={() => navigation.navigate("SearchScreen")}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Icons
-            size={22}
-            name="search"
-            family="Feather"
-            color={COLORS.white}
-          />
+          {/* same `search` glyph (Material Symbols Rounded 24) as the Search
+              screen field — client: no outline search icon */}
+          <Icons size={24} name="search" family="MaterialSymbolsRounded" color={COLORS.white} />
         </TouchableOpacity>
 
         {/* Location pill — centered in the free space between the icons */}
@@ -412,7 +416,7 @@ const FeedHeader = ({
           style={[
             styles.forYouChip,
             {
-              backgroundColor: tab === null ? COLORS.white : colors.surfaceAlt,
+              backgroundColor: forYouActive ? COLORS.white : colors.surfaceAlt,
             },
           ]}
         >
@@ -422,14 +426,14 @@ const FeedHeader = ({
             family="MaterialSymbolsRoundedFilled"
             name="explore"
             size={16}
-            color={tab === null ? "#121212" : COLORS.gray64}
+            color={forYouActive ? "#121212" : COLORS.gray64}
           />
           <CustomText
             label="For You"
             fontSize={14}
             fontFamily={fonts.semiBold}
             letterSpacing={-0.56}
-            color={tab === null ? "#121212" : COLORS.gray64}
+            color={forYouActive ? "#121212" : COLORS.gray64}
             marginLeft={4}
           />
         </TouchableOpacity>
@@ -448,6 +452,40 @@ const FeedHeader = ({
             color={COLORS.white}
           />
         </TouchableOpacity>
+
+        {/* election chips (Figma Home-Feed): flag 14 · BoldItalic 14 −4%
+            caps; idle = white 4% + 1px blue → white → red outline whose
+            (solid, Figma stroke 1px inside);
+            picked = white chip, #121212 text */}
+        {elections.map((e) => {
+          const active = electionId === e._id;
+          return (
+            <TouchableOpacity
+              key={e._id}
+              activeOpacity={0.7}
+              onPress={() => onElectionPress?.(active ? null : e._id)}
+              style={[styles.topicChip, styles.electionChip, { backgroundColor: active ? COLORS.white : colors.surfaceAlt }]}
+            >
+              {!active && (
+                // fill = white 4% chip on the #121212 header, made opaque so
+                // the turning gradient only shows as the 1px line
+                <GradientBorder colors={["#007BFF", "#FFFFFF", "#EE1045"]} borderRadius={8} strokeWidth={1} fill="#1C1C1C" />
+              )}
+              <FlagImage code={e.country} size={14} />
+              <CustomText
+                label={String(e.title || "").toUpperCase()}
+                fontSize={14}
+                fontFamily={fonts.BoldItalic}
+                fontStyle="italic"
+                letterSpacing={-0.56}
+                color={active ? "#121212" : COLORS.gray64}
+                // italic overhang: the last glyph leans past its box, so the
+                // text gets 2pt of its own room (chip padding drops to 6)
+                containerStyle={styles.italicRoom}
+              />
+            </TouchableOpacity>
+          );
+        })}
 
         {tabNames.map((name, index) => {
           const active = isTopicActive(index);
@@ -582,4 +620,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 8,
   },
+  electionChip: { flexDirection: "row", gap: 4, paddingRight: 6, overflow: "hidden" },
+  italicRoom: { paddingRight: 2 },
 });

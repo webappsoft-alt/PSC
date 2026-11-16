@@ -6,7 +6,7 @@ import ErrorComponent from "../../../../components/ErrorComponent";
 import Icons from "../../../../components/Icons";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { COLORS } from "../../../../utils/COLORS";
-import MentionList from "./MentionList";
+import MentionCard from "../../../../components/MentionCard";
 
 // Viral: "@" at the end of the text opens the people picker; the picked
 // person is inserted as "@Name" and painted in the mention colour
@@ -41,7 +41,8 @@ export const newPollOption = (text = "", mention = null) => ({
  *    deleted (blur / backspace on an empty row / its clear button), keeping
  *    at least 2 rows
  */
-const PollOptionsEditor = ({ options, onChange, error }) => {
+// onMentionChange: the screen shows the floating people card for us
+const PollOptionsEditor = ({ options, onChange, error, onMentionChange }) => {
   const { colors } = useTheme();
   const inputRefs = useRef({});
   const pendingFocus = useRef(null);
@@ -85,6 +86,22 @@ const PollOptionsEditor = ({ options, onChange, error }) => {
     setMentioning(null);
     inputRefs.current[id]?.focus?.();
   };
+
+  // hand the "@…" search to the screen's floating card (kept fresh so the
+  // picked person goes into the current text)
+  useEffect(() => {
+    if (!onMentionChange) return;
+    onMentionChange(
+      mentioning
+        ? {
+            query: mentioning.query,
+            onSelect: (u) => applyMention(mentioning.id, u),
+            onClose: () => setMentioning(null),
+          }
+        : null,
+    );
+  }, [mentioning, options]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onMentionChange?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const removeOption = (id, focusPrevious = false) => {
     if (options.length <= POLL_MIN_OPTIONS) {
@@ -198,10 +215,14 @@ const PollOptionsEditor = ({ options, onChange, error }) => {
               </TouchableOpacity>
             ) : null}
           </View>
-          {mentioning?.id === option.id ? (
-            <MentionList
+          {!onMentionChange && mentioning?.id === option.id ? (
+            // same floating card as chat (FloatingSheet style)
+            <MentionCard
+              style={styles.mentionCard}
               query={mentioning.query}
               onSelect={(u) => applyMention(option.id, u)}
+              onClose={() => setMentioning(null)}
+              maxVisibleRows={3}
             />
           ) : null}
           </View>
@@ -249,6 +270,7 @@ const PollOptionsEditor = ({ options, onChange, error }) => {
 export default PollOptionsEditor;
 
 const styles = StyleSheet.create({
+  mentionCard: { marginTop: 8 },
   list: {
     gap: 6,
   },

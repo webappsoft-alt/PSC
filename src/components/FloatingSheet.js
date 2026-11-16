@@ -1,5 +1,5 @@
 import { BlurView } from "@react-native-community/blur";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -13,6 +13,12 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Reanimated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import fonts from "../assets/fonts";
 import { useTheme } from "../contexts/ThemeContext";
 import { COLORS } from "../utils/COLORS";
@@ -58,6 +64,10 @@ const FloatingSheet = ({
   // the next screen from here, not from the button press, or the fading
   // backdrop stays layered over the new screen
   onClosed,
+  // multi-step sheets (e.g. Job filters → Contract Types): changing the key
+  // springs the card to the new step's height and fades the step in, like
+  // the client's Pinterest reference — one card that adapts, never re-opens
+  stepKey,
 }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -65,6 +75,47 @@ const FloatingSheet = ({
   const slide = useRef(new Animated.Value(visible ? 0 : SCREEN_HEIGHT)).current;
   const onClosedRef = useRef(onClosed);
   onClosedRef.current = onClosed;
+
+  // step morph: animated card height + content fade/slide
+  const morph = stepKey !== undefined;
+  const [measured, setMeasured] = useState(false);
+  const cardH = useSharedValue(0);
+  const stepIn = useSharedValue(1);
+  const firstStep = useRef(true);
+  const onInnerLayout = useCallback(
+    (e) => {
+      if (!morph) return;
+      const h = e.nativeEvent.layout.height;
+      if (!measured) {
+        cardH.value = h;
+        setMeasured(true);
+      } else {
+        cardH.value = withSpring(h, { damping: 26, stiffness: 240, mass: 0.9 });
+      }
+    },
+    [morph, measured, cardH],
+  );
+  useLayoutEffect(() => {
+    if (!morph) return;
+    if (firstStep.current) {
+      firstStep.current = false;
+      return;
+    }
+    stepIn.value = 0;
+    stepIn.value = withTiming(1, { duration: 260 });
+  }, [stepKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // every opening measures afresh
+  useEffect(() => {
+    if (!visible) {
+      setMeasured(false);
+      firstStep.current = true;
+    }
+  }, [visible]);
+  const cardStyle = useAnimatedStyle(() => ({ height: cardH.value }));
+  const stepStyle = useAnimatedStyle(() => ({
+    opacity: stepIn.value,
+    transform: [{ translateY: (1 - stepIn.value) * 8 }],
+  }));
 
   useEffect(() => {
     if (visible) {
@@ -132,13 +183,17 @@ const FloatingSheet = ({
                     blurAmount={6}
                     reducedTransparencyFallbackColor="#2A2A2A"
                   />
+                  <Reanimated.View style={morph && measured ? [styles.morphCard, cardStyle] : null}>
                   <View
+                    onLayout={morph ? onInnerLayout : undefined}
                     style={[
                       styles.inner,
                       { backgroundColor: colors.background, gap },
                       innerStyle,
+                      morph && measured && styles.morphInner,
                     ]}
                   >
+                    <StepWrap morph={morph} gap={gap} style={stepStyle}>
                     {/* Figma text boxes are tight (subtitle box 10pt), so the
                         20pt gap reads as subtitle-centre → next-centre 30pt.
                         RN line boxes are taller; pull the next block up. */}
@@ -177,7 +232,9 @@ const FloatingSheet = ({
                     </View>
                     )}
                     {children}
+                    </StepWrap>
                   </View>
+                  </Reanimated.View>
                 </View>
               </Animated.View>
             </TouchableWithoutFeedback>
@@ -187,6 +244,10 @@ const FloatingSheet = ({
     </Modal>
   );
 };
+
+/** Step-morph sheets wrap their content to fade it; others render as before. */
+const StepWrap = ({ morph, gap, style, children }) =>
+  morph ? <Reanimated.View style={[{ gap }, style]}>{children}</Reanimated.View> : <>{children}</>;
 
 /** Figma sheet footer: Reset All (white 4%) + Confirm (white), h48 r100. */
 export const SheetActions = ({ onReset, onConfirm, confirmLabel = "Confirm", resetLabel = "Reset All" }) => {
@@ -435,6 +496,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.16)",
     overflow: "hidden",
   },
+  // step morph: the card's height animates; the content is laid out
+  // absolutely inside it so its natural height can be measured
+  morphCard: { overflow: "hidden", borderRadius: 28 },
+  morphInner: { position: "absolute", top: 0, left: 0, right: 0 },
   inner: {
     borderRadius: 28,
     overflow: "hidden",

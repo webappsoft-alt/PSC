@@ -56,6 +56,9 @@ const ToastItem = ({ toast, index, onHide }) => {
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(-150);
   const hideTimeout = useRef(null);
+  // one line = pill; when a message wraps, a pill becomes a blob, so use a card
+  const [multiline, setMultiline] = useState(false);
+  const radius = multiline ? 18 : 96;
 
   const hide = useCallback(() => {
     translateY.value = withSpring(-150, { damping: 15 });
@@ -122,8 +125,15 @@ const ToastItem = ({ toast, index, onHide }) => {
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.toastContainer, animatedStyle]}>
-        <View style={styles.cardInner}>
-          <Blur borderRadius={96} style={{ position: "absolute" }} />
+        <View
+          style={[
+            styles.cardInner,
+            { borderRadius: radius },
+            multiline && styles.cardMulti,
+          ]}
+          onLayout={(e) => setMultiline(e.nativeEvent.layout.height > 40)}
+        >
+          <Blur borderRadius={radius} style={{ position: "absolute" }} />
           <View style={styles.textContainer}>
             <View style={styles.icon}>
               <View style={styles.iconDot} />
@@ -141,7 +151,8 @@ const ToastItem = ({ toast, index, onHide }) => {
               letterSpacing={-0.2}
               fontFamily={fonts.medium}
               color={COLORS.white}
-              numberOfLines={2}
+              numberOfLines={3}
+              containerStyle={styles.message}
             />
           </View>
         </View>
@@ -189,10 +200,17 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flexDirection: "row",
-    gap: 4,
+    gap: 6,
     justifyContent: "center",
     alignItems: "center",
+    flexShrink: 1,
   },
+  cardMulti: {
+    paddingLeft: 12,
+    paddingRight: 16,
+    paddingVertical: 10,
+  },
+  message: { flexShrink: 1 },
   icon: {
     width: 16,
     height: 16,

@@ -11,6 +11,7 @@ import {
   isValidElement,
   useCallback,
   useContext,
+  useEffect,
   useState,
 } from "react";
 import {
@@ -59,6 +60,8 @@ const ScreenFooterInsetContext = createContext(0);
 const noopScrollProps = (own) =>
   typeof own === "function" ? { onScroll: own } : own || {};
 const ScreenScrollPropsContext = createContext(noopScrollProps);
+// receives the ScrollView's native-driven scroll value (sticky headers)
+const StickyScrollValueContext = createContext(null);
 // measured header heights per route, so a revisit lays out on the first frame
 const headerHeightCache = new Map();
 
@@ -109,7 +112,13 @@ export const ScreenFooterSpacer = ({ extra = 0 }) => {
 const BelowHeaderSticky = forwardRef(
   ({ onLayout, scrollAnimatedValue, nativeID, children }, ref) => {
     const inset = useContext(ScreenHeaderInsetContext);
+    const onStickyScrollValue = useContext(StickyScrollValueContext);
     const [layoutY, setLayoutY] = useState(null);
+    // hand the native scroll value to the screen (scroll-linked animations
+    // that run on the UI thread, e.g. the profile's compact header)
+    useEffect(() => {
+      onStickyScrollValue?.(scrollAnimatedValue);
+    }, [onStickyScrollValue, scrollAnimatedValue]);
     // ScrollView hands every sticky header the next one's y; not needed here
     useImperativeHandle(ref, () => ({ setNextHeaderY: () => {} }), []);
     const start = layoutY == null ? null : Math.max(0, layoutY - inset);
@@ -179,6 +188,7 @@ const ScreenWrapper = ({
   scrollEventThrottle = 16,
   headerFloating = false,
   scrollRef,
+  onStickyScrollValue,
   stickyHeaderIndices,
   // progressive-blur floating header; defaults on for `scrollEnabled` screens
   headerBlur,
@@ -236,6 +246,7 @@ const ScreenWrapper = ({
       <ScreenHeaderInsetContext.Provider value={headerInset}>
       <ScreenFooterInsetContext.Provider value={footerInset}>
       <ScreenScrollPropsContext.Provider value={edge.scrollProps}>
+      <StickyScrollValueContext.Provider value={onStickyScrollValue || null}>
         <View
           style={{
             flex: 1,
@@ -390,6 +401,7 @@ const ScreenWrapper = ({
             footerElement
           )}
         </View>
+      </StickyScrollValueContext.Provider>
       </ScreenScrollPropsContext.Provider>
       </ScreenFooterInsetContext.Provider>
       </ScreenHeaderInsetContext.Provider>

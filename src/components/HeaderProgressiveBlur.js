@@ -45,6 +45,20 @@ const BAND_STRIPS = 8;
 // "linear", fillAlpha 1).
 export const FOOTER_FILL_ALPHA = 0.64;
 
+/**
+ * Header look (client, Nov 13 — Make It Animated "Instagram header"): instead
+ * of a flat frosted bar that eases out over a short band, the blur and the
+ * tint ramp down across the whole header, so the content under the circles
+ * and pill tabs stays colourful and only the status-bar area is fully
+ * frosted. Same masked-blur technique (BlurView + gradient mask) as before;
+ * set to "band" to go back to the previous header.
+ */
+export const HEADER_BLUR_LOOK = "ramp";
+// "ramp": full blur and tint over the top RAMP_START of the header, then
+// both ease to 0 by its inner edge (+ the overhang band)
+const RAMP_START = 0.35;
+const RAMP_ALPHA = [0.64, 0.32, 0];
+
 const toRgb = (color, fallback) => {
   if (typeof color !== "string") return fallback;
   const hex = color.replace("#", "");
@@ -67,7 +81,8 @@ export const EdgeProgressiveBlur = memo(
     overhang = fade,
     // "band": tint flat behind the content, fading out over the band
     // (header); "linear": one gradient 0 → fillAlpha across the whole
-    // height (Figma nav container)
+    // height (Figma nav container); "ramp": blur and tint both ease out
+    // from RAMP_START of the height (HEADER_BLUR_LOOK)
     tintMode = "band",
     style,
   }) => {
@@ -89,12 +104,16 @@ export const EdgeProgressiveBlur = memo(
     // Figma fill.
     const blurType = isLight ? "light" : "dark";
     const top = edge === "top";
-    const body = Math.max(0, total - fade);
+    const ramp = tintMode === "ramp";
+    // ramp: the band is everything past RAMP_START of the height
+    const band =
+      ramp && total > 0 ? total - Math.round(total * RAMP_START) : fade;
+    const body = Math.max(0, total - band);
     // outer edge → inner edge: full blur behind the header content, then
     // the band is cut into thin strips whose blur fades out step by step
     // (radius and opacity), so there is no hard edge where it ends. The
     // layers sit side by side (never stacked) so the material tint is even.
-    const strip = Math.max(1, Math.round(fade / BAND_STRIPS));
+    const strip = Math.max(1, Math.round(band / BAND_STRIPS));
     const bodyPx = Math.round(body);
     const layers =
       total > 0
@@ -120,10 +139,26 @@ export const EdgeProgressiveBlur = memo(
           ]
         : [];
     const fadeStart = total > 0 ? body / total : 1;
-    const tint = tintMode === "linear"
+    const tint = ramp
       ? top
-        ? { colors: [`rgba(${rgb}, ${fillAlpha})`, `rgba(${rgb}, 0)`], locations: [0, 1] }
-        : { colors: [`rgba(${rgb}, 0)`, `rgba(${rgb}, ${fillAlpha})`], locations: [0, 1] }
+        ? {
+            colors: RAMP_ALPHA.map((a) => `rgba(${rgb}, ${a})`),
+            locations: [0, fadeStart, 1],
+          }
+        : {
+            colors: [...RAMP_ALPHA].reverse().map((a) => `rgba(${rgb}, ${a})`),
+            locations: [0, 1 - fadeStart, 1],
+          }
+      : tintMode === "linear"
+      ? top
+        ? {
+            colors: [`rgba(${rgb}, ${fillAlpha})`, `rgba(${rgb}, 0)`],
+            locations: [0, 1],
+          }
+        : {
+            colors: [`rgba(${rgb}, 0)`, `rgba(${rgb}, ${fillAlpha})`],
+            locations: [0, 1],
+          }
       : top
       ? {
           colors: [
@@ -207,6 +242,7 @@ const HeaderProgressiveBlur = ({ style, color, visible, fade, overhang }) => (
     color={color}
     fade={fade}
     overhang={overhang}
+    tintMode={HEADER_BLUR_LOOK}
     style={style}
   />
 );

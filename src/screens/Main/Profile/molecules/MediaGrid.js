@@ -25,6 +25,7 @@ const MediaGrid = ({
   marginBottom,
   onEditModeChange,
   onSelectionChange,
+  editable = true, // owner tools (edit / lock) only on your own media
 }) => {
   const { colors } = useTheme();
   const [isEditMode, setIsEditMode] = useState(false);
@@ -167,7 +168,7 @@ const MediaGrid = ({
           <CustomText label="Most Recent" fontFamily={fonts.medium} />
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={toggleEditMode}>
+          {editable && <TouchableOpacity onPress={toggleEditMode}>
             <Image
               source={Images.edit}
               style={[
@@ -175,36 +176,49 @@ const MediaGrid = ({
                 { tintColor: isEditMode ? colors.textSecondary : colors.text },
               ]}
             />
-          </TouchableOpacity>
+          </TouchableOpacity>}
           <TouchableOpacity>
             <Image
               source={Images.gridProfile}
               style={[styles.headerIcon, { tintColor: colors.text }]}
             />
           </TouchableOpacity>
-          <TouchableOpacity>
+{editable && (          <TouchableOpacity>
             <Image
               source={Images.lock}
               style={[styles.headerIcon, { tintColor: colors.text }]}
             />
-          </TouchableOpacity>
+          </TouchableOpacity>)}
         </View>
       </View>
 
       <FlatList
         data={mediaData}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => String(item.id ?? item._id ?? index)}
         numColumns={3}
         scrollEnabled={false}
         contentContainerStyle={styles.gridContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
+            <Icons
+              family="MaterialSymbolsRoundedFilled"
+              name="image"
+              size={80}
+              color="rgba(255, 255, 255, 0.48)"
+            />
             <CustomText
-              label="No Media Found"
-              color={colors.textSecondary}
-              fontSize={16}
-              textAlign={"center"}
+              label="No Media"
+              fontSize={32}
+              fontFamily={fonts.BoldItalic}
+              fontStyle="italic"
+              color="#FFFFFF"
+              marginTop={12}
+            />
+            <CustomText
+              label="There are no photos or videos right now."
+              fontFamily={fonts.medium}
+              color="rgba(255, 255, 255, 0.48)"
             />
           </View>
         }

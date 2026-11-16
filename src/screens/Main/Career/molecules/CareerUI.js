@@ -122,12 +122,12 @@ export const SearchPill = ({
 );
 
 /** Section title — Medium 18 −0.5% */
-export const SectionTitle = ({ label }) => (
+export const SectionTitle = ({ label, letterSpacing = -0.09 }) => (
   // trimmed to the Figma 13pt text box, so section padding / gaps are exact
   <CustomText
     label={label}
     fontSize={18}
-    letterSpacing={-0.09}
+    letterSpacing={letterSpacing}
     fontFamily={fonts.medium}
     color="#FFFFFF"
     marginTop={-X(18)}
@@ -195,7 +195,7 @@ export const FieldBox = ({
 };
 
 /** Field box with a typed value (same box as FieldBox; label + TextInput Medium 16 −0.5) */
-export const TextFieldBox = ({ label, value, onChangeText, placeholder, keyboardType, maxLength, autoCapitalize }) => (
+export const TextFieldBox = ({ label, value, onChangeText, placeholder, keyboardType, maxLength, autoCapitalize, valueLetterSpacing }) => (
   <View style={styles.field}>
     <View style={styles.fieldColumn}>
       <CustomText
@@ -217,16 +217,41 @@ export const TextFieldBox = ({ label, value, onChangeText, placeholder, keyboard
         maxLength={maxLength}
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
-        style={styles.fieldInput}
+        style={[styles.fieldInput, valueLetterSpacing != null && { letterSpacing: valueLetterSpacing }]}
       />
     </View>
+  </View>
+);
+
+/**
+ * Material Symbols glyph centred in an exact size × size box (same technique
+ * as GlassBackButton): the font's line box is taller than the em square, so
+ * a bare glyph sits low and clips in rows sized to the icon.
+ */
+export const BoxIcon = ({ name, size = 12, color, family = MS }) => (
+  <View style={{ width: size, height: size }}>
+    <Icons
+      family={family}
+      name={name}
+      size={size}
+      color={color}
+      style={{
+        position: "absolute",
+        left: 0,
+        top: -0.1 * size,
+        width: size,
+        height: 1.2 * size,
+        lineHeight: 1.2 * size,
+        textAlign: "center",
+      }}
+    />
   </View>
 );
 
 /** Figma helper row under a field: `info` 12 white 48% · 4 · Regular 12 −3% */
 export const HelperRow = ({ label, icon = "info", color = WHITE_48, letterSpacing = -0.36 }) => (
   <View style={styles.helperRow}>
-    <Icons family={MS} name={icon} size={12} color={color} />
+    <BoxIcon name={icon} size={12} color={color} />
     <CustomText
       label={label}
       fontSize={12}
@@ -312,17 +337,18 @@ export const SelectChip = ({ label, selected, onPress, disabled, flex }) => (
 );
 
 /** Figma footer 94h padding 12 / 12 / 34: Continue 48h r100 gold, Medium 18 */
-export const FooterButton = ({ label = "Continue", onPress, disabled, loading }) => {
+// `glass`: Figma Job-Apply footer (8336:5704) — white 1% over the blur, no top rule
+export const FooterButton = ({ label = "Continue", onPress, disabled, loading, loadingLabel = "Saving…", glass }) => {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 0 }]}>
+    <View style={[styles.footer, glass && styles.footerGlass, { paddingBottom: Math.max(insets.bottom, 12) + 0 }]}>
       <TouchableOpacity
         activeOpacity={0.8}
         disabled={disabled || loading}
         onPress={onPress}
         style={[styles.footerBtn, (disabled || loading) && { opacity: 0.5 }]}
       >
-        <CustomText label={loading ? "Saving…" : label} fontSize={18} fontFamily={fonts.medium} color={INK} />
+        <CustomText label={loading ? loadingLabel : label} fontSize={18} fontFamily={fonts.medium} color={INK} />
       </TouchableOpacity>
     </View>
   );
@@ -396,6 +422,7 @@ const styles = StyleSheet.create({
   // Figma "Frame 10" (Add-An-Experience): solid #121212, 1pt #262626 line
   // above it (the page's section gap), padding 12/12/34
   footer: { paddingHorizontal: 12, paddingTop: 12, backgroundColor: INK, borderTopWidth: 1, borderTopColor: SHEET_BG },
+  footerGlass: { backgroundColor: "rgba(255, 255, 255, 0.01)", borderTopWidth: 0 },
   footerBtn: {
     height: 48,
     borderRadius: 100,

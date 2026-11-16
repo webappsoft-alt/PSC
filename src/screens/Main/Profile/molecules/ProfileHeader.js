@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 
 import fonts from "../../../../assets/fonts";
+import { CopyLinkSvg } from "../../../../assets/svgs";
 import Blur from "../../../../components/Blur";
 import CustomText from "../../../../components/CustomText";
 import GlassBackButton from "../../../../components/GlassBackButton";
@@ -87,14 +88,18 @@ const TierGradient = ({ id, color, innerOpacity = 1 }) => {
   );
 };
 
-const HeaderIcon = ({ name, onPress, color, disabled, size = 24, box = 40 }) => (
+const HeaderIcon = ({ name, onPress, color, disabled, size = 24, box = 40, svg: Glyph }) => (
   <TouchableOpacity
     activeOpacity={0.6}
     onPress={onPress}
     disabled={disabled}
     style={[styles.iconBox, { width: box }]}
   >
-    <Icons family={MSF} name={name} size={size} color={color} />
+    {Glyph ? (
+      <Glyph width={size} height={size} color={color} />
+    ) : (
+      <Icons family={MSF} name={name} size={size} color={color} />
+    )}
   </TouchableOpacity>
 );
 
@@ -115,6 +120,77 @@ const SkeletonBlock = ({ style, color }) => {
   return <Animated.View style={[{ backgroundColor: color, opacity }, style]} />;
 };
 
+/**
+ * The profile header's background (Figma): cover image + tier radial
+ * gradient (#121212 56% → tier colour), cover + #121212 56%, the tier
+ * gradient alone, or #121212 64% + 32 blur. Shared with the compact
+ * scrolled header (Figma "Header-When-Scrolling-Instagram-Inspired").
+ */
+export const ProfileHeaderBackground = ({ user, isUser = false, coverImage }) => {
+  const { isDark } = useTheme();
+  const tier = getProfileTier(user);
+  const hasTierBg = !isUser && !!tier.headerColor;
+  const gradientId = `profileHeader-${tier.key}-${coverImage ? "c" : "n"}`;
+
+  return coverImage ? (
+    <>
+      <ImageBackground
+        source={{ uri: coverImage }}
+        resizeMode="cover"
+        style={StyleSheet.absoluteFill}
+      />
+      {hasTierBg ? (
+        <TierGradient id={gradientId} color={tier.headerColor} innerOpacity={0.56} />
+      ) : (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: "rgba(18, 18, 18, 0.56)" },
+          ]}
+        />
+      )}
+    </>
+  ) : hasTierBg ? (
+    <TierGradient id={gradientId} color={tier.headerColor} />
+  ) : (
+    <>
+      {/* opacity = blur: #121212 @ 64% + 32 background blur */}
+      <Blur
+        blurType={isDark ? "dark" : "xlight"}
+        blurAmount={32}
+        borderRadius={0.1}
+      />
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: isDark
+              ? "rgba(18, 18, 18, 0.64)"
+              : "rgba(250, 250, 250, 0.64)",
+          },
+        ]}
+      />
+    </>
+  );
+
+};
+
+/** Name badge: Premium/Premium+ tier star, else blue (verified) / grey shield. */
+export const ProfileNameBadge = ({ user, mutedColor = "rgba(255, 255, 255, 0.64)" }) => {
+  const tier = getProfileTier(user);
+  const isVerified = !!user?.profile?.isVerified;
+  return tier.star ? (
+    <Image source={tier.star} style={styles.badge} />
+  ) : (
+    <Icons
+      family={isVerified ? MSF : MS}
+      name="verified_user"
+      size={14}
+      color={isVerified ? "rgba(0, 123, 255, 1)" : mutedColor}
+    />
+  );
+};
+
 const ProfileHeader = ({
   isUser = false, // true → the signed-in user's own profile
   isBack,
@@ -123,6 +199,7 @@ const ProfileHeader = ({
   coverImage,
   user,
   loading = false, // other user's profile still loading → skeleton
+  contentOpacity, // Animated: fades out as the compact scrolled header comes in
 }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -164,48 +241,7 @@ const ProfileHeader = ({
       ? navigation.goBack()
       : navigation.reset({ index: 0, routes: [{ name: "TabStack" }] });
 
-  const gradientId = `profileHeader-${tier.key}-${coverImage ? "c" : "n"}`;
-
-  const background = coverImage ? (
-    <>
-      <ImageBackground
-        source={{ uri: coverImage }}
-        resizeMode="cover"
-        style={StyleSheet.absoluteFill}
-      />
-      {hasTierBg ? (
-        <TierGradient id={gradientId} color={tier.headerColor} innerOpacity={0.56} />
-      ) : (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: "rgba(18, 18, 18, 0.56)" },
-          ]}
-        />
-      )}
-    </>
-  ) : hasTierBg ? (
-    <TierGradient id={gradientId} color={tier.headerColor} />
-  ) : (
-    <>
-      {/* opacity = blur: #121212 @ 64% + 32 background blur */}
-      <Blur
-        blurType={isDark ? "dark" : "xlight"}
-        blurAmount={32}
-        borderRadius={0.1}
-      />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            backgroundColor: isDark
-              ? "rgba(18, 18, 18, 0.64)"
-              : "rgba(250, 250, 250, 0.64)",
-          },
-        ]}
-      />
-    </>
-  );
+  const background = <ProfileHeaderBackground user={user} isUser={isUser} coverImage={coverImage} />;
 
   return (
     <View
@@ -217,7 +253,7 @@ const ProfileHeader = ({
       ]}
     >
       {background}
-      <View style={styles.row}>
+      <Animated.View style={[styles.row, contentOpacity != null && { opacity: contentOpacity }]}>
         <View style={styles.nameRow}>
           {isBack && (
             <GlassBackButton
@@ -243,16 +279,7 @@ const ProfileHeader = ({
             />
             {/* Premium/Premium+ → tier star only (already verified);
                 otherwise blue filled shield if verified, grey outline if not */}
-            {tier.star ? (
-              <Image source={tier.star} style={styles.badge} />
-            ) : (
-              <Icons
-                family={isVerified ? MSF : MS}
-                name="verified_user"
-                size={14}
-                color={isVerified ? "rgba(0, 123, 255, 1)" : mutedColor}
-              />
-            )}
+            <ProfileNameBadge user={user} mutedColor={mutedColor} />
             </>
           )}
         </View>
@@ -283,6 +310,7 @@ const ProfileHeader = ({
             <>
               <HeaderIcon
                 name="content_copy"
+                svg={CopyLinkSvg} // Figma: Material Icons Round "content_copy_black_24dp"
                 color={contentColor}
                 onPress={handleCopyLink}
               />
@@ -299,7 +327,7 @@ const ProfileHeader = ({
             </>
           )}
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 };

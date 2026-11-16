@@ -43,6 +43,7 @@ import { post, put } from "../../../services/ApiRequest";
 import { COLORS } from "../../../utils/COLORS";
 import { uploadAndGetUrl, uploadFileGetUrl } from "../../../utils/constants";
 import { ToastMessage } from "../../../utils/ToastMessage";
+import { HELD_MESSAGE, blockedMessage, isHeld } from "../../../utils/moderation";
 import PeopleSelection from "../PublishPost/molecules/PeopleSelection";
 import { useTheme } from "../../../contexts/ThemeContext";
 
@@ -534,7 +535,9 @@ const PublishShort = ({ route }) => {
             console.log("Create Response:", response);
 
             if (response?.data?.success) {
-              completeUpload("Post created successfully");
+              completeUpload(
+                isHeld(response) ? HELD_MESSAGE : "Post created successfully",
+              );
             } else {
               const errorMessage =
                 response?.data?.message ||
@@ -545,7 +548,8 @@ const PublishShort = ({ route }) => {
             }
           }
         } catch (error) {
-          console.error("Error submitting post:", error);
+          // a blocked post is an expected outcome, not an app error
+          if (!blockedMessage(error)) console.error("Error submitting post:", error);
           if (editMode) {
             const errorMessage =
               error.response?.data?.message ||
@@ -553,7 +557,9 @@ const PublishShort = ({ route }) => {
               "Failed to submit post";
             ToastMessage(errorMessage, "error");
           } else {
-            failUpload("Failed to create post. Please try again.");
+            failUpload(
+              blockedMessage(error) || "Failed to create post. Please try again.",
+            );
           }
         } finally {
           setIsSubmitting(false);
@@ -869,6 +875,7 @@ const PublishShort = ({ route }) => {
             fontFamily={fonts.medium}
             onPress={handleSubmit}
             loading={isSubmitting || imgLoading}
+            indicatorColor={COLORS.white}
             disabled={isSubmitting || imgLoading}
           />
 
@@ -1108,7 +1115,7 @@ const PublishShort = ({ route }) => {
                       <View style={styles.uploadingIndicator}>
                         <ActivityIndicator
                           size="small"
-                          color={COLORS.buttonColor}
+                          color={COLORS.white}
                         />
                       </View>
                     </>

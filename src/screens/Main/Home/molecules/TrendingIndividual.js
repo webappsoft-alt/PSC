@@ -111,6 +111,7 @@ const TrendingIndividual = () => {
         </View>
 
         <ScrollView
+          style={styles.cardsScroll}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.cards}
@@ -269,7 +270,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cards: { gap: 8 },
+  // bleed the row to the screen edges (section pads 12) so cards scroll off
+  // the edge instead of being clipped 12pt in; first / last card keep the 12
+  cardsScroll: { marginHorizontal: -12 },
+  cards: { gap: 8, paddingHorizontal: 12 },
   card: {
     width: 140,
     height: 186,

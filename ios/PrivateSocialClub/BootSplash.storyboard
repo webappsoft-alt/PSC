@@ -18,7 +18,7 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <imageView autoresizesSubviews="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="BootSplashLogo-c899fb" translatesAutoresizingMaskIntoConstraints="NO" id="3lX-Ut-9ad">
-                                <rect key="frame" x="97.5" y="243.5" width="180" height="180"/>
+                                <rect key="frame" x="147.5" y="293.5" width="80" height="80"/>
                                 <accessibility key="accessibilityConfiguration">
                                     <accessibilityTraits key="traits" image="YES" notEnabled="YES"/>
                                 </accessibility>
@@ -38,7 +38,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="BootSplashLogo-c899fb" width="180" height="180"/>
+        <image name="BootSplashLogo-c899fb" width="80" height="80"/>
         <namedColor name="BootSplashBackground-c899fb">
             <color red="0.00000000000000" green="0.00000000000000" blue="0.00000000000000" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>

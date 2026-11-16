@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Animated, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 
 import fonts from "../../../../assets/fonts";
 import CustomText from "../../../../components/CustomText";
@@ -8,6 +8,7 @@ import UserBadge from "../../../../components/UserBadge";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { get } from "../../../../services/ApiRequest";
 import InitialsFill from "../../../../components/InitialsFill";
+import { SheetCloseButton } from "../../../../components/FloatingSheet";
 
 const MAX_ROWS = 5;
 
@@ -17,7 +18,10 @@ const MAX_ROWS = 5;
  * titled "Mention People" with the count. Shown inline under the option being
  * typed (the publish form is a scroll view, not a sheet).
  */
-const MentionList = ({ query, onSelect }) => {
+// one row: 40 avatar + 8 / 8 padding
+const ROW_H = 56;
+
+const MentionList = ({ query, onSelect, onClose, maxVisibleRows }) => {
   const { colors } = useTheme();
   const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +48,30 @@ const MentionList = ({ query, onSelect }) => {
   }, [query]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, onClose && styles.cardContainer]}>
+      {onClose ? (
+        // floating card (chat): FloatingSheet "sm" header — SemiBold 16
+        // −2% title, count, 32 close circle
+        <View style={styles.cardHeader}>
+          <View style={[styles.titleRow, styles.cardTitle]}>
+            <CustomText
+              label="Mention People"
+              fontSize={16}
+              letterSpacing={-0.32}
+              fontFamily={fonts.semiBold}
+              color={colors.text}
+            />
+            <CustomText
+              label={`${people.length}`}
+              fontSize={16}
+              letterSpacing={-0.32}
+              fontFamily={fonts.medium}
+              color={colors.textSecondary}
+            />
+          </View>
+          <SheetCloseButton onPress={onClose} />
+        </View>
+      ) : (
       <View style={styles.titleRow}>
         <CustomText
           label="Mention People"
@@ -59,6 +86,7 @@ const MentionList = ({ query, onSelect }) => {
           color={colors.text}
         />
       </View>
+      )}
       {loading ? (
         [0, 1, 2].map((i) => <RowSkeleton key={i} colors={colors} />)
       ) : people.length === 0 ? (
@@ -70,7 +98,10 @@ const MentionList = ({ query, onSelect }) => {
           marginVertical={16}
         />
       ) : (
-        people.slice(0, MAX_ROWS).map((u) => (
+        // card (chat): everyone matching, scrolling past `maxVisibleRows`
+        // (3 while the keyboard is up, so the card never reaches the header)
+        <Rows scroll={!!maxVisibleRows} maxHeight={(maxVisibleRows || MAX_ROWS) * ROW_H}>
+        {people.slice(0, maxVisibleRows ? 50 : MAX_ROWS).map((u) => (
           <TouchableOpacity
             key={u?._id}
             activeOpacity={0.7}
@@ -102,11 +133,26 @@ const MentionList = ({ query, onSelect }) => {
               />
             </View>
           </TouchableOpacity>
-        ))
+        ))}
+        </Rows>
       )}
     </View>
   );
 };
+
+const Rows = ({ scroll, maxHeight, children }) =>
+  scroll ? (
+    <ScrollView
+      style={{ maxHeight }}
+      keyboardShouldPersistTaps="always"
+      showsVerticalScrollIndicator={false}
+      nestedScrollEnabled
+    >
+      {children}
+    </ScrollView>
+  ) : (
+    <>{children}</>
+  );
 
 const RowSkeleton = ({ colors }) => {
   const pulse = useRef(new Animated.Value(0)).current;
@@ -141,6 +187,18 @@ const styles = StyleSheet.create({
   container: {
     paddingTop: 8,
     paddingBottom: 4,
+  },
+  cardContainer: {
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  cardTitle: { paddingBottom: 0 },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingLeft: 4,
+    marginBottom: 4,
   },
   titleRow: {
     flexDirection: "row",

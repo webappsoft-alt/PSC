@@ -23,3 +23,4 @@ export { default as RegularSvg } from "./regular.svg";
 export { default as ProSvg } from "./pro.svg";
 export { default as Stock } from "./Stock.svg";
 export { default as LockSvg } from "./LockSvg.svg";
+export { default as CopyLinkSvg } from "./copyLinkSvg.svg";

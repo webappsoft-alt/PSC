@@ -159,9 +159,9 @@ const requestGet = async (url, params = {}) => {
   }
 };
 
-const requestPost = async (url, data = {}) => {
+const requestPost = async (url, data = {}, config) => {
   try {
-    const response = await instance.post(url, data);
+    const response = await instance.post(url, data, config);
     return response;
   } catch (error) {
     handleApiError(error, "POST", url);
@@ -207,6 +207,14 @@ const renewAuthToken = async (refreshToken) => {
 
     const newToken = response.data.tokens;
     await AsyncStorage.setItem("token", newToken?.accessToken);
+    // keep the store's token (the socket's credential) in step
+    try {
+      const { store } = require("../store");
+      const { setToken } = require("../store/reducer/AuthConfig");
+      if (newToken?.accessToken) store.dispatch(setToken(newToken.accessToken));
+    } catch (e) {
+      // store not ready — AsyncStorage still has the new token
+    }
     await AsyncStorage.setItem("refreshToken", newToken?.refreshToken);
 
     console.log("Token refreshed successfully");

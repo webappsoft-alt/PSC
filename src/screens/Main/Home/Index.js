@@ -45,6 +45,7 @@ import {
 import MomentCard from "./molecules/MomentCard";
 import NewPostsPill from "./molecules/NewPostsPill";
 import FeedPostItem from "./molecules/FeedPostItem";
+import FeedEventCard from "./molecules/FeedEventCard";
 import PostCard from "./molecules/PostCard";
 import PostCardSkeleton from "./molecules/PostCardSkeleton";
 import RadioCard from "./molecules/RadioCard";
@@ -87,6 +88,7 @@ const Home = ({
   isFocusedPage,
   sharedTab,
   sharedTabNames,
+  sharedElectionId,
   feedFilters,
 }) => {
   const navigation = useNavigation();
@@ -100,6 +102,8 @@ const Home = ({
   const tab = sharedTab;
   const [posts, setPosts] = useState([]);
   const [unfollowedPosts, setUnfollowedPosts] = useState([]);
+  // upcoming events mixed into the feed (Figma Home-Feed event card)
+  const [feedEvents, setFeedEvents] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [skeletonLoading, setSkeletonLoading] = useState(true);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
@@ -343,6 +347,10 @@ const Home = ({
           if (selectedTopic) {
             endpoint += `&topic=${selectedTopic}`;
           }
+          // election chip (e.g. PRÉSIDENTIELLE 2027)
+          if (sharedElectionId) {
+            endpoint += `&election=${sharedElectionId}`;
+          }
 
           if (selectedHashtag) {
             const tagObj = hashtags.find((h) => h._id === selectedHashtag);
@@ -427,6 +435,7 @@ const Home = ({
       selectedTrendingTopic,
       tab,
       sharedTabNames,
+      sharedElectionId,
       feedFilters,
       feedLocation,
     ],
@@ -559,6 +568,17 @@ const Home = ({
     fetchTrendingTopics();
   }, [fetchTrendingTopics]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await get(`events?startDateFrom=${encodeURIComponent(new Date().toISOString())}&limit=10`);
+        if (res?.data?.success && Array.isArray(res.data.data)) setFeedEvents(res.data.data);
+      } catch (e) {
+        console.log("feed events error", e);
+      }
+    })();
+  }, []);
+
   // Figma: list content starts 1px below the 170pt header.
   // On iOS the pager (react-native-pager-view 8 / SwiftUI TabView) already
   // shifts every page down by the status-bar safe-area inset, so that part of
@@ -673,6 +693,12 @@ const Home = ({
       if (postsAdded === 5) {
         result.push({ type: "trendingIndividual" });
       }
+      // one upcoming event after post 7, then every 10 posts (≈10 % of the
+      // feed — client mix; the final order comes from the client)
+      if (postsAdded >= 7 && (postsAdded - 7) % 10 === 0) {
+        const event = feedEvents[(postsAdded - 7) / 10];
+        if (event) result.push({ type: "event", data: event });
+      }
     };
 
     posts.forEach((post) => addPost(post));
@@ -683,7 +709,7 @@ const Home = ({
     }
 
     return result;
-  }, [posts, unfollowedPosts]);
+  }, [posts, unfollowedPosts, feedEvents]);
 
   useEffect(() => {
     hasFeedContentRef.current = posts.length > 0 || unfollowedPosts.length > 0;
@@ -726,6 +752,10 @@ const Home = ({
             <TrendingIndividual />
           </>
         );
+      }
+
+      if (item.type === "event") {
+        return <FeedEventCard event={item.data} />;
       }
 
       if (item.type === "unfollowedText") {
@@ -831,6 +861,7 @@ const Home = ({
 
   const keyExtractor = useCallback((item, index) => {
     if (item.type === "post") return `post-${item.data?._id || index}`;
+    if (item.type === "event") return `event-${item.data?._id || index}`;
     return `${item.type}-${index}`;
   }, []);
 

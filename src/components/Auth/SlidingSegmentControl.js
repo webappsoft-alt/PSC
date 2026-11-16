@@ -44,6 +44,7 @@ function SegmentLabel({
   inactiveLabelColor,
   disabledLabelColor,
   labelStyle,
+  activeLabelStyle,
 }) {
   const textStyle = useAnimatedStyle(() => {
     const t = 1 - Math.min(1, Math.abs(progress.value - index));
@@ -73,6 +74,7 @@ function SegmentLabel({
           },
           !item.disabled && textStyle,
           labelStyle,
+          selected && activeLabelStyle,
         ]}
       >
         {item.label}
@@ -90,6 +92,7 @@ function SegmentLabels({
   inactiveLabelColor,
   disabledLabelColor,
   labelStyle,
+  activeLabelStyle,
 }) {
   return (
     <>
@@ -105,6 +108,7 @@ function SegmentLabels({
           inactiveLabelColor={inactiveLabelColor}
           disabledLabelColor={disabledLabelColor}
           labelStyle={labelStyle}
+          activeLabelStyle={activeLabelStyle}
         />
       ))}
     </>
@@ -173,6 +177,7 @@ export function SlidingSegmentControl({
   gap = DEFAULT_GAP,
   style,
   labelStyle,
+  activeLabelStyle,
 }) {
   const { count, index, progress, startIndex, trackW, snapTo, swipeEnabled } =
     useSegmentProgress(items, selectedKey, onChange);
@@ -242,6 +247,7 @@ export function SlidingSegmentControl({
           inactiveLabelColor={inactiveLabelColor}
           disabledLabelColor={disabledLabelColor}
           labelStyle={labelStyle}
+          activeLabelStyle={activeLabelStyle}
         />
       </View>
     </GestureDetector>

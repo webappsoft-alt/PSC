@@ -340,6 +340,11 @@ export const AuthTextField = forwardRef(
       autoComplete,
       valueFamily,
       marginTop,
+      // multi-line text box (e.g. a report): grows from minHeight as you type
+      multiline = false,
+      minHeight = 132,
+      // fixed text before the value (e.g. "@" on the username field)
+      prefix,
     },
     ref,
   ) => {
@@ -380,6 +385,9 @@ export const AuthTextField = forwardRef(
         onSubmitEditing={onSubmitEditing}
         textContentType={textContentType}
         autoComplete={autoComplete}
+        multiline={multiline}
+        textAlignVertical={multiline ? "top" : undefined}
+        scrollEnabled={multiline ? false : undefined}
         style={[
           styles.input,
           {
@@ -388,6 +396,7 @@ export const AuthTextField = forwardRef(
             color: valueColor,
             height: labeled ? 22.4 : "100%",
           },
+          multiline && { height: undefined, minHeight: minHeight - 24, lineHeight: 22 },
         ]}
       />
     );
@@ -405,12 +414,19 @@ export const AuthTextField = forwardRef(
             backgroundColor: hasError ? p.errorBg : p.t04,
             borderColor: hasError ? p.error : "transparent",
           },
+          multiline && {
+            height: undefined,
+            minHeight,
+            alignItems: "flex-start",
+            paddingVertical: 11,
+          },
         ]}
       >
         <View
           style={[
             styles.fieldBody,
             labeled ? styles.fieldBodyLabeled : styles.fieldBodyPlain,
+            multiline && { height: undefined },
           ]}
         >
           {labeled ? (
@@ -421,7 +437,14 @@ export const AuthTextField = forwardRef(
               color={hasError ? p.error : p.t64}
             />
           ) : null}
-          {body}
+          {prefix ? (
+            <View style={styles.prefixRow}>
+              <CustomText label={prefix} fontSize={16} fontFamily={fonts.regular} letterSpacing={letterSpacing} color={hasError ? p.error : p.t48} />
+              <View style={styles.prefixInput}>{body}</View>
+            </View>
+          ) : (
+            body
+          )}
         </View>
         {secure ? (
           <TouchableOpacity
@@ -970,6 +993,8 @@ const styles = StyleSheet.create({
   fieldBodyPlain: {
     justifyContent: "center",
   },
+  prefixRow: { flexDirection: "row", alignItems: "center", height: "100%" },
+  prefixInput: { flex: 1, height: "100%", justifyContent: "center" },
   fieldBodyLabeled: {
     paddingTop: 12 - capTop(12) - 1,
   },

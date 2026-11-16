@@ -183,3 +183,7 @@ export const CURRENCIES = [
   { value: "GBP", label: "GBP", flag: "gb" },
 ];
 export const currencyFlag = (code) => CURRENCIES.find((c) => c.value === code)?.flag || "us";
+
+/** "automotive design" → "Automotive Design" (client: capital first letter of each word) */
+export const titleCase = (v) =>
+  String(v ?? "").replace(/(^|[\s/(-])([a-zà-öø-ÿ])/g, (m, a, b) => a + b.toUpperCase());

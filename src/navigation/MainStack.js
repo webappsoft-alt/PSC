@@ -70,6 +70,9 @@ import JobDetail from "../screens/Main/Jobs/JobDetail";
 import JobOffer from "../screens/Main/Jobs/JobOffer";
 import JobCandidate from "../screens/Main/Jobs/JobCandidate";
 import RequestsScreen from "../screens/Main/Profile/RequestsScreen.js";
+import CompanyPeople from "../screens/Main/Profile/CompanyPeople";
+import FinancialReports from "../screens/Main/Profile/FinancialReports";
+import InteractionHistory from "../screens/Main/Profile/InteractionHistory";
 import UserProfile from "../screens/Main/Profile/UserProfile";
 import CreatePost from "../screens/Main/PublishPost/Index";
 import Friends from "../screens/Main/PublishPost/molecules/Friends.js";
@@ -78,6 +81,8 @@ import SearchScreen from "../screens/Main/SearchScreen";
 import PostFilter from "../screens/Main/SearchScreen/PostFilter.js";
 import Settings from "../screens/Main/Settings";
 import DataUsage from "../screens/Main/Settings/AccessibilityPreferences/DataUsage.js";
+import MyDocuments from "../screens/Main/Settings/Documents/MyDocuments.js";
+import JobApply from "../screens/Main/Jobs/JobApply.js";
 import DateFormat from "../screens/Main/Settings/AccessibilityPreferences/DateFormat.js";
 import Display from "../screens/Main/Settings/AccessibilityPreferences/Display.js";
 import FirstDayOfWeek from "../screens/Main/Settings/AccessibilityPreferences/FirstDayOfWeek.js";
@@ -257,6 +262,9 @@ const MainStack = () => {
         <Stack.Screen name="InvestmentScreen" component={InvestmentScreen} />
         <Stack.Screen name="CommentScreen" component={CommentScreen} />
         <Stack.Screen name="UserProfile" component={UserProfile} />
+        <Stack.Screen name="CompanyPeople" component={CompanyPeople} />
+        <Stack.Screen name="FinancialReports" component={FinancialReports} />
+        <Stack.Screen name="InteractionHistory" component={InteractionHistory} />
         <Stack.Screen name="DetailPage" component={DetailPage} />
         <Stack.Screen
           name="StoryViewer"
@@ -383,6 +391,8 @@ const MainStack = () => {
         <Stack.Screen name="JobDetail" component={JobDetail} />
         <Stack.Screen name="JobOffer" component={JobOffer} />
         <Stack.Screen name="JobCandidate" component={JobCandidate} />
+        <Stack.Screen name="MyDocuments" component={MyDocuments} />
+        <Stack.Screen name="JobApply" component={JobApply} />
         <Stack.Screen name="PostFilter" component={PostFilter} />
         <Stack.Screen name="RequestsScreen" component={RequestsScreen} />
 

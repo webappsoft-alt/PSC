@@ -1,5 +1,5 @@
 import { BlurView } from "@react-native-community/blur";
-import { useNavigation } from "@react-navigation/native";
+import { StackActions, useNavigation } from "@react-navigation/native";
 import { getPalette } from "@somesoap/react-native-image-palette";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -23,7 +23,7 @@ import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
 import MediaBottomBlur from "../../../../components/MediaBottomBlur";
-import { useTabBarVisibility } from "../../../../navigation/TabStack";
+import { openPagerTab, useTabBarVisibility } from "../../../../navigation/TabStack";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { del, get, post } from "../../../../services/ApiRequest";
 import { setUserData } from "../../../../store/reducer/usersSlice";
@@ -584,8 +584,62 @@ const PostCard = ({
     }));
   }, []);
 
+  // "@Name" mentions picked in the publish form (post.textMentions): the
+  // whole name in SemiBold, without "@", tap → that profile
+  const openMentioned = (userId) => {
+    if (!userId) return;
+    if (String(userId) === String(userData?._id)) {
+      navigation.dispatch(StackActions.popTo("TabStack"));
+      openPagerTab("Profile");
+      return;
+    }
+    navigation.navigate("UserProfile", { userId });
+  };
+  const renderWords = (text, keyPrefix = "") =>
+    text.split(/(\s+)/).map((part, index) => {
+      if (part.startsWith("@")) {
+        return (
+          <Text
+            key={`${keyPrefix}${index}`}
+            style={{ color: colors.text, fontFamily: fonts.semiBold }}
+          >
+            {part?.substring(1)}
+          </Text>
+        );
+      }
+      return part;
+    });
   const renderFormattedText = (text) => {
     if (!text) return "";
+    const tagged = (item?.textMentions || item?.parentPost?.textMentions || []).filter(
+      (m) => m?.name && m?.user,
+    );
+    if (tagged.length) {
+      const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const byName = new Map(tagged.map((m) => [m.name, m]));
+      const names = [...byName.keys()].sort((a, b) => b.length - a.length);
+      const re = new RegExp(`@(${names.map(esc).join("|")})`, "g");
+      const out = [];
+      let last = 0;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        if (m.index > last) out.push(...renderWords(text.slice(last, m.index), `t${last}-`));
+        const who = byName.get(m[1]);
+        out.push(
+          <Text
+            key={`m${m.index}`}
+            suppressHighlighting
+            onPress={() => openMentioned(who?.user?._id || who?.user)}
+            style={{ color: colors.text, fontFamily: fonts.semiBold }}
+          >
+            {m[1]}
+          </Text>,
+        );
+        last = m.index + m[0].length;
+      }
+      if (last < text.length) out.push(...renderWords(text.slice(last), `t${last}-`));
+      return out;
+    }
     return text.split(/(\s+)/).map((part, index) => {
       if (part.startsWith("@")) {
         return (
@@ -1338,7 +1392,7 @@ const PostCard = ({
               </View>
             ) : null}
 
-            {item?.hashtags?.length > 0 && (
+            {(item?.hashtags?.length > 0 || item?.isSponsored) && (
             <View
               style={[
                 styles.wrapper,
@@ -1348,6 +1402,18 @@ const PostCard = ({
                 },
               ]}
             >
+              {/* Figma Home-Feed "AD" chip (8335:3030): h24 r100 pad 8,
+                  white 4 % + 1px white 16 %, SemiBold 12 white 64 % */}
+              {item?.isSponsored ? (
+                <View style={styles.adChip}>
+                  <CustomText
+                    label="AD"
+                    fontSize={12}
+                    fontFamily={fonts.semiBold}
+                    color={COLORS.gray64}
+                  />
+                </View>
+              ) : null}
               {item?.hashtags?.map((item, index) => (
                 <View
                   style={[styles.tagBg, { backgroundColor: colors.surfaceAlt }]}
@@ -2120,16 +2186,7 @@ const PostCard = ({
                         </View>
                       )}
                     </>
-                  ) : isPollPost(item) ? null : (
-                    <View
-                      style={{
-                        height: getImageHeight(),
-                        width: screenWidth - MEDIA_INSET,
-                        backgroundColor: profileColor || COLORS.inputBg,
-                        borderRadius: MEDIA_RADIUS,
-                      }}
-                    />
-                  )}
+                  ) : null}
 
                   {/* Dynamic Pagination Indicators */}
                 </View>
@@ -3019,6 +3076,16 @@ const createStyles = (colors, themeMode) =>
       left: 0,
       right: 0,
       opacity: 0,
+    },
+    adChip: {
+      height: 24,
+      borderRadius: 100,
+      paddingHorizontal: 8,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.04)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.16)",
     },
     tagWrapper: {
       gap: 4,
