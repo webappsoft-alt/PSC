@@ -15,6 +15,7 @@ import { createThumbnail } from "react-native-create-thumbnail";
 import { ScrollView } from "react-native-gesture-handler";
 import Video from "react-native-video";
 import { useDispatch, useSelector } from "react-redux";
+import { setPlaying } from "../../../../store/reducer/playerSlice";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
 import Blur from "../../../../components/Blur";
@@ -23,6 +24,7 @@ import CustomText from "../../../../components/CustomText";
 import Icons from "../../../../components/Icons";
 import ImageFast from "../../../../components/ImageFast";
 import MediaBottomBlur from "../../../../components/MediaBottomBlur";
+import ExpandingDots from "../../../../components/ExpandingDots";
 import { openPagerTab, useTabBarVisibility } from "../../../../navigation/TabStack";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { del, get, post } from "../../../../services/ApiRequest";
@@ -113,6 +115,8 @@ const PostCard = ({
 }) => {
   const navigation = useNavigation();
   const scrollViewRef = useRef(null);
+  // media carousel position → expanding pagination dots
+  const mediaScrollX = useRef(new Animated.Value(0)).current;
   const dispatch = useDispatch();
   const userData = useSelector((state) => state.users.userData);
   const { colors, themeMode } = useTheme();
@@ -714,21 +718,31 @@ const PostCard = ({
     setCurrentDescIndex(index);
   };
 
+  // Client rule: while a radio is playing, feed videos are muted (one sound
+  // at a time). Unmuting a video then pauses the radio.
+  const radioPlaying = useSelector(
+    (state) => !!(state.player.showRadioPlayer && state.player.isPlaying),
+  );
+  const isVideoMuted = (index) => radioPlaying || !!mutedVideos[index];
+
   // Toggle mute for current video
   const toggleMute = useCallback(() => {
     const currentUri = images[currentImageIndex];
-    if (isVideoUrl(currentUri)) {
-      setMutedVideos((prev) => ({
-        ...prev,
-        [currentImageIndex]: !prev[currentImageIndex],
-      }));
+    if (!isVideoUrl(currentUri)) return;
+    if (radioPlaying) {
+      // muted because of the radio → unmute = pause the radio, sound on
+      dispatch(setPlaying(false));
+      setMutedVideos((prev) => ({ ...prev, [currentImageIndex]: false }));
+      return;
     }
-  }, [currentImageIndex, images]);
+    setMutedVideos((prev) => ({
+      ...prev,
+      [currentImageIndex]: !prev[currentImageIndex],
+    }));
+  }, [currentImageIndex, images, radioPlaying, dispatch]);
 
   // Get mute state for current video
-  const isCurrentVideoMuted = () => {
-    return mutedVideos[currentImageIndex] || false;
-  };
+  const isCurrentVideoMuted = () => isVideoMuted(currentImageIndex);
 
   // Handle video press to open fullscreen
   const handleVideoPress = useCallback((index) => {
@@ -1128,19 +1142,16 @@ const PostCard = ({
                 ]}
               >
                 {/* Left Section — the header row already insets 8
-                    (Figma card pad 8); styles.row's own 8 doubled it */}
-                <TouchableOpacity
-                  style={[styles.row, styles.noInset]}
-                  activeOpacity={0.6}
-                  onPress={() => setShowCreatorSummary(true)}
-                >
-                  <View
-                    style={{
-                      padding: 2,
-                      borderColor: profileColor,
-                      borderWidth: 2,
-                      borderRadius: 99,
-                    }}
+                    (Figma card pad 8); styles.row's own 8 doubled it.
+                    Client: the creator summary opens ONLY from the
+                    profile picture; the name opens the profile. */}
+                <View style={[styles.row, styles.noInset, { flexShrink: 1 }]}>
+                  <TouchableOpacity
+                    activeOpacity={0.6}
+                    onPress={() => setShowCreatorSummary(true)}
+                    // client (Nov 2026): no profile-colour ring on the feed
+                    // avatar — plain 32 circle (Figma header row 32)
+                    style={{ borderRadius: 99 }}
                   >
                     {item?.author?.profile?.avatar ? (
                       <ImageFast
@@ -1158,11 +1169,17 @@ const PostCard = ({
                         ]}
                       />
                     )}
-                  </View>
-                  <View style={styles.userInfo}>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.6}
+                    onPress={() => openMentioned(item?.author?._id)}
+                    style={[styles.userInfo, { flexShrink: 1 }]}
+                  >
                     <View style={styles.nameRow}>
                       <CustomText
                         label={displayName}
+                        numberOfLines={1}
+                        containerStyle={{ flexShrink: 1 }}
                         fontSize={14}
                         letterSpacing={-0.07}
                         fontFamily={fonts.medium}
@@ -1174,12 +1191,13 @@ const PostCard = ({
                     {/* Figma: username Regular 14 / −2% @48% */}
                     <CustomText
                       label={`${username}`}
+                      numberOfLines={1}
                       fontSize={14}
                       letterSpacing={-0.28}
                       color={COLORS.gray48}
                     />
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </View>
 
                 {/* Right Section */}
                 <View
@@ -1790,7 +1808,10 @@ const PostCard = ({
                         horizontal
                         pagingEnabled={false}
                         showsHorizontalScrollIndicator={false}
-                        onScroll={handleScroll}
+                        onScroll={Animated.event(
+                          [{ nativeEvent: { contentOffset: { x: mediaScrollX } } }],
+                          { useNativeDriver: false, listener: handleScroll },
+                        )}
                         scrollEventThrottle={16}
                         decelerationRate="fast"
                         snapToInterval={screenWidth - MEDIA_INSET}
@@ -1832,7 +1853,22 @@ const PostCard = ({
                                     (videoRefs.current[index] = ref)
                                   }
                                   repeat
-                                  source={{ uri: imageUri }}
+                                  source={{
+                                    uri: imageUri,
+                                    metadata: {
+                                      title:
+                                        (item?.text || item?.description || "")
+                                          .toString()
+                                          .slice(0, 80) || "PSC",
+                                      artist:
+                                        `${item?.author?.firstName || ""} ${item?.author?.lastName || ""}`.trim() ||
+                                        "PSC",
+                                      imageUri:
+                                        item?.thumbnail ||
+                                        item?.author?.profile?.avatar ||
+                                        undefined,
+                                    },
+                                  }}
                                   style={[
                                     {
                                       height: getImageHeight(),
@@ -1845,11 +1881,24 @@ const PostCard = ({
                                   paused={
                                     !shouldPlay || index !== currentImageIndex
                                   }
-                                  muted={mutedVideos[index] || false}
+                                  muted={isVideoMuted(index)}
                                   controls={false}
-                                  ignoreSilentSwitch="obey"
-                                  playInBackground={false}
-                                  playWhenInactive={false}
+                                  // the mute button must work with the
+                                  // iPhone on silent: a video with sound on
+                                  // ignores the ring/silent switch (with
+                                  // "obey" iOS played no sound at all)
+                                  ignoreSilentSwitch={
+                                    isVideoMuted(index) ? "obey" : "ignore"
+                                  }
+                                  // with sound on, keep playing with the
+                                  // screen locked + lock screen controls
+                                  playInBackground={!isVideoMuted(index)}
+                                  playWhenInactive={!isVideoMuted(index)}
+                                  showNotificationControls={
+                                    !isVideoMuted(index) &&
+                                    shouldPlay &&
+                                    index === currentImageIndex
+                                  }
                                   onProgress={(data) =>
                                     handleVideoProgress(index, data)
                                   }
@@ -1933,6 +1982,12 @@ const PostCard = ({
                               isVideo={!!isVideoUrl(imageUri)}
                               width={screenWidth - MEDIA_INSET}
                               mediaHeight={getImageHeight()}
+                              // client: iOS-style progressive blur — a long
+                              // soft ramp (35% of the media), not a 56pt band
+                              height={Math.max(
+                                56,
+                                Math.round(getImageHeight() * 0.35),
+                              )}
                               borderBottomLeftRadius={
                                 getBorderRadiusStyle(index)
                                   .borderBottomLeftRadius
@@ -2004,7 +2059,7 @@ const PostCard = ({
                             <Blur />
                             <Icons
                               name={
-                                isCurrentVideoMuted() ? "volume_up" : "volume_off"
+                                isCurrentVideoMuted() ? "volume_off" : "volume_up"
                               }
                               family={"MaterialSymbolsRoundedFilled"}
                               size={16}
@@ -2173,16 +2228,13 @@ const PostCard = ({
                           pointerEvents="none"
                           style={[styles.dotsOverlay, { bottom: -17 }]}
                         >
-                          {images?.map((img, index) => (
-                            <View
-                              key={index}
-                              style={[
-                                styles.dot,
-                                { backgroundColor: "rgba(255, 255, 255, 0.16)" },
-                                index === currentImageIndex && styles.dotActive,
-                              ]}
-                            />
-                          ))}
+                          <ExpandingDots
+                            scrollX={mediaScrollX}
+                            count={images.length}
+                            pageWidth={screenWidth - MEDIA_INSET}
+                            activeWidth={32}
+                            activeColor={COLORS.white}
+                          />
                         </View>
                       )}
                     </>
@@ -2194,15 +2246,14 @@ const PostCard = ({
             )}
             {!isDetail && images?.length > 1 && (
               <View pointerEvents="none" style={styles.dotsRow}>
-                {images.map((img, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.feedDot,
-                      index === currentImageIndex && styles.feedDotActive,
-                    ]}
-                  />
-                ))}
+                {/* client: expanding dots that follow the swipe smoothly */}
+                <ExpandingDots
+                  scrollX={mediaScrollX}
+                  count={images.length}
+                  pageWidth={screenWidth - MEDIA_INSET}
+                  activeWidth={30}
+                  activeColor={COLORS.buttonColor}
+                />
               </View>
             )}
             {/* Poll post: options + votes / time left (Figma 8100:2384) */}
@@ -2835,8 +2886,8 @@ const createStyles = (colors, themeMode) =>
     },
     // Figma: 32 ring (2px profile colour + 2 pad) → 24 avatar
     avatar: {
-      height: 24,
-      width: 24,
+      height: 32,
+      width: 32,
       borderRadius: 99,
     },
     noInset: { paddingHorizontal: 0 },

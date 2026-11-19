@@ -16,12 +16,14 @@ const LOCATION_BLUE = "#007BFF";
 
 /**
  * Figma "Post-creator-summary": user header (32 avatar · ⋮ · ×) · info rows
- * (16 icon + Medium 14/20; location blue, connectors @48%) · stats row
+ * (14 icon @64% + Medium 14; location blue, connectors @48%) · stats row
  * (Medium 18 / Regular 14 @64%) · "In common" + avatar stack · bio
- * (Regular 16 / 125% @64%). Figma inner gap 20 with tight text boxes
- * (info rows 14, stats 29, in-common 14); with RN 1.4 line boxes the same
- * centres come out as gap 12 (+5 before the info rows, −5 between a stat
- * number and its label).
+ * (Regular 16 / 125% @64%). Figma inner gap 20 measured between CAP-HEIGHT
+ * boxes (vertical trim): header 32 → info rows (14 tall, gap 8) → stats 29
+ * (number cap 13 + label) → in-common 14 → bio. RN text boxes are 1.4 × font
+ * with 0.35 × font above the caps (Poppins ascent 1.05 / cap 0.7), so with
+ * the sheet gap 12: info +5 / rows 2.4 apart, stats −1, label −5, bio −2.5
+ * after the stats (0 after in-common).
  */
 const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
   const { colors } = useTheme();
@@ -36,8 +38,17 @@ const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
       ? `${user.location.city}, ${user.location.country}`
       : user?.location?.city || user?.location?.country || null;
 
-  const occupation = user?.occupation?.jobTitle || null;
-  const company = user?.occupation?.company || null;
+  // Client: a company shows only when it was picked from the company
+  // directory (current Career experience) — then with its logo before the
+  // name. A typed-in company (occupation.company, e.g. "Sola") is not shown.
+  const currentExp =
+    (Array.isArray(user?.experiences) ? user.experiences : []).find(
+      (e) => e?.current && e?.company,
+    ) || null;
+  const occupation = currentExp?.title || user?.occupation?.jobTitle || null;
+  const company = currentExp ? currentExp.companyName || null : null;
+  const companyLogo = currentExp?.companyLogo || null;
+  const bio = (user?.profile?.bio || user?.bio || "").trim();
 
   const education = user?.education?.[0];
   const degree = education?.degree || null;
@@ -95,22 +106,22 @@ const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
           onPressUser={openProfile}
           right={
             <>
-              <SheetIconButton name="more_vert" onPress={onMore} />
-              <SheetCloseButton onPress={onClose} />
+              <SheetIconButton name="more_vert" onPress={onMore} color="muted" />
+              <SheetCloseButton onPress={onClose} color="muted" />
             </>
           }
         />
       }
     >
       {/* Info rows */}
-      {(location || (occupation && company) || (degree && major && school)) && (
+      {(location || occupation || (degree && major && school)) && (
         <View style={styles.info}>
           {location ? (
-            <View style={styles.row}>
+            <View style={[styles.row, styles.infoRow]}>
               <Icons
                 family="MaterialSymbolsRoundedFilled"
                 name="location_on"
-                size={16}
+                size={14}
                 color={LOCATION_BLUE}
               />
               <CustomText
@@ -121,26 +132,34 @@ const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
               />
             </View>
           ) : null}
-          {occupation && company ? (
-            <View style={styles.row}>
+          {occupation ? (
+            <View style={[styles.row, styles.infoRow]}>
               <Icons
                 family="MaterialSymbolsRoundedFilled"
                 name="work"
-                size={16}
-                color={colors.text}
+                size={14}
+                color={COLORS.gray64}
               />
               <Strong label={occupation} />
-              <Muted label="at" />
-              <Strong label={company} />
+              {company ? (
+                <>
+                  <Muted label="at" />
+                  {/* Figma: company logo 16 before the company name */}
+                  {companyLogo ? (
+                    <ImageFast source={{ uri: companyLogo }} style={styles.companyLogo} />
+                  ) : null}
+                  <Strong label={company} />
+                </>
+              ) : null}
             </View>
           ) : null}
           {degree && major && school ? (
-            <View style={styles.row}>
+            <View style={[styles.row, styles.infoRow]}>
               <Icons
                 family="MaterialSymbolsRoundedFilled"
                 name="school"
-                size={16}
-                color={colors.text}
+                size={14}
+                color={COLORS.gray64}
               />
               <Strong label={degree} />
               <Muted label="in" />
@@ -170,6 +189,7 @@ const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
               letterSpacing={-0.07}
               color={COLORS.gray64}
               textAlign="center"
+              // Figma: label cap top 161 = number cap bottom 155 + 6
               marginTop={-5}
             />
           </View>
@@ -205,14 +225,17 @@ const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
 
       {/* Bio — Figma: Regular 16 / 125% @64%, 20 below the previous block
           (tight boxes ⇒ first-line centre 30 below the stat labels) */}
-      <CustomText
-        label={user?.profile?.bio || user?.bio || "No bio available"}
-        fontSize={16}
-        letterSpacing={-0.5}
-        color={COLORS.gray64}
-        numberOfLines={3}
-        marginTop={-3}
-      />
+      {/* no bio → nothing (client: never show "No bio available") */}
+      {bio ? (
+        <CustomText
+          label={bio}
+          fontSize={16}
+          letterSpacing={-0.5}
+          color={COLORS.gray64}
+          numberOfLines={3}
+          marginTop={inCommon.length > 0 ? 0 : -2.5}
+        />
+      ) : null}
     </FloatingSheet>
   );
 };
@@ -220,13 +243,16 @@ const CreatorSummary = ({ isVisible, onClose, onMore, user }) => {
 export default CreatorSummary;
 
 const styles = StyleSheet.create({
-  // Figma: rows 14 tall, gap 8 → centres 22 apart; first centre 27 below header
-  info: { gap: 2, marginTop: 4 },
+  // Figma: header bottom 44 → row 1 caps 66; rows 22 apart (14 + 8)
+  // (measured on the Simulator: +3 / +1.6 / +4 over the computed values)
+  info: { marginTop: 8, gap: 4 },
+  infoRow: {},
   row: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
-  // Figma: stats 20 below the info rows (number centre 6.5 into the block)
-  stats: { flexDirection: "row", gap: 8, marginTop: -2 },
+  // Figma: info bottom 122 → number caps 142
+  stats: { flexDirection: "row", gap: 8, marginTop: 3 },
   stat: { flex: 1, alignItems: "center" },
   avatars: { flexDirection: "row", alignItems: "center" },
+  companyLogo: { width: 16, height: 16, borderRadius: 4 },
   // Figma: in-common avatars are 14 (row 14 tall), stacked
   commonAvatar: {
     width: 14,

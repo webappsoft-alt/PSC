@@ -119,6 +119,8 @@ const ConversationBox = ({ item, onLongPress }) => {
               recipientName: title,
               groupPicture: item?.picture,
               memberCount: item?.memberCount,
+              // group members — the "@" mention candidates in the chat
+              members: item?.participants || [],
             })
           : navigation.navigate("InboxScreen", {
               recipientId: otherUser?._id,

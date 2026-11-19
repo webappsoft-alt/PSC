@@ -27,6 +27,7 @@ import {
   isLiquidGlassSupported,
 } from "@callstack/liquid-glass";
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
+import { PanGestureHandler, State as GestureState } from "react-native-gesture-handler";
 import PagerView from "react-native-pager-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -80,6 +81,7 @@ import {
   loadFeedTopics,
   persistFeedTopics,
   resolveFeedTopics,
+  PSC_TOPIC_NAMES,
 } from "../utils/feedTopics";
 import CustomButton from "../components/CustomButton";
 import ProgressiveBlur from "../components/ProgressiveBlur";
@@ -89,17 +91,7 @@ import HeaderProgressiveBlur, {
 import ViewerWatchScreen from "../screens/Main/LiveScreens/ViewerWatchScreen";
 import { get as apiGet } from "../services/ApiRequest";
 
-const TAB_NAMES = [
-  "Technology",
-  "Politics",
-  "Sports",
-  "Music",
-  "Fashion",
-  "Entertainment",
-  "Gaming",
-  "Food",
-  "Health",
-];
+const TAB_NAMES = PSC_TOPIC_NAMES;
 
 // Viral (components/MainPager.tsx): while a page is swiped, every page turns
 // into a rounded card (r52), side pages shrink to 0.96 and sit 4pt apart, and
@@ -385,14 +377,52 @@ const HomeWithCameraPager = ({ route, navigation }) => {
   // margin/radius, which only the JS driver supports
   const pageScroll = useRef(new Animated.Value(HOME_PAGE_INDEX)).current;
   const pagerDrag = useRef(new Animated.Value(0)).current;
+  // page chrome (radius / inset / 0.96 scale) is on while a swipe is in
+  // flight; `chromeOnRef` mirrors it so a settle seen through onPageScroll
+  // can release it even when the pager never reports "idle" (a page's own
+  // pan gesture — the Matching cards — can swallow the swipe after the
+  // pager already reported "dragging": the page stayed shrunk for seconds)
+  const chromeOnRef = useRef(false);
+  const chromeWatchdogRef = useRef(null);
+  const chromeMovedRef = useRef(false);
+  const releaseChrome = useCallback(
+    (animated) => {
+      if (chromeWatchdogRef.current) {
+        clearTimeout(chromeWatchdogRef.current);
+        chromeWatchdogRef.current = null;
+      }
+      if (!chromeOnRef.current) return;
+      chromeOnRef.current = false;
+      pagerDrag.stopAnimation();
+      if (animated) {
+        Animated.timing(pagerDrag, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: false,
+        }).start(({ finished }) => {
+          if (finished) pagerChrome.setValue(0);
+        });
+      } else {
+        pagerDrag.setValue(0);
+        pagerChrome.setValue(0);
+      }
+    },
+    [pagerChrome, pagerDrag],
+  );
   const handlePageScrollStateChanged = useCallback(
     (e) => {
       const state = e.nativeEvent.pageScrollState;
       if (state === "dragging") {
         // the tab chip tracks the swipe natively from here on
         setChipFollow(1);
+        chromeOnRef.current = true;
+        chromeMovedRef.current = false;
         pagerChrome.setValue(1);
         pagerDrag.setValue(1);
+        // safety net: no settle / idle within 600ms of the last scroll
+        // event → the swipe was taken over by the page, restore the chrome
+        if (chromeWatchdogRef.current) clearTimeout(chromeWatchdogRef.current);
+        chromeWatchdogRef.current = setTimeout(() => releaseChrome(true), 600);
       } else if (state === "settling") {
         Animated.timing(pagerDrag, {
           toValue: 0,
@@ -400,12 +430,10 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           useNativeDriver: false,
         }).start();
       } else if (state === "idle") {
-        pagerDrag.stopAnimation();
-        pagerDrag.setValue(0);
-        pagerChrome.setValue(0);
+        releaseChrome(false);
       }
     },
-    [pagerChrome, pagerDrag, setChipFollow],
+    [pagerChrome, pagerDrag, setChipFollow, releaseChrome],
   );
 
   const animateHeader = useCallback(
@@ -495,6 +523,17 @@ const HomeWithCameraPager = ({ route, navigation }) => {
       pagerProgress.setValue(val);
       pageScroll.setValue(val);
       pagerProgressShared.setValue(val);
+      if (chromeOnRef.current) {
+        if (offset === 0 && chromeMovedRef.current) {
+          // back on a page after moving: release the chrome, "idle" or not
+          releaseChrome(true);
+        } else if (offset !== 0) {
+          chromeMovedRef.current = true;
+          // still moving: push the watchdog back
+          if (chromeWatchdogRef.current) clearTimeout(chromeWatchdogRef.current);
+          chromeWatchdogRef.current = setTimeout(() => releaseChrome(true), 600);
+        }
+      }
 
       const nextIsCameraActive = (position === 0 || offset > 0) && isFocused;
       if (isCameraActiveRef.current !== nextIsCameraActive) {
@@ -502,7 +541,7 @@ const HomeWithCameraPager = ({ route, navigation }) => {
         setIsCameraActive(nextIsCameraActive);
       }
     },
-    [isFocused, pagerProgress, pagerProgressShared],
+    [isFocused, pagerProgress, pagerProgressShared, releaseChrome],
   );
   // native mirror of the scroll for the tab chip; the JS handler above still
   // runs as the listener (header fade, page cards, camera)
@@ -528,9 +567,49 @@ const HomeWithCameraPager = ({ route, navigation }) => {
 
   // Header visible on pages 1 (Home), 2 (Shorts)
   // Fades in from page 0→1, fades out from page 2→3
-  const headerOpacity = pagerProgress.interpolate({
-    inputRange: [0, 0.8, 0.98, 2, 2.3],
-    outputRange: [0, 0, 1, 1, 0],
+  // Instagram-style (client): the header belongs to the Feed/Shorts pages
+  // and slides out WITH them (towards Camera on the left, the next tab on
+  // the right) instead of sitting still and fading over a moving page —
+  // which showed the next page's controls through the chips mid-swipe.
+  // Opaque the whole way; it is simply off-screen on other pages.
+  // Driven by the pager's native scroll mirror (same source as the tab
+  // chip): the header node lives on the native driver, where JS setValue()s
+  // on pagerProgress mid-swipe did not reach it — the header sat still while
+  // the pages moved (client recording).
+  const pagerNative = useMemo(
+    () => Animated.add(pagerPositionNative, pagerOffsetNative),
+    [pagerPositionNative, pagerOffsetNative],
+  );
+  const headerOpacity = pagerNative.interpolate({
+    inputRange: [0, 0.01, 2.99, 3],
+    outputRange: [0, 1, 1, 0],
+    extrapolate: "clamp",
+  });
+  const headerTranslateX = pagerNative.interpolate({
+    inputRange: [0, 1, 2, 3],
+    outputRange: [
+      Dimensions.get("window").width,
+      0,
+      0,
+      -Dimensions.get("window").width,
+    ],
+    extrapolate: "clamp",
+  });
+
+  // X-drawer: camera page (0) ← feed page (1); 0 = drawer fully open
+  const cameraDrawerOpacity = pagerNative.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.4],
+    extrapolate: "clamp",
+  });
+  const cameraDrawerTranslateY = pagerNative.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 24],
+    extrapolate: "clamp",
+  });
+  const cameraDrawerDim = pagerNative.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.6],
     extrapolate: "clamp",
   });
 
@@ -541,7 +620,7 @@ const HomeWithCameraPager = ({ route, navigation }) => {
   // the header blur belongs to the Feed page (Shorts plays full-bleed video);
   // it fades over the first half of a swipe so a slightly diagonal vertical
   // scroll (pager nudged a few points) doesn't flicker it
-  const bgOpacity = pagerProgress.interpolate({
+  const bgOpacity = pagerNative.interpolate({
     inputRange: [0, 1.05, 1.5, 2, 3],
     outputRange: [1, 1, 0, 0, 0],
     extrapolate: "clamp",
@@ -624,6 +703,7 @@ const HomeWithCameraPager = ({ route, navigation }) => {
           right: 0,
           zIndex: 10,
           opacity: headerContainerOpacity,
+          transform: [{ translateX: headerTranslateX }],
           paddingTop: insets.top,
           pointerEvents: "box-none",
         }}
@@ -703,9 +783,30 @@ const HomeWithCameraPager = ({ route, navigation }) => {
             },
           ]}
         >
-          <CameraScreen
-            navigation={navigation}
-            isCameraActive={isCameraActive}
+          {/* makeitanimated "X Drawer" (client): the camera is the drawer
+              behind the feed — it fades in with a gentle vertical slide
+              while a dim overlay lifts in step with the swipe; the feed
+              page itself rounds its corners (PagerPage chrome) */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                opacity: cameraDrawerOpacity,
+                transform: [{ translateY: cameraDrawerTranslateY }],
+              },
+            ]}
+          >
+            <CameraScreen
+              navigation={navigation}
+              isCameraActive={isCameraActive}
+            />
+          </Animated.View>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: PAGE_BACKDROP, opacity: cameraDrawerDim },
+            ]}
           />
         </View>
 
@@ -1865,13 +1966,82 @@ const CustomTabBar = ({ state, navigation }) => {
       }),
     [pagerPositionNative, pagerOffsetNative],
   );
-  const chipPos = useMemo(
+  const chipPosFollow = useMemo(
     () =>
       Animated.add(
         Animated.multiply(pagerTab, chipFollow),
         Animated.multiply(tapX, Animated.subtract(1, chipFollow)),
       ),
     [pagerTab, chipFollow, tapX],
+  );
+  // Viral PagerTabBar `tabSwipe` (client: "swipe through the tabs on the
+  // bar"): a horizontal drag across the bar scrubs the chip under the
+  // finger (native-driven x) and switches to the tab it's dropped on.
+  const barDrag = useRef(new Animated.Value(0)).current;
+  const barDragX = useRef(new Animated.Value(0)).current;
+  const lastTab = TAB_ROUTE_ORDER.length - 1;
+  const firstCentre = rowPad + NAV_CHIP_WIDTH / 2;
+  const barDragIndex = useMemo(
+    () =>
+      barDragX.interpolate({
+        inputRange: [firstCentre, firstCentre + slotWidth * lastTab],
+        outputRange: [0, lastTab],
+        extrapolate: "clamp",
+      }),
+    [barDragX, firstCentre, slotWidth, lastTab],
+  );
+  const chipPos = useMemo(
+    () =>
+      Animated.add(
+        Animated.multiply(chipPosFollow, Animated.subtract(1, barDrag)),
+        Animated.multiply(barDragIndex, barDrag),
+      ),
+    [chipPosFollow, barDragIndex, barDrag],
+  );
+  const onBarDrag = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { x: barDragX } }], {
+        useNativeDriver: true,
+      }),
+    [barDragX],
+  );
+  const barDragTickRef = useRef(-1);
+  const barDragIndexFromX = useCallback(
+    (x) =>
+      Math.max(0, Math.min(lastTab, (x - firstCentre) / slotWidth)),
+    [firstCentre, slotWidth, lastTab],
+  );
+  const onBarDragState = useCallback(
+    (e) => {
+      const { state, x, velocityX } = e.nativeEvent;
+      if (state === GestureState.ACTIVE) {
+        barDragX.setValue(x);
+        barDrag.setValue(1);
+        barDragTickRef.current = Math.round(barDragIndexFromX(x));
+      } else if (
+        state === GestureState.END ||
+        state === GestureState.CANCELLED ||
+        state === GestureState.FAILED
+      ) {
+        if (state !== GestureState.END) {
+          barDrag.setValue(0);
+          return;
+        }
+        let target = Math.round(barDragIndexFromX(x));
+        if (velocityX > 900) target += 1;
+        if (velocityX < -900) target -= 1;
+        target = Math.max(0, Math.min(lastTab, target));
+        // hand over to the tap spring from where the finger left the chip
+        tapX.setValue(barDragIndexFromX(x));
+        lastTabRef.current = target;
+        setChipFollow(0);
+        barDrag.setValue(0);
+        const pageIndex = TAB_TO_PAGER[TAB_ROUTE_ORDER[target]];
+        setOptimisticActivePage(pageIndex);
+        navigateToPagerPage(pageIndex);
+      }
+    },
+    [barDrag, barDragX, barDragIndexFromX, lastTab, tapX, setChipFollow, navigateToPagerPage],
   );
   useEffect(() => {
     Animated.spring(tapX, {
@@ -2298,7 +2468,13 @@ const CustomTabBar = ({ state, navigation }) => {
             </Animated.View>
           </View>
 
-          <View
+          <PanGestureHandler
+            activeOffsetX={[-6, 6]}
+            failOffsetY={[-28, 28]}
+            onGestureEvent={onBarDrag}
+            onHandlerStateChange={onBarDragState}
+          >
+          <Animated.View
             onLayout={(e) => {
               const w = e?.nativeEvent?.layout?.width;
               if (w && Math.abs(w - barWidth) > 1) setBarWidth(w);
@@ -2327,7 +2503,8 @@ const CustomTabBar = ({ state, navigation }) => {
               />
               </View>
             ))}
-          </View>
+          </Animated.View>
+          </PanGestureHandler>
         </BarShell>
       </Animated.View>
 

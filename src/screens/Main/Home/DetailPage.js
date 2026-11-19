@@ -806,25 +806,15 @@ const DetailPage = () => {
       scrollEnabled
       headerUnScrollable={() => (
         <View style={styles.rowBetween}>
-          {/* Left Section */}
-          <View style={styles.row}>
+          {/* Left Section — shrinks so long names truncate */}
+          <View style={[styles.row, { flexShrink: 1, marginRight: 8 }]}>
             <GlassBackButton
               onPress={() => navigation.goBack()}
-              fill={colors.surfaceAlt}
-              iconSize={26}
-              color={colors.text}
-              fullOpacity
               style={styles.backButton}
             />
-            {/* Figma: 32 ring (2px profile colour) → 24px avatar at 4,4 */}
-            <View
-              style={{
-                padding: 2,
-                borderColor: profileColor,
-                borderWidth: 2,
-                borderRadius: 99,
-              }}
-            >
+            {/* client: 40 like the back button; no profile-colour ring
+                (Nov 2026, same as the feed avatar) */}
+            <View style={{ padding: 4, borderRadius: 99 }}>
               <TouchableOpacity
                 onPress={() =>
                   navigation.navigate("UserProfile", { userId: author?._id })
@@ -853,8 +843,9 @@ const DetailPage = () => {
                 {/* Figma: Medium 14 / −0.5% white */}
                 <CustomText
                   label={displayName}
+                  numberOfLines={1}
+                  containerStyle={{ flexShrink: 1 }}
                   fontSize={14}
-                  lineHeight={18}
                   letterSpacing={-0.07}
                   fontFamily={fonts.medium}
                   color={colors.text}
@@ -863,8 +854,8 @@ const DetailPage = () => {
               </View>
               <CustomText
                 label={`${username}`}
+                numberOfLines={1}
                 fontSize={14}
-                lineHeight={18}
                 letterSpacing={-0.07}
                 color={COLORS.gray48}
               />
@@ -884,8 +875,8 @@ const DetailPage = () => {
               >
                 <CustomText
                   label={isFollowingUser ? "Following" : "Follow"}
+                  numberOfLines={1}
                   fontSize={14}
-                  lineHeight={18}
                   fontFamily={fonts.medium}
                   color={colors.text}
                 />
@@ -898,8 +889,9 @@ const DetailPage = () => {
               <Icons
                 family="MaterialSymbolsRounded"
                 name="more_vert"
-                size={20}
+                size={24}
                 color={colors.text}
+                style={{ opacity: 0.64 }}
               />
             </TouchableOpacity>
           </View>
@@ -1316,13 +1308,14 @@ const createStyles = (colors, isDark) =>
       alignItems: "center",
       height: 80,
     },
+    // in the ScreenWrapper footer (not absolute): an absolute bar left the
+    // footer 0pt tall, so its progressive blur was never drawn (client:
+    // "bottom progressive blur has to be fixed"). Same 20pt offset as before.
     inputContainer: {
-      position: "absolute",
-      bottom: 20,
       width: "100%",
-      paddingVertical: 8,
+      paddingTop: 8,
+      paddingBottom: 8 + 20,
       paddingHorizontal: 12,
-      zIndex: 999,
       backgroundColor: "transparent",
     },
     replyBlur: {
@@ -1433,17 +1426,19 @@ const createStyles = (colors, isDark) =>
       alignItems: "center",
     },
     avatar: {
-      height: 24,
-      width: 24,
+      height: 32,
+      width: 32,
       borderRadius: 99,
       backgroundColor: colors.surfaceAlt,
     },
     userInfo: {
       marginLeft: 8,
+      flexShrink: 1,
     },
     nameRow: {
       flexDirection: "row",
       alignItems: "center",
+      flexShrink: 1,
     },
     verifiedIcon: {
       height: 14,
@@ -1451,15 +1446,15 @@ const createStyles = (colors, isDark) =>
       marginLeft: 4,
     },
     followBtn: {
-      height: 32,
-      paddingHorizontal: 10,
+      height: 40,
+      paddingHorizontal: 16,
       borderRadius: 8,
       alignItems: "center",
       justifyContent: "center",
     },
     moreBtn: {
-      height: 32,
-      width: 32,
+      height: 40,
+      width: 40,
       borderRadius: 100,
       alignItems: "center",
       justifyContent: "center",

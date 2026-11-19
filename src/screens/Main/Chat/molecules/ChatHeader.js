@@ -6,6 +6,7 @@ import fonts from "../../../../assets/fonts";
 import CustomText from "../../../../components/CustomText";
 import GlassBackButton from "../../../../components/GlassBackButton";
 import Icons from "../../../../components/Icons";
+import ImageFast from "../../../../components/ImageFast";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import CallOptionsSheet from "./CallOptionsSheet";
 
@@ -21,7 +22,17 @@ import CallOptionsSheet from "./CallOptionsSheet";
  */
 const GRAY = "#828186";
 
-const ChatHeader = ({ title, subtitle, company, online, onSettingsPress, onVoiceCall, onVideoCall }) => {
+const ChatHeader = ({
+  title,
+  subtitle,
+  location,
+  company,
+  companyLogo,
+  online,
+  onSettingsPress,
+  onVoiceCall,
+  onVideoCall,
+}) => {
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
   const tint = (o) => (isDark ? `rgba(255, 255, 255, ${o})` : `rgba(18, 18, 18, ${o})`);
@@ -36,7 +47,6 @@ const ChatHeader = ({ title, subtitle, company, online, onSettingsPress, onVoice
         fill={tint(0.08)}
         iconSize={20}
         color={isDark ? "#F8F9FB" : colors.text}
-        fullOpacity
       />
 
       <TouchableOpacity activeOpacity={0.7} onPress={onSettingsPress} disabled={!onSettingsPress} style={styles.texts}>
@@ -52,10 +62,21 @@ const ChatHeader = ({ title, subtitle, company, online, onSettingsPress, onVoice
             containerStyle={styles.shrink}
           />
         </View>
-        {(!!subtitle || !!company) && (
+        {/* Figma Inbox_General-Default (2212:6795): row 16, gap 4, #828186 —
+            location_on 16 · "Los Angeles" · 4 dot · "CEO" · "at" · logo 16 ·
+            "Nvidia" (client: company = current Career experience, with logo) */}
+        {(!!subtitle || !!company || !!location) && (
           <View style={styles.subRow}>
+            {!!location && (
+              <>
+                <Icons family="MaterialSymbolsRoundedFilled" name="location_on" size={16} color={GRAY} />
+                <CustomText label={location} fontSize={12} color={GRAY} numberOfLines={1} containerStyle={styles.shrink} />
+              </>
+            )}
+            {!!location && (!!subtitle || !!company) && <View style={styles.sep} />}
             {!!subtitle && <CustomText label={subtitle} fontSize={12} color={GRAY} numberOfLines={1} containerStyle={styles.noShrink} />}
-            {!!subtitle && !!company && <View style={styles.sep} />}
+            {!!subtitle && !!company && <CustomText label="at" fontSize={12} color={GRAY} numberOfLines={1} containerStyle={styles.noShrink} />}
+            {!!company && !!companyLogo && <ImageFast source={{ uri: companyLogo }} style={styles.logo} />}
             {!!company && <CustomText label={company} fontSize={12} color={GRAY} numberOfLines={1} containerStyle={styles.shrink} />}
           </View>
         )}
@@ -117,6 +138,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: GRAY,
   },
+  logo: { width: 16, height: 16, borderRadius: 4 },
   shrink: { flexShrink: 1 },
   noShrink: { flexShrink: 0 },
 });

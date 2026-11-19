@@ -3,6 +3,8 @@ import { Image, StyleSheet, View } from "react-native";
 import { getProfileTier } from "../utils/profileTier";
 import Icons from "./Icons";
 import ImageFast from "./ImageFast";
+import { Images } from "../assets/images";
+import { isPscOfficial } from "./PscChannelLogo";
 
 /**
  * Badges next to a user's name (client badge set):
@@ -10,7 +12,8 @@ import ImageFast from "./ImageFast";
  *             unverified → grey outline verified_user
  *  · Premium → silver PSC star, Premium+ → gold PSC star, shown INSTEAD of
  *    the shield (a premium account is already verified)
- * The blue "verified" rosette is not used anywhere in PSC.
+ *  · PSC official channel (username "pscofficial") → the blue rosette
+ *    (client, Nov 2026: "special badge for the PSC channel")
  *  · verified employer → the primary employer's logo at the end (client:
  *    only when the employment is verified; backend profile.employer)
  */
@@ -41,7 +44,9 @@ const UserBadge = ({
     <View style={[styles.row, style]}>
       {/* Premium / Premium+ accounts are already verified, so the tier
           star replaces the shield rather than sitting beside it. */}
-      {tier.star ? (
+      {isPscOfficial(user) ? (
+        <Image source={Images.verifiedBadge} style={{ width: size, height: size, resizeMode: "contain" }} />
+      ) : tier.star ? (
         <Image source={tier.star} style={{ width: size, height: size, resizeMode: "contain" }} />
       ) : verified || showUnverified ? (
         <Icons

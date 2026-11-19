@@ -126,7 +126,8 @@ const GenreRow = ({
       <Animated.View style={[styles.rowWrap, animatedStyle]}>
         <View style={styles.row}>
           <View style={styles.rowLeft}>
-            <TopicLottie name={name} />
+            {/* only the checked topic animates (main-thread cost) */}
+            <TopicLottie name={name} playing={!!checked} />
             <CustomText
               label={name}
               fontSize={16}
@@ -231,6 +232,8 @@ export const TopicPicker = ({
   // single pick: the radio shows the choice, no chips row
   const showChips = !single && pickedOrdered.length > 0;
   const headerHeight = insets.top + 12 + 40 + (showChips ? 8 + 32 : 0) + 8;
+  // single pick (Figma "Select-Topic" 2257:3974): back + "Select A Topic"
+  // title, NO search bar — the search pill belongs to Select-Genre only
 
   return (
     <View style={styles.page}>
@@ -277,6 +280,18 @@ export const TopicPicker = ({
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         {/* Figma Header: progressive blur 16 → 0; the list scrolls under it */}
         <HeaderProgressiveBlur visible={edge.headerVisible} />
+        {single ? (
+          <View style={styles.titleRow}>
+            <GlassBackButton accessibilityLabel="Back" onPress={onClose} />
+            <CustomText
+              label="Select A Topic"
+              fontSize={20}
+              letterSpacing={-0.4}
+              fontFamily={fonts.semiBold}
+              color={SHOWS.white}
+            />
+          </View>
+        ) : (
         <View style={styles.searchRow}>
           <View style={styles.search}>
             <GlassFill fill={SHOWS.white04} />
@@ -320,6 +335,7 @@ export const TopicPicker = ({
             onPress={onClose}
           />
         </View>
+        )}
         {showChips ? (
           <View style={styles.chips}>
             {pickedOrdered.map((name) => (
@@ -388,6 +404,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  // single-pick header: back + title (Figma Select-Topic); the header
+  // container already pads 12 horizontally
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
   },
   search: {
     flex: 1,

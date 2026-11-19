@@ -21,6 +21,7 @@ import { COLORS } from "../../../../utils/COLORS";
 import moment from "moment";
 import Blur from "../../../../components/Blur";
 import UserBadge from "../../../../components/UserBadge";
+import PscChannelLogo, { isPscOfficial } from "../../../../components/PscChannelLogo";
 
 const RadioCard = ({ data = [] }) => {
   const dispatch = useDispatch();
@@ -136,7 +137,11 @@ const RadioCard = ({ data = [] }) => {
               >
                 <View style={styles.identity}>
                   <View style={styles.logoBox}>
-                    {avatar ? (
+                    {isPscOfficial(item?.userId) ? (
+                      // client: the PSC channel shows the PSC mark (dark
+                      // star on gold), not the account avatar
+                      <PscChannelLogo size={40} borderRadius={8} style={styles.image} />
+                    ) : avatar ? (
                       <Image source={{ uri: avatar }} style={styles.image} />
                     ) : (
                       <View
@@ -159,7 +164,9 @@ const RadioCard = ({ data = [] }) => {
                         <CustomText
                           label="NEW"
                           fontSize={10}
-                          fontFamily={fonts.semiBold}
+                          // client: italic
+                          fontFamily={fonts.semiBoldItalic}
+                          fontStyle="italic"
                           color={COLORS.white}
                           marginTop={(7 - 14) / 2}
                           marginBottom={(7 - 14) / 2}

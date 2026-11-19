@@ -54,6 +54,7 @@ const ChatFooter = ({
   recordSignal, // bump to start a voice recording (voice reply chip)
   mentionRanges = [], // "@" mentions in the text: [{ user, offset, length }]
   onPickMention, // (user) => insert the picked person
+  mentionPeople, // conversation members — always-available "@" candidates
 }) => {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -201,6 +202,7 @@ const ChatFooter = ({
         // inner #121212 r28 pad 12), floating 8 above the chat bar
         <MentionCard
           style={styles.mentionCard}
+          extraPeople={mentionPeople}
           query={mentionQuery}
           onSelect={(u) => {
             onPickMention?.(u);

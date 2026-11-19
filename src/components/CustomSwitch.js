@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Platform, StyleSheet, Switch, View } from "react-native";
+import { AppState, Animated, NativeModules, Platform, StyleSheet, Switch, View } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
 import { COLORS } from "../utils/COLORS";
 
@@ -19,6 +19,56 @@ import { COLORS } from "../utils/COLORS";
 
 const IOS = Platform.OS === "ios";
 const IOS_26 = IOS && parseInt(String(Platform.Version), 10) >= 26;
+
+// When the user has Settings › Accessibility › Display & Text Size ›
+// On/Off Labels enabled, iOS draws its own | / O marks on the switch, and
+// drawing ours too doubles them (client's TestFlight screenshots). The native
+// PSCAccessibility module (ios/PrivateSocialClub/GetCurrentLocation.m)
+// reports the setting. Our marks are only drawn once the answer is known and
+// is "off", so there is never a moment with both. Without the module (an old
+// native build / Android) we keep drawing ours.
+let systemDrawsLabels = null; // null = not read yet; cached across switches
+let pendingRead = null;
+const readSystemLabels = () => {
+  if (!pendingRead) {
+    pendingRead = (async () => {
+      try {
+        const mod = NativeModules.PSCAccessibility;
+        if (!mod?.isOnOffSwitchLabelsEnabled) return false;
+        return !!(await mod.isOnOffSwitchLabelsEnabled());
+      } catch (e) {
+        return false;
+      }
+    })().then((v) => {
+      systemDrawsLabels = v;
+      pendingRead = null;
+      return v;
+    });
+  }
+  return pendingRead;
+};
+// true while our marks must NOT be drawn (system draws them / not known yet)
+const useHideOwnLabels = () => {
+  const [hide, setHide] = useState(systemDrawsLabels !== false);
+  useEffect(() => {
+    if (!IOS) return undefined;
+    let alive = true;
+    const refresh = () =>
+      readSystemLabels().then((v) => {
+        if (alive) setHide(v);
+      });
+    refresh();
+    // the setting can change while the app is in the background
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active") refresh();
+    });
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
+  return hide;
+};
 
 // iOS 26 draws the (Liquid Glass) switch 64pt wide, but React Native still
 // lays it out with the old 51pt box, so it spills 13pt past its slot and gets
@@ -46,6 +96,7 @@ const CustomSwitch = ({
   const on = !!value;
 
   const [touching, setTouching] = useState(false);
+  const hideOwnLabels = useHideOwnLabels();
   const labelOpacity = useRef(new Animated.Value(1)).current;
 
   // hide while touched / while the knob is moving, then fade back in
@@ -94,7 +145,7 @@ const CustomSwitch = ({
         thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
       />
 
-      {IOS && (
+      {IOS && !hideOwnLabels && (
         <Animated.View
           pointerEvents="none"
           style={[

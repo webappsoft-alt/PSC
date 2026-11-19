@@ -1,3 +1,4 @@
+import { PSC_TOPIC_NAMES } from "../../../utils/feedTopics";
 import { useNavigation } from "@react-navigation/native";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -31,17 +32,7 @@ import EventDetailCard from "./molecules/EventDetailCard";
 import EventDetailCardSkeleton from "./molecules/EventDetailCardSkeleton";
 import FilterModal from "./molecules/FilterModal";
 
-const TAB_NAMES = [
-  "Technology",
-  "Politics",
-  "Sports",
-  "Music",
-  "Entertainment",
-  "Fashion",
-  "Food",
-  "Gaming",
-  "Health",
-];
+const TAB_NAMES = PSC_TOPIC_NAMES;
 
 const SORT_LABELS = {
   latest: "Latest",

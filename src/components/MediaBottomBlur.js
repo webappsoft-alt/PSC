@@ -65,23 +65,12 @@ const MediaBottomBlur = ({
   );
 
   let blurred = null;
-  if (Platform.OS === "ios") {
-    // patched BlurView: tint-free (keeps the media's colours) and progressive
-    // — five stacked blurs whose radius ramps from 0 at the inner edge to
-    // `blurRadius` at the outer edge, the Figma "progressive background
-    // blur". No masked copy of the media, so no smeared double image.
-    blurred = (
-      <BlurView
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-        blurType="dark"
-        tintFree
-        blurAmount={blurRadius}
-        progressiveDirection={top ? "top" : "bottom"}
-        progressiveStart={0}
-      />
-    );
-  } else if (!isVideo && uri) {
+  // Images (both platforms): a pure Gaussian copy of the image revealed
+  // through the eased mask. On iOS the patched-BlurView path lost its
+  // progressive mask inside the feed card and showed an evenly blurred band
+  // with a hard top edge (client screenshot) — this path always ramps
+  // smoothly from clear to blurred, like iOS's own progressive blur.
+  if (!isVideo && uri) {
     blurred = (
       <MaskedView style={StyleSheet.absoluteFill} maskElement={mask}>
         <Image

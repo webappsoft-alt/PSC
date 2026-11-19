@@ -1,3 +1,4 @@
+import { PSC_TOPIC_NAMES } from "../../../../utils/feedTopics";
 import { useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -27,17 +28,7 @@ import SearchCardSkeleton from "./SearchCardSkeleton";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import TopicChips from "./TopicChips";
 
-export const TAB_NAMES = [
-  "Technology",
-  "Politics",
-  "Sports",
-  "Music",
-  "Entertainment",
-  "Fashion",
-  "Food",
-  "Gaming",
-  "Health",
-];
+export const TAB_NAMES = PSC_TOPIC_NAMES;
 
 const PostTab = ({ isActive }) => {
   const { colors, isDark } = useTheme();

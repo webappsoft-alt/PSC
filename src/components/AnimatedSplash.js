@@ -2,7 +2,7 @@
  * Animated launch screen — Figma › Social Feed › SplashScreen (2319:3527)
  * → SplashScreen_2 (2319:3551).
  *
- * Starts exactly where the native launch screen ends (black, white 80pt star
+ * Starts exactly where the native launch screen ends (black, gold 80pt star
  * centred), fades in the dark tile grid, then morphs into the second frame:
  * the tiles turn white 6 % and re-flow, the star travels to its tile while
  * turning gold, the wordmark and the copyright fade in. Then it fades out
@@ -80,7 +80,7 @@ const AnimatedSplash = ({ onFinish }) => {
   const cx = W / 2 - 187.5;
   const cy = H / 2 - 406;
 
-  // the native launch screen (same black + white star) stays up until this
+  // the native launch screen (same black + gold star) stays up until this
   // view is on screen, then hands over without a gap
   const start = () => {
     const t0 = T.grid;
@@ -114,7 +114,6 @@ const AnimatedSplash = ({ onFinish }) => {
     top: interpolate(p.value, [0, 1], [H / 2 - 40, cy + 158]),
     transform: [{ rotate: `${interpolate(p.value, [0, 1], [0, 90])}deg` }],
   }));
-  const goldStyle = useAnimatedStyle(() => ({ opacity: p.value }));
   const titleStyle = useAnimatedStyle(() => ({
     opacity: title.value,
     transform: [{ translateY: interpolate(title.value, [0, 1], [12, 0]) }],
@@ -135,15 +134,12 @@ const AnimatedSplash = ({ onFinish }) => {
         <Tile key={`${r}-${c}`} r={r} c={c} p={p} grid={grid} cx={cx} cy={cy} />
       ))}
 
+      {/* client (Nov 2026): the star is gold from the native launch screen
+          on (bootsplash logo tinted #A19375) — no white → gold cross-fade */}
       <Animated.View style={[styles.star, starStyle]}>
         <Svg width={80} height={80} viewBox="0 0 80 80">
-          <Path d={STAR} fill="#FFFFFF" />
+          <Path d={STAR} fill={GOLD} />
         </Svg>
-        <Animated.View style={[StyleSheet.absoluteFill, goldStyle]}>
-          <Svg width={80} height={80} viewBox="0 0 80 80">
-            <Path d={STAR} fill={GOLD} />
-          </Svg>
-        </Animated.View>
       </Animated.View>
 
       {/* wordmark — Figma frame 2390:8155 at (77, 303), 209 × 118, gap 20 */}

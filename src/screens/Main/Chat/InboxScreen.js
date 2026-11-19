@@ -161,12 +161,23 @@ const InboxScreen = ({ route }) => {
   const cameraRef = useRef(null);
 
   const otherUser = route?.params?.otherUser || null;
+  // header "CEO at [logo] Nvidia": the current Career experience picked from
+  // the company directory (same rule as the creator summary)
+  const otherCurrentExp =
+    (Array.isArray(otherInfo?.experiences) ? otherInfo.experiences : []).find(
+      (e) => e?.current && e?.company,
+    ) || null;
+  // Figma: city only ("Los Angeles")
+  const otherLocation = otherInfo?.location?.city || otherInfo?.location?.country || null;
   const recipientId = route?.params?.recipientId; // This is the user ID of the other person
   const recipientName = route?.params?.recipientName || "Chat";
   const conversationId = route?.params?.conversationId; // Optional, can be derived or passed
   // Group / Circle chat: messages go to the conversation, not one person
   const isGroup = !!route?.params?.isGroup && !!conversationId;
   const memberCount = route?.params?.memberCount;
+  // "@" candidates always offered in this chat: the group's members, or the
+  // 1-on-1 counterpart (the people you follow are merged in by MentionList)
+  const routeMembers = route?.params?.members;
   const target = isGroup
     ? { conversation_id: conversationId }
     : { participant_id: recipientId };
@@ -679,8 +690,10 @@ const InboxScreen = ({ route }) => {
               ? `${otherInfo.firstName}${otherInfo?.age ? `, ${otherInfo.age}` : ""}`
               : recipientName
           }
-          subtitle={isGroup ? (memberCount ? `${memberCount} members` : undefined) : otherInfo?.occupation?.jobTitle}
-          company={isGroup ? undefined : otherInfo?.occupation?.company}
+          subtitle={isGroup ? (memberCount ? `${memberCount} members` : undefined) : otherCurrentExp?.title || otherInfo?.occupation?.jobTitle}
+          location={isGroup ? undefined : otherLocation}
+          company={isGroup ? undefined : otherCurrentExp?.companyName}
+          companyLogo={isGroup ? undefined : otherCurrentExp?.companyLogo}
           online={!isGroup && (otherInfo?.status === "online" || (otherInfo?.status === undefined && !!otherInfo?.isOnline))}
           onVoiceCall={comingSoon("Voice calling")}
           onVideoCall={comingSoon("Video calling")}
@@ -703,6 +716,13 @@ const InboxScreen = ({ route }) => {
           // item={item}
           setInputText={handleTyping}
           mentionRanges={inputRanges}
+          mentionPeople={
+            isGroup
+              ? (routeMembers || []).filter((m) => m?._id && String(m._id) !== String(userId))
+              : otherInfo?._id
+              ? [otherInfo]
+              : []
+          }
           onPickMention={(user) => {
             if (!user?._id) return;
             setInputText((t) => insertMention(t, user));

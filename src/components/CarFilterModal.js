@@ -18,8 +18,8 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 import ReactNativeHapticFeedback from "react-native-haptic-feedback";
-import { findTopic } from "../utils/feedTopics";
-import TopicLottie from "./TopicLottie";
+import { findTopic, PSC_TOPIC_OPTIONS } from "../utils/feedTopics";
+import TopicLottie, { useDeferredReady } from "./TopicLottie";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import fonts from "../assets/fonts";
 import { Images } from "../assets/images";
@@ -34,19 +34,12 @@ import Icons from "./Icons";
 import { useTheme } from "../contexts/ThemeContext";
 
 // Fallback default topics (used when no data is passed)
-const DEFAULT_FILTERS = [
-  { name: "Technology", image: Images.Topis1 },
-  { name: "Politics", image: Images.Topis2 },
-  { name: "Sports", image: Images.Topis3 },
-  { name: "Music", image: Images.Topis4 },
-  { name: "Entertainment", image: Images.Topis5 },
-  { name: "Fashion", image: Images.Topis6 },
-  { name: "Food", image: Images.Topis7 },
-  { name: "Gaming", image: Images.Topis8 },
-  { name: "Health", image: Images.Topis9 },
-];
+const DEFAULT_FILTERS = PSC_TOPIC_OPTIONS;
 
 const ROW_HEIGHT = 64;
+// first-open icon mounting (Viral SelectionModal ICONS_PER_FRAME)
+const ICONS_PER_FRAME = 2;
+let topicIconsWarmed = false;
 
 const haptic = (type) =>
   ReactNativeHapticFeedback.trigger(type, {
@@ -80,6 +73,7 @@ function DraggableTopicRow({
   enabled,
   onToggle,
   lottieReady,
+  playing,
   styles,
   colors,
 }) {
@@ -150,12 +144,15 @@ function DraggableTopicRow({
         </View>
       </GestureDetector>
       <View style={[styles.row, { flex: 1 }]}>
-        <TopicLottie name={item.name} ready={lottieReady} />
+        <TopicLottie name={item.name} ready={lottieReady} playing={playing} loop={false} />
+        {/* Figma Select-Topic-Feed row: Poppins Bold Italic 14, -4%, UPPERCASE */}
         <CustomText
           label={item.name}
           color={colors.text}
-          fontFamily={fonts.medium}
-          fontSize={16}
+          fontFamily={fonts.BoldItalic}
+          fontSize={14}
+          letterSpacing={-0.56}
+          textTransform="uppercase"
           marginLeft={12}
           numberOfLines={1}
         />
@@ -188,8 +185,23 @@ const FilterModal = ({
 
   const [selectedIndex, setSelectedIndex] = useState(null);
   // Topic Lotties load from asset URIs off the main thread (see
-  // topicAnimationSource), so they can mount on the first frame like Viral.
-  const lottieReady = true;
+  // topicAnimationSource). First open: wait for the slide-in, then mount a
+  // couple of icons per frame (Viral SelectionModal); later opens have the
+  // compositions cached and mount them all at once.
+  const sheetSettled = useDeferredReady(isVisible, 320);
+  const [mountedIcons, setMountedIcons] = useState(() =>
+    topicIconsWarmed ? Number.POSITIVE_INFINITY : 0,
+  );
+  const lottieReady = sheetSettled || topicIconsWarmed;
+  // the one icon that animates: the row just switched on / the picked row
+  const [playingName, setPlayingName] = useState(null);
+  const playingTimer = useRef(null);
+  const playOnce = useCallback((name) => {
+    if (playingTimer.current) clearTimeout(playingTimer.current);
+    setPlayingName(name);
+    playingTimer.current = setTimeout(() => setPlayingName(null), 1600);
+  }, []);
+  useEffect(() => () => playingTimer.current && clearTimeout(playingTimer.current), []);
   const dragIndex = useSharedValue(-1);
   const dragTranslation = useSharedValue(0);
   const [dragging, setDragging] = useState(false);
@@ -213,11 +225,30 @@ const FilterModal = ({
       ? data
       : DEFAULT_FILTERS;
 
+  useEffect(() => {
+    if (!isVisible) {
+      if (!topicIconsWarmed) setMountedIcons(0);
+      return undefined;
+    }
+    if (topicIconsWarmed || !sheetSettled) return undefined;
+    if (mountedIcons >= items.length) {
+      topicIconsWarmed = true;
+      return undefined;
+    }
+    const frame = requestAnimationFrame(() =>
+      setMountedIcons((n) => Math.min(n + ICONS_PER_FRAME, items.length)),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [isVisible, sheetSettled, mountedIcons, items.length]);
+
   const handleItemToggle = (item) => {
     if (toggleMode) {
-      onToggleItem?.(item.name, !enabledItems.includes(item.name));
+      const on = !enabledItems.includes(item.name);
+      if (on) playOnce(item.name);
+      onToggleItem?.(item.name, on);
       return;
     }
+    playOnce(item.name);
     if (multiSelect) {
       const isSelected = localSelectedItems.includes(item.name);
       if (isSelected) {
@@ -281,10 +312,6 @@ const FilterModal = ({
           >
             <GlassBackButton
               onPress={onDisable}
-              fill={colors.white04}
-              iconSize={26}
-              color={colors.text}
-              fullOpacity
               style={styles.backIcon}
             />
 
@@ -307,6 +334,9 @@ const FilterModal = ({
           <ScrollView
             showsVerticalScrollIndicator={false}
             scrollEnabled={!dragging}
+            // the last row must clear the home indicator (client: "the
+            // bottom is not well put")
+            contentContainerStyle={{ paddingBottom: insests.bottom + 16 }}
           >
             {toggleMode
               ? items.map((f, idx) => (
@@ -320,8 +350,12 @@ const FilterModal = ({
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                     enabled={enabledItems.includes(f.name)}
-                    onToggle={(name, on) => onToggleItem?.(name, on)}
-                    lottieReady={lottieReady}
+                    onToggle={(name, on) => {
+                      if (on) playOnce(name);
+                      onToggleItem?.(name, on);
+                    }}
+                    lottieReady={lottieReady && idx < mountedIcons}
+                    playing={playingName === f.name}
                     styles={styles}
                     colors={colors}
                   />
@@ -339,7 +373,12 @@ const FilterModal = ({
                 >
                   <View style={styles.row}>
                     {findTopic(f?.name)?.animation ? (
-                      <TopicLottie name={f.name} ready={lottieReady} />
+                      <TopicLottie
+                        name={f.name}
+                        ready={lottieReady && idx < mountedIcons}
+                        playing={playingName === f.name}
+                        loop={false}
+                      />
                     ) : f?.image ? (
                       <Image source={f.image} style={styles.filterImage} />
                     ) : null}

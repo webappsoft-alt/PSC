@@ -1,3 +1,4 @@
+import { PSC_TOPIC_OPTIONS } from "../../../utils/feedTopics";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
@@ -199,17 +200,7 @@ const validateForm = (
   return errors;
 };
 
-const topics = [
-  { name: "Technology", image: Images.Topis1 },
-  { name: "Politics", image: Images.Topis2 },
-  { name: "Sports", image: Images.Topis3 },
-  { name: "Music", image: Images.Topis4 },
-  { name: "Entertainment", image: Images.Topis5 },
-  { name: "Fashion", image: Images.Topis6 },
-  { name: "Food", image: Images.Topis7 },
-  { name: "Gaming", image: Images.Topis8 },
-  { name: "Health", image: Images.Topis9 },
-];
+const topics = PSC_TOPIC_OPTIONS;
 
 const ageLimt = [
   { name: "+14", subtitle: "14 years old or older" },
@@ -1813,9 +1804,20 @@ const CreatePost = ({ route }) => {
                 <CustomDatePicker
                   withLabel={"STARTING DATE"}
                   value={startDate}
-                  setValue={(date) => setStartDate(date)}
+                  setValue={(date) => {
+                    setStartDate(date);
+                    // keep the range valid: the poll can't end before it starts
+                    setEndDate((end) =>
+                      end && date && new Date(end) < new Date(date) ? date : end,
+                    );
+                  }}
                   placeholder="Select Date"
                   type="date"
+                  // the poll can't start in the past (client: the picker let
+                  // you move the day back)
+                  minDate={new Date()}
+                  // client: no full month name ("Nov 16, 2026")
+                  dateFormat="MMM D, YYYY"
                   leadingIcon={{
                     name: "event",
                     filled: true,
@@ -1843,6 +1845,7 @@ const CreatePost = ({ route }) => {
                   placeholder="Select Date"
                   type="date"
                   minDate={startDate || new Date()}
+                  dateFormat="MMM D, YYYY"
                   leadingIcon={{
                     name: "event",
                     filled: true,

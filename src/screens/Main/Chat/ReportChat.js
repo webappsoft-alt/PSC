@@ -184,7 +184,6 @@ const ReportChat = () => {
             size={48}
             iconSize={27}
             color={colors.text}
-            fullOpacity
           />
           <View style={styles.shrink}>
             <CustomButton title="Submit Report" height={48} fontSize={18} loading={sending} disabled={!canSubmit} onPress={submit} />

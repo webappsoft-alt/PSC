@@ -1,3 +1,4 @@
+import { PSC_TOPIC_NAMES } from "./feedTopics";
 import moment from "moment";
 
 /**
@@ -38,17 +39,7 @@ export const RECOMMEND_OPTIONS = ["Yes", "Neutral", "No"];
 export const LETTER_RANGES = ["A-C", "D-F", "G-I", "J-L", "M-O", "P-R", "S-U", "V-Z"];
 
 // Job marketplace (Figma Job-Listing) — topic chips + status filters
-export const JOB_TOPICS = [
-  "Technology",
-  "Politics",
-  "Sports",
-  "Music",
-  "Fashion",
-  "Entertainment",
-  "Gaming",
-  "Food",
-  "Health",
-];
+export const JOB_TOPICS = PSC_TOPIC_NAMES;
 export const JOB_LEVELS = ["Junior", "Mid-Level", "Senior", "Lead", "Executive"];
 export const WORK_MODES = ["On-site", "Remote", "Hybrid"];
 export const SALARY_PERIODS = ["Yearly", "Monthly", "Hourly"];

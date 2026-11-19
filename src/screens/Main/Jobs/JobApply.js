@@ -72,6 +72,25 @@ const sameLanguage = (a, b) =>
  * The resume is pre-filled from Settings › My Documents; a file uploaded
  * here goes with this application only.
  */
+// scroll to y on the ScreenWrapper's AnimatedKeyboardAwareScrollView ref —
+// it only exposes scrollToPosition(x, y, animated), not scrollTo(), and
+// scrollRef.current?.scrollTo?.() silently no-ops since scrollTo is undefined
+const scrollRefTo = (ref, y, animated = false) => {
+  try {
+    const comp = ref.current;
+    if (!comp) return;
+    if (typeof comp.scrollTo === "function") comp.scrollTo({ y, animated });
+    else if (typeof comp.scrollToPosition === "function") comp.scrollToPosition(0, y, animated);
+    else if (typeof comp.getNode === "function") {
+      const node = comp.getNode();
+      if (typeof node?.scrollTo === "function") node.scrollTo({ y, animated });
+      else if (typeof node?.scrollToPosition === "function") node.scrollToPosition(0, y, animated);
+    }
+  } catch (e) {
+    console.log("scrollRefTo error", e);
+  }
+};
+
 const JobApply = ({ route }) => {
   const navigation = useNavigation();
   const jobId = route?.params?.jobId;
@@ -95,13 +114,25 @@ const JobApply = ({ route }) => {
   const leaving = useRef(false); // set once the application is sent
   const stepFade = useRef(new Animated.Value(1)).current;
 
-  // step change: top of the page, content fades in (TabFade timing)
+  // step change: the page cross-dissolves — it fades out where it is, the
+  // step swaps and the scroll resets to the top while nothing is visible,
+  // then the new step fades in (below). Blanking it instantly and jumping to
+  // the top in the same frame is what read as a jerk.
   const goToStep = (next) => {
-    stepFade.setValue(0);
-    setStep(next);
-    scrollRef.current?.scrollTo?.({ y: 0, animated: false });
-    Animated.timing(stepFade, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    if (next === step) return;
+    Animated.timing(stepFade, { toValue: 0, duration: 140, useNativeDriver: true }).start(
+      ({ finished }) => {
+        if (!finished) return;
+        scrollRefTo(scrollRef, 0, false);
+        setStep(next);
+      },
+    );
   };
+
+  // fades the step in once its content is mounted (TabFade timing)
+  useEffect(() => {
+    Animated.timing(stepFade, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // back gesture / hardware back on step 2 → step 1, not out of the form
   useEffect(() => {
@@ -177,10 +208,7 @@ const JobApply = ({ route }) => {
     ) {
       setTried(true);
       ToastMessage("Please answer every question to apply", "error");
-      scrollRef.current?.scrollTo?.({
-        y: Math.max(0, questionsY.current - 120),
-        animated: true,
-      });
+      scrollRefTo(scrollRef, Math.max(0, questionsY.current - 120), true);
       return;
     }
     try {
@@ -266,10 +294,10 @@ const JobApply = ({ route }) => {
         {!ready ? (
           <DetailSkeleton />
         ) : (
-          <View style={styles.page}>
+          <Animated.View style={[styles.page, { opacity: stepFade }]}>
             <DetailHero {...jobHeroProps(job)} />
 
-            <Animated.View style={[styles.steps, { opacity: stepFade }]}>
+            <View style={styles.steps}>
             {step === 1 && (
             <>
             {!!company?.description && (
@@ -462,8 +490,8 @@ const JobApply = ({ route }) => {
             </DetailSection>
             </>
             )}
-            </Animated.View>
-          </View>
+            </View>
+          </Animated.View>
         )}
       </ScreenWrapper>
 

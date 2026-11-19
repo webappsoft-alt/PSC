@@ -111,6 +111,7 @@ const AudioHeader = ({
                     fontFamily={fonts.medium}
                     fontSize={14}
                     color={AUDIO.white}
+                    numberOfLines={1}
                     marginTop={fitLine(14, 10)}
                     marginBottom={fitLine(14, 10)}
                   />
@@ -129,7 +130,7 @@ const AudioHeader = ({
               ) : null}
               <TouchableOpacity activeOpacity={0.7} onPress={onMore} style={styles.more}>
                 <GlassFill fill={AUDIO.white04} />
-                <Glyph family={MS} name="more_vert" size={16} color={AUDIO.white64} />
+                <Glyph family={MS} name="more_vert" size={24} color={AUDIO.white64} />
               </TouchableOpacity>
             </View>
           </View>
@@ -209,40 +210,41 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   topRow: { height: 40, flexDirection: "row", alignItems: "center", gap: 12 },
-  identityWrap: { flex: 1, height: 32, flexDirection: "row", alignItems: "center" },
+  // client: avatar + right buttons the same 40pt as the back button
+  identityWrap: { flex: 1, height: 40, flexDirection: "row", alignItems: "center", gap: 8 },
   spaceBetween: { justifyContent: "space-between" },
   identity: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
   avatarRing: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 100,
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatar: { width: 24, height: 24, borderRadius: 100 },
+  avatar: { width: 32, height: 32, borderRadius: 100 },
   names: { gap: 6, flexShrink: 1 },
   nameRow: { height: 14, flexDirection: "row", alignItems: "center", gap: 4 },
   shrink: { flexShrink: 1 },
-  actions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  actions: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
+  // hugs its label (a fixed 64pt cropped "Follow" to "Follo / w")
   follow: {
-    width: 64,
-    height: 32,
+    height: 40,
     borderRadius: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
   },
   following: {
-    width: 36,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
   more: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 100,
     alignItems: "center",
     justifyContent: "center",

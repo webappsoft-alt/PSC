@@ -12,16 +12,11 @@ export const HEADER_ICON_OPACITY = {
   pressed: 1,
 };
 
-function withGlyphOpacity(children, opacity) {
-  return React.Children.map(children, (child) => {
-    if (!React.isValidElement(child)) return child;
-    // Badge dots stay full strength; fading a parent View blanks SVG/images on iOS.
-    if (child.type === View) return child;
-    return React.cloneElement(child, {
-      style: [child.props.style, { opacity }],
-    });
-  });
-}
+// The opacity goes on the glyph container itself. The old per-child clone
+// skipped View children ("badge dots stay full strength") — but
+// GlassBackButton wraps its Icons glyph in a sizing View, so the 64% idle
+// opacity never actually applied and every back chevron rendered 100% white
+// (the client's "default 64%" complaint). No current caller draws a badge.
 
 export default function HeaderIconButton({
   children,
@@ -57,8 +52,8 @@ export default function HeaderIconButton({
       style={style}
     >
       {backdrop}
-      <View pointerEvents="none" collapsable={false} style={styles.icon}>
-        {withGlyphOpacity(children, opacity)}
+      <View pointerEvents="none" collapsable={false} style={[styles.icon, { opacity }]}>
+        {children}
       </View>
     </Pressable>
   );

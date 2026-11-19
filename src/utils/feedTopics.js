@@ -11,16 +11,31 @@ export const FEED_TOPICS_CHANGED_EVENT = "FEED_TOPICS_CHANGED";
 
 // Same list / order as the backend `getPostsSchema` topic enum used by the feed
 export const PSC_TOPICS = [
+  // Figma "Select-Topic-Feed" order; Travel / Automotive / Animals /
+  // Education Lotties ported from Viral (automobile.anim → automotive).
   { name: "Technology", emoji: "💡", animation: require("../assets/animations/topics/technology.anim") },
   { name: "Politics", emoji: "🏛️", animation: require("../assets/animations/topics/politics.anim") },
+  // Figma Select-Topic-Feed (Nov 2026): FINANCE after Politics — no Lottie
+  // in the Viral set yet, TopicLottie falls back to the emoji
+  { name: "Finance", emoji: "💰" },
+  { name: "Travel", emoji: "🌍", animation: require("../assets/animations/topics/travel.anim") },
   { name: "Sports", emoji: "🏀", animation: require("../assets/animations/topics/sports.anim") },
+  { name: "Automotive", emoji: "🚗", animation: require("../assets/animations/topics/automotive.anim") },
   { name: "Music", emoji: "🎵", animation: require("../assets/animations/topics/music.anim") },
-  { name: "Fashion", emoji: "👗", animation: require("../assets/animations/topics/fashion.anim") },
   { name: "Entertainment", emoji: "🎬", animation: require("../assets/animations/topics/entertainment.anim") },
-  { name: "Gaming", emoji: "🎮", animation: require("../assets/animations/topics/gaming.anim") },
+  { name: "Fashion", emoji: "👗", animation: require("../assets/animations/topics/fashion.anim") },
+  { name: "Animals", emoji: "🐱", animation: require("../assets/animations/topics/animals.anim") },
   { name: "Food", emoji: "🍔", animation: require("../assets/animations/topics/food.anim") },
+  { name: "Gaming", emoji: "🎮", animation: require("../assets/animations/topics/gaming.anim") },
+  { name: "Education", emoji: "🎓", animation: require("../assets/animations/topics/education.anim") },
   { name: "Health", emoji: "💚", animation: require("../assets/animations/topics/health.anim") },
 ];
+
+// The ONE topic catalogue for the whole app (feed chips, search, shorts,
+// events, jobs, and every topic picker); same list as the backend enums.
+export const PSC_TOPIC_NAMES = PSC_TOPICS.map((t) => t.name);
+// picker rows ({ name }) — FilterModal draws each topic's animated icon
+export const PSC_TOPIC_OPTIONS = PSC_TOPICS.map((t) => ({ name: t.name }));
 
 /**
  * Topic Lotties, loaded the way Viral does it (assets/images/topics/index.ts):
@@ -53,6 +68,7 @@ export function prefetchTopicAnimations() {
       .then(() =>
         Promise.all(
           PSC_TOPICS.map(async (topic) => {
+            if (!topic.animation) return;
             const uri = Image.resolveAssetSource(topic.animation)?.uri;
             if (!uri) return;
             if (!/^https?:/i.test(uri)) {

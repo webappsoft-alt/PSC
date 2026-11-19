@@ -22,6 +22,7 @@ const CustomDatePicker = ({
   type = "date",
   maxDate,
   minDate,
+  dateFormat, // moment format for the shown date (default "MMMM D, YYYY")
   backgroundColor,
   defaultError,
   width,
@@ -117,7 +118,7 @@ const CustomDatePicker = ({
                 label={
                   value && moment(value).isValid()
                     ? moment(value).format(
-                        type == "date" ? "MMMM D, YYYY" : "h:mm A",
+                        type == "date" ? dateFormat || "MMMM D, YYYY" : "h:mm A",
                       )
                     : placeholder
                 }

@@ -1,3 +1,4 @@
+import { PSC_TOPIC_OPTIONS } from "../../../utils/feedTopics";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import moment from "moment";
 import { useEffect, useMemo, useState } from "react";
@@ -31,17 +32,7 @@ import SelectLocation from "./molecules/SelectLocation";
 import SwitchOption from "./molecules/SwitchOption";
 import TimingDetails from "./molecules/TimingDetails";
 
-const topics = [
-  { name: "Technology", image: Images.Topis1 },
-  { name: "Politics", image: Images.Topis2 },
-  { name: "Sports", image: Images.Topis3 },
-  { name: "Music", image: Images.Topis4 },
-  { name: "Entertainment", image: Images.Topis5 },
-  { name: "Fashion", image: Images.Topis6 },
-  { name: "Food", image: Images.Topis7 },
-  { name: "Gaming", image: Images.Topis8 },
-  { name: "Health", image: Images.Topis9 },
-];
+const topics = PSC_TOPIC_OPTIONS;
 
 const ageRatingFilters = [
   { name: "Kids", subtitle: "Under 10 years old" },

@@ -1,3 +1,4 @@
+import { PSC_TOPIC_NAMES } from "../../../utils/feedTopics";
 import { BlurView } from "@react-native-community/blur";
 import {
   useIsFocused,
@@ -944,17 +945,7 @@ const ShortWithId = () => {
               isBlur
               setTab={setTab}
               borderRadius={8}
-              tabNames={[
-                "Technology",
-                "Politics",
-                "Sports",
-                "Music",
-                "Fashion",
-                "Entertainment",
-                "Gaming",
-                "Food",
-                "Health",
-              ]}
+              tabNames={PSC_TOPIC_NAMES}
             />
           </View>
         </View>

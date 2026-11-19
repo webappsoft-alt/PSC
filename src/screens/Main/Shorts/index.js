@@ -1,3 +1,4 @@
+import { PSC_TOPIC_NAMES } from "../../../utils/feedTopics";
 import { BlurView } from "@react-native-community/blur";
 import {
   useIsFocused,
@@ -46,17 +47,7 @@ import ShortsSkeleton from "./molecules/ShortsSkeleton";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
-const TAB_NAMES = [
-  "Technology",
-  "Politics",
-  "Sports",
-  "Music",
-  "Fashion",
-  "Entertainment",
-  "Gaming",
-  "Food",
-  "Health",
-];
+const TAB_NAMES = PSC_TOPIC_NAMES;
 
 const emojiData = [
   {

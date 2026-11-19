@@ -1,6 +1,6 @@
 import LottieView from "lottie-react-native";
-import { memo, useEffect, useState } from "react";
-import { InteractionManager, View } from "react-native";
+import { memo, useEffect, useRef, useState } from "react";
+import { InteractionManager, Text, View } from "react-native";
 import {
   areTopicAnimationsReady,
   findTopic,
@@ -18,7 +18,11 @@ import {
  *  - mounts the Lottie only once the sheet's open animation has finished
  *    (`ready`), keeping the same 24px slot empty until then.
  */
-const TopicLottie = ({ name, size = 24, ready = true, style }) => {
+// Viral SelectionModal › TopicRowIcon: only the row being interacted with
+// plays; every other icon is held on its first frame. Thirteen looping
+// Lotties kept the iOS main thread at ~15 fps ("Pick Your Interests" froze).
+const TopicLottie = ({ name, size = 24, ready = true, playing = false, loop = true, style }) => {
+  const lottieRef = useRef(null);
   // Normally already true (prefetched at app start); fallback for an open
   // that beats the prefetch.
   const [filesReady, setFilesReady] = useState(areTopicAnimationsReady);
@@ -31,17 +35,41 @@ const TopicLottie = ({ name, size = 24, ready = true, style }) => {
     };
   }, [filesReady]);
 
+  const topic = findTopic(name);
   const animation = filesReady ? topicAnimationSource(name) : null;
-  if (!animation || !findTopic(name)) {
-    return <View style={[{ width: size, height: size }, style]} />;
+  useEffect(() => {
+    const view = lottieRef.current;
+    if (!view || !animation || !ready) return;
+    if (playing) {
+      view.play();
+      return;
+    }
+    // same animation, parked on its first frame
+    view.reset();
+    view.pause();
+  }, [playing, animation, ready]);
+  if (!animation || !topic) {
+    // topic without a Lottie yet (e.g. Travel / Automotive / Animals /
+    // Education): the Figma emoji in the same slot, instead of a blank box
+    return (
+      <View style={[{ width: size, height: size, alignItems: "center", justifyContent: "center" }, style]}>
+        {topic?.emoji ? (
+          <Text allowFontScaling={false} style={{ fontSize: size * 0.75, lineHeight: size }}>
+            {topic.emoji}
+          </Text>
+        ) : null}
+      </View>
+    );
   }
   return (
     <View style={[{ width: size, height: size }, style]}>
       {ready ? (
         <LottieView
+          ref={lottieRef}
           source={animation}
-          autoPlay
-          loop
+          autoPlay={playing}
+          loop={playing && loop}
+          progress={playing ? undefined : 0}
           cacheComposition
           style={{ width: size, height: size }}
         />

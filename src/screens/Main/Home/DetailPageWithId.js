@@ -828,7 +828,6 @@ const DetailPageWithId = ({ route }) => {
                 }
                 fill={colors.surfaceAlt}
                 color={colors.text}
-                fullOpacity
                 style={styles.backButton}
               />
               <View

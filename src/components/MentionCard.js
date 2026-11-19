@@ -16,7 +16,10 @@ import MentionList from "../screens/Main/PublishPost/molecules/MentionList";
  */
 /** keyboard height (0 when hidden) */
 const useKeyboardHeight = (enabled) => {
-  const [h, setH] = useState(0);
+  // the keyboard is usually already open when the card mounts (the "@" was
+  // typed with it up), and the listeners below only fire on the NEXT event —
+  // so seed with the current metrics or the card hides behind the keyboard
+  const [h, setH] = useState(() => (enabled && Keyboard.metrics?.()?.height) || 0);
   useEffect(() => {
     if (!enabled) return undefined;
     const show = Keyboard.addListener(
@@ -40,7 +43,7 @@ const useKeyboardHeight = (enabled) => {
  * margin, bottom inset + 16), riding above the keyboard while it's open —
  * render it at the screen root (not inside a scroll view).
  */
-const MentionCard = ({ query, onSelect, onClose, maxVisibleRows, style, floating = false }) => {
+const MentionCard = ({ query, onSelect, onClose, maxVisibleRows, style, floating = false, extraPeople }) => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardHeight(floating);
@@ -73,6 +76,7 @@ const MentionCard = ({ query, onSelect, onClose, maxVisibleRows, style, floating
           onSelect={onSelect}
           onClose={onClose}
           maxVisibleRows={rows}
+          extraPeople={extraPeople}
         />
       </View>
     </Reanimated.View>

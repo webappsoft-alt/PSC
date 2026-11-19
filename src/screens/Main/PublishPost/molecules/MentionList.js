@@ -21,7 +21,19 @@ const MAX_ROWS = 5;
 // one row: 40 avatar + 8 / 8 padding
 const ROW_H = 56;
 
-const MentionList = ({ query, onSelect, onClose, maxVisibleRows }) => {
+// does this user match what was typed after the "@"?
+const matchesQuery = (u, q) => {
+  if (!q) return true;
+  const needle = q.toLowerCase();
+  return (
+    `${u?.firstName || ""} ${u?.lastName || ""}`.toLowerCase().includes(needle) ||
+    (u?.username || "").toLowerCase().includes(needle)
+  );
+};
+
+// `extraPeople`: always-available candidates (the conversation's members in a
+// chat), shown first — the people you follow are merged in after them
+const MentionList = ({ query, onSelect, onClose, maxVisibleRows, extraPeople }) => {
   const { colors } = useTheme();
   const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,12 +52,18 @@ const MentionList = ({ query, onSelect, onClose, maxVisibleRows }) => {
         setPeople(res?.data?.data?.users || []);
       } catch (e) {
         if (id === requestId.current) setPeople([]);
+        // the members passed in still show on a failed request
       } finally {
         if (id === requestId.current) setLoading(false);
       }
     }, 250);
     return () => clearTimeout(timer);
   }, [query]);
+
+  // members first, then the people you follow, deduped by id
+  const members = (extraPeople || []).filter((u) => u?._id && matchesQuery(u, (query || "").trim()));
+  const memberIds = new Set(members.map((u) => String(u._id)));
+  const shown = [...members, ...people.filter((u) => u?._id && !memberIds.has(String(u._id)))];
 
   return (
     <View style={[styles.container, onClose && styles.cardContainer]}>
@@ -62,7 +80,7 @@ const MentionList = ({ query, onSelect, onClose, maxVisibleRows }) => {
               color={colors.text}
             />
             <CustomText
-              label={`${people.length}`}
+              label={`${shown.length}`}
               fontSize={16}
               letterSpacing={-0.32}
               fontFamily={fonts.medium}
@@ -80,16 +98,16 @@ const MentionList = ({ query, onSelect, onClose, maxVisibleRows }) => {
           color={colors.textSecondary}
         />
         <CustomText
-          label={`${people.length}`}
+          label={`${shown.length}`}
           fontSize={14}
           fontFamily={fonts.medium}
           color={colors.text}
         />
       </View>
       )}
-      {loading ? (
+      {loading && shown.length === 0 ? (
         [0, 1, 2].map((i) => <RowSkeleton key={i} colors={colors} />)
-      ) : people.length === 0 ? (
+      ) : shown.length === 0 ? (
         <CustomText
           label="No results found"
           fontSize={14}
@@ -101,7 +119,7 @@ const MentionList = ({ query, onSelect, onClose, maxVisibleRows }) => {
         // card (chat): everyone matching, scrolling past `maxVisibleRows`
         // (3 while the keyboard is up, so the card never reaches the header)
         <Rows scroll={!!maxVisibleRows} maxHeight={(maxVisibleRows || MAX_ROWS) * ROW_H}>
-        {people.slice(0, maxVisibleRows ? 50 : MAX_ROWS).map((u) => (
+        {shown.slice(0, maxVisibleRows ? 50 : MAX_ROWS).map((u) => (
           <TouchableOpacity
             key={u?._id}
             activeOpacity={0.7}

@@ -1,3 +1,4 @@
+import { PSC_TOPIC_OPTIONS } from "../../utils/feedTopics";
 import React, { useCallback, useEffect, useState } from "react";
 import {Image,
   ScrollView,
@@ -45,17 +46,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import Text from "../../components/ScaledText";
 
 // Constants
-const topics = [
-  { name: "Technology", image: Images.Topis1 },
-  { name: "Politics", image: Images.Topis2 },
-  { name: "Sports", image: Images.Topis3 },
-  { name: "Music", image: Images.Topis4 },
-  { name: "Entertainment", image: Images.Topis5 },
-  { name: "Fashion", image: Images.Topis6 },
-  { name: "Food", image: Images.Topis7 },
-  { name: "Gaming", image: Images.Topis8 },
-  { name: "Health", image: Images.Topis9 },
-];
+const topics = PSC_TOPIC_OPTIONS;
 
 const availableToOptions = [
   { name: "Public" },

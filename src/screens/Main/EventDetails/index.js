@@ -437,7 +437,6 @@ const EventDetail = ({ navigation }) => {
             <GlassBackButton
               onPress={() => navigation.goBack()}
               color={colors.text}
-              fullOpacity
             />
             <CustomText
               label={detail?.venueName || "Toscana"}

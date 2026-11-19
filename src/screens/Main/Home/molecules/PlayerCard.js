@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   Easing,
   Image,
   StyleSheet,
@@ -24,6 +25,7 @@ import { useDispatch, useSelector } from "react-redux";
 import fonts from "../../../../assets/fonts";
 import { Images } from "../../../../assets/images";
 import CustomText from "../../../../components/CustomText";
+import PscChannelLogo, { isPscOfficial } from "../../../../components/PscChannelLogo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import {
   setAudioUrl,
@@ -87,7 +89,16 @@ const PlayerCard = () => {
   const { colors, isDark } = useTheme();
 
   const animValue = useRef(new Animated.Value(isTabBarVisible ? 1 : 0)).current;
-  const tabBarHeight = 90 + insets.bottom;
+  // Bottom nav geometry (TabStack): offset = max(12, safe area − 4); the
+  // bar (60 tall) sits in a container with 10 padding + 10 margin, so its
+  // top edge is offset + 50; the floating "+" (60) sits on `offset`, top
+  // edge offset + 60. The mini player stays 8 above the higher of the two
+  // (was a hardcoded 90 + safe area → it floated ~26pt above the bar).
+  const navOffset = Math.max(12, (insets.bottom ?? 0) - 4);
+  const navBottom = 0;
+  const PLAYER_GAP = 8;
+  const aboveBar = navOffset + 50 + PLAYER_GAP; // bar showing
+  const aboveFab = navOffset + 60 + PLAYER_GAP; // bar hidden, "+" showing
   const mountedRef = useRef(true);
 
   // sound-wave animation state
@@ -120,9 +131,12 @@ const PlayerCard = () => {
     }).start();
   }, [isTabBarVisible, animValue]);
 
+  // 8 above the bar while it shows; when the bar hides on scroll the
+  // floating "+" takes that row and the player used to land on top of it
+  // (client screenshot) — then it stays 8 above the "+".
   const translateY = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -tabBarHeight],
+    outputRange: [-aboveFab, -aboveBar],
   });
 
   // drive the traveling wave while playing
@@ -217,16 +231,45 @@ const PlayerCard = () => {
       <Video
         key={`${audioUrl}-${playRequest}`}
         ref={videoRef}
-        source={{ uri: audioUrl }}
+        source={{
+          uri: audioUrl,
+          // lock screen / Control Center "Now Playing" card (client: like
+          // Apple Music) — title, author, artwork
+          metadata: {
+            title: playingRadioData?.title || "PSC Radio",
+            artist:
+              `${playingRadioData?.userId?.firstName || ""} ${playingRadioData?.userId?.lastName || ""}`.trim() ||
+              playingRadioData?.userId?.username ||
+              "PSC",
+            imageUri:
+              playingRadioData?.images?.[0] ||
+              playingRadioData?.userId?.profile?.avatar ||
+              undefined,
+          },
+        }}
         audioOnly
         paused={!isPlaying}
         muted={muted}
         ignoreSilentSwitch="ignore"
+        // keeps playing with the screen off / locked (needs UIBackgroundModes
+        // "audio" in Info.plist) and shows the lock screen controls
+        playInBackground
+        playWhenInactive
+        showNotificationControls
         progressUpdateInterval={250}
         onLoad={onRadioLoad}
         onProgress={onRadioProgress}
         onEnd={onRadioEnd}
         onError={onRadioError}
+        // play / pause pressed on the lock screen or Control Center: keep the
+        // app's state in step (only while the app isn't in front — in the
+        // app, our own buttons drive playback and buffering reports
+        // "not playing" for a moment)
+        onPlaybackStateChanged={({ isPlaying: nowPlaying }) => {
+          if (AppState.currentState !== "active" && nowPlaying !== isPlaying) {
+            dispatch(setPlaying(!!nowPlaying));
+          }
+        }}
         style={styles.engine}
       />
     ) : null;
@@ -253,9 +296,8 @@ const PlayerCard = () => {
           style={[
             styles.playerContainer,
             {
-              bottom: 0,
+              bottom: navBottom,
               overflow: "hidden",
-              marginBottom: isTabBarVisible ? 0 : insets.bottom,
               transform: [{ translateY }],
             },
           ]}
@@ -306,7 +348,9 @@ const PlayerCard = () => {
                 </Animated.View>
               )}
             </View>
-            {playingRadioData?.userId?.profile?.avatar ? (
+            {isPscOfficial(playingRadioData?.userId) ? (
+              <PscChannelLogo size={38} borderRadius={8} />
+            ) : playingRadioData?.userId?.profile?.avatar ? (
               <Image
                 source={{
                   uri: playingRadioData?.userId?.profile?.avatar,
@@ -362,10 +406,15 @@ const PlayerCard = () => {
               </View>
 
               <View style={styles.row}>
+                {/* one line like the TOP RADIOS card (Figma 14 Medium −0.5%);
+                    a wrapped title overflowed the 56 card onto the wave */}
                 <CustomText
                   label={playingRadioData?.title || "Untitled"}
                   fontFamily={fonts.medium}
+                  letterSpacing={-0.07}
                   color={colors.text}
+                  numberOfLines={1}
+                  containerStyle={{ flexShrink: 1 }}
                 />
               </View>
             </View>

@@ -1,3 +1,4 @@
+import { PSC_TOPIC_NAMES } from "../../../utils/feedTopics";
 import {
   useFocusEffect,
   useIsFocused,
@@ -55,17 +56,7 @@ import TrendingIndividual from "./molecules/TrendingIndividual";
 import QuestionModal from "../../../components/QuestionModal";
 import GiftModal from "../../../components/GiftModal";
 
-const TAB_NAMES = [
-  "Technology",
-  "Politics",
-  "Sports",
-  "Music",
-  "Fashion",
-  "Entertainment",
-  "Gaming",
-  "Food",
-  "Health",
-];
+const TAB_NAMES = PSC_TOPIC_NAMES;
 
 const areTopicListsEqual = (current = [], next = []) => {
   if (current.length !== next.length) return false;
